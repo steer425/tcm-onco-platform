@@ -16,7 +16,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="TCM 中藥腫瘤篩選平台 - 後台系統 API（目標零）",
     description="帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄",
-    version="1.7.1",
+    version="1.7.2",
 )
 
 ALLOWED_ORIGINS = [

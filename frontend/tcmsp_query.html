@@ -1211,7 +1211,9 @@ const CHANGELOG = [
 // that version's herb_query_site_template.html source at the time it shipped. Substituted at
 // build time from version_snapshots.json (a small standalone file kept alongside the template
 // so old snapshots never need recomputing -- new versions just append a new key).
-const VERSION_SNAPSHOTS = __VERSION_SNAPSHOTS_JSON__;
+// 舊版樣板的「歷史版本下載」功能需要外部快照檔案，此次整合沒有對應資料來源，
+// 故此處固定為空物件：版本歷史仍可查看說明文字，但不提供舊版本下載（畫面上會顯示「無可下載檔案」）。
+const VERSION_SNAPSHOTS = {};
 function openVersionModal(){
   const body = document.getElementById('versionModalBody');
   body.innerHTML = CHANGELOG.map(v => `
