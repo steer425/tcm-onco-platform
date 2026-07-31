@@ -115,11 +115,17 @@ document.getElementById("annModalCancel").addEventListener("click", () => {
 document.getElementById("annModalSave").addEventListener("click", async () => {
   const id = document.getElementById("annId").value;
   const msg = document.getElementById("annModalMsg");
+  const startVal = document.getElementById("annStart").value;
+  const endVal = document.getElementById("annEnd").value;
+  if (!startVal) { msg.textContent = "請填寫開始顯示時間"; return; }
   const payload = {
     title: document.getElementById("annTitle").value.trim(),
     content: document.getElementById("annContent").value.trim(),
-    start_at: document.getElementById("annStart").value,
-    end_at: document.getElementById("annEnd").value || null,
+    // <input type="datetime-local"> 給的是「瀏覽器當地時間」的字串，沒有時區資訊；
+    // 用 new Date(...) 解讀成當地時間後，再用 toISOString() 轉成正確的 UTC 時間字串送給後端，
+    // 否則後端會把這串文字誤當成 UTC 時間，導致「現在」被判斷成還沒到（或已經過了）。
+    start_at: new Date(startVal).toISOString(),
+    end_at: endVal ? new Date(endVal).toISOString() : null,
     notes: document.getElementById("annNotes").value.trim(),
   };
   try {

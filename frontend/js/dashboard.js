@@ -183,9 +183,147 @@ async function applyWidgetVisibility() {
   }
 }
 
+// ---------- Dashboard 版面編輯模式（僅管理者可見）----------
+let widgetFeatureCache = {}; // code -> feature 完整物件（含 id），管理者才會載入
+
+async function initLayoutEditor() {
+  let isAdmin = false;
+  try {
+    const me = await api("/auth/me");
+    isAdmin = (me.role_names || []).includes("管理者");
+  } catch (err) { return; }
+  if (!isAdmin) return;
+
+  const btn = document.getElementById("editLayoutBtn");
+  btn.style.display = "inline-block";
+
+  try {
+    const features = await api("/features");
+    Object.keys(WIDGET_CARD_MAP).forEach((code) => {
+      const f = features.find(x => x.code === code);
+      if (f) widgetFeatureCache[code] = f;
+    });
+  } catch (err) {
+    return;
+  }
+
+  applyCardOrder();
+
+  btn.addEventListener("click", () => {
+    const grid = document.getElementById("dashGrid");
+    const editing = grid.classList.toggle("edit-mode");
+    btn.classList.toggle("active", editing);
+    btn.textContent = editing ? "✓ 完成編輯" : "🛠 編輯版面";
+    if (editing) {
+      // 編輯模式：把目前隱藏的卡片也強制顯示出來（半透明），讓管理者能重新打開
+      document.querySelectorAll(".dash-card[data-widget-code]").forEach(c => { c.style.display = ""; });
+      syncToggleStates();
+      enableDragReorder();
+    } else {
+      // 離開編輯模式：恢復正常的顯示規則
+      applyWidgetVisibility();
+    }
+  });
+}
+
+function applyCardOrder() {
+  const grid = document.getElementById("dashGrid");
+  const cards = Array.from(grid.querySelectorAll(".dash-card"));
+  cards.sort((a, b) => {
+    const fa = widgetFeatureCache[a.dataset.widgetCode];
+    const fb = widgetFeatureCache[b.dataset.widgetCode];
+    return (fa ? fa.sort_order : 0) - (fb ? fb.sort_order : 0);
+  });
+  cards.forEach(c => grid.appendChild(c));
+}
+
+function syncToggleStates() {
+  document.querySelectorAll(".dash-card[data-widget-code]").forEach((card) => {
+    const code = card.dataset.widgetCode;
+    const f = widgetFeatureCache[code];
+    const checkbox = card.querySelector(".widget-visible-toggle");
+    if (!f || !checkbox) return;
+    // 管理者在編輯 Dashboard 時，切換的是「後台視角」的顯示與否（show_backend）
+    checkbox.checked = f.show_backend;
+    checkbox.onchange = async () => {
+      try {
+        const updated = await api(`/features/${f.id}`, {
+          method: "PUT",
+          body: JSON.stringify({ show_backend: checkbox.checked }),
+        });
+        widgetFeatureCache[code] = updated;
+        card.style.opacity = checkbox.checked ? "1" : "0.4";
+      } catch (err) {
+        alert("更新失敗：" + err.message);
+        checkbox.checked = !checkbox.checked;
+      }
+    };
+    card.style.opacity = f.show_backend ? "1" : "0.4";
+  });
+}
+
+function enableDragReorder() {
+  const grid = document.getElementById("dashGrid");
+  const cards = Array.from(grid.querySelectorAll(".dash-card"));
+  let draggedEl = null;
+
+  cards.forEach((card) => {
+    card.setAttribute("draggable", "true");
+    card.ondragstart = (e) => {
+      draggedEl = card;
+      card.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    };
+    card.ondragend = () => {
+      card.classList.remove("dragging");
+      cards.forEach(c => c.classList.remove("drag-over"));
+      persistCardOrder();
+    };
+    card.ondragover = (e) => {
+      e.preventDefault();
+      if (card !== draggedEl) card.classList.add("drag-over");
+    };
+    card.ondragleave = () => card.classList.remove("drag-over");
+    card.ondrop = (e) => {
+      e.preventDefault();
+      card.classList.remove("drag-over");
+      if (!draggedEl || draggedEl === card) return;
+      const allCards = Array.from(grid.querySelectorAll(".dash-card"));
+      const draggedIdx = allCards.indexOf(draggedEl);
+      const targetIdx = allCards.indexOf(card);
+      if (draggedIdx < targetIdx) {
+        card.after(draggedEl);
+      } else {
+        card.before(draggedEl);
+      }
+    };
+  });
+}
+
+async function persistCardOrder() {
+  const grid = document.getElementById("dashGrid");
+  const cards = Array.from(grid.querySelectorAll(".dash-card[data-widget-code]"));
+  const updates = [];
+  cards.forEach((card, idx) => {
+    const code = card.dataset.widgetCode;
+    const f = widgetFeatureCache[code];
+    const newOrder = (idx + 1) * 10; // 留間隔，方便之後手動微調
+    if (f && f.sort_order !== newOrder) {
+      updates.push(api(`/features/${f.id}`, { method: "PUT", body: JSON.stringify({ sort_order: newOrder }) })
+        .then(updated => { widgetFeatureCache[code] = updated; }));
+    }
+  });
+  try {
+    await Promise.all(updates);
+  } catch (err) {
+    alert("排序儲存失敗：" + err.message);
+  }
+}
+
 loadHosts();
 loadVersion();
 loadDocs();
 renderGoals();
 loadAnnouncements();
 applyWidgetVisibility();
+initLayoutEditor();
