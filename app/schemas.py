@@ -133,6 +133,12 @@ class PermissionSet(BaseModel):
     can_view: bool = False
     can_execute: bool = False
     notes: Optional[str] = None
+    # 以下為全站共用設定（不分角色），一併從權限矩陣視窗編輯，儲存時會同步更新到 Feature 本身
+    enabled: Optional[bool] = None
+    show_frontend: Optional[bool] = None
+    show_backend: Optional[bool] = None
+    nav_label: Optional[str] = None
+    sort_order: Optional[int] = None
 
 
 class RolePermissionBulkUpdate(BaseModel):
@@ -147,6 +153,13 @@ class RolePermissionOut(BaseModel):
     can_view: bool
     can_execute: bool
     notes: Optional[str]
+    # 全站共用設定（顯示用，供權限矩陣視窗一併編輯）
+    enabled: bool
+    show_frontend: bool
+    show_backend: bool
+    nav_label: Optional[str]
+    page_url: Optional[str]
+    sort_order: int
 
     class Config:
         from_attributes = True

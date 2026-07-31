@@ -38,6 +38,14 @@ def run():
     print("步驟 2／2：依 FEATURE_CONFIG 回填既有功能項目的導覽資料...")
     db = SessionLocal()
     try:
+        # v1.10.0：移除已併入「權限矩陣」的舊版「功能項目管理」獨立頁面（F0-14）
+        obsolete = db.query(models.Feature).filter(models.Feature.code == "F0-14").first()
+        if obsolete:
+            db.query(models.RolePermission).filter(models.RolePermission.feature_id == obsolete.id).delete()
+            db.delete(obsolete)
+            db.commit()
+            print("  已移除舊版 F0-14（功能項目管理獨立頁面，功能已併入角色管理的權限矩陣視窗）")
+
         updated = 0
         for item in FEATURE_CONFIG:
             feature = db.query(models.Feature).filter(models.Feature.code == item["code"]).first()

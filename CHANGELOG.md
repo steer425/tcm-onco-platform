@@ -1,5 +1,55 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.11.0 — 2026-07-31（補齊未完成功能頁面、開合式選單、可命名配色主題）
+
+### 新增功能
+
+- **補齊先前沒有頁面的功能項目**：
+  - `architecture.html`：系統架構規劃（F0-1/F0-3/F0-9 共用，直接渲染 `rules.md` 內容）
+  - `oauth-status.html`：第三方登入整合狀態總覽（F0-6，顯示 Google/Facebook/小紅書/WeChat 目前串接狀態）
+  - `security.html`：資安規劃（F0-7，列出已完成與規劃中的資安項目）
+  - `reports.html`：報表設計（F0-8，列出規劃中的報表項目）
+  - `system-settings.html`：系統設定（F0-16，新頁面，見下方主題系統）
+  - F0-10（資料庫備份與還原）、F0-12（登入紀錄查詢）、F5-3（評價管理）改為指向既有頁面（`logs.html`／`pharmacies.html`），避免重工也避免導覽選單出現重複連結
+- **權限矩陣表格顯示完整頁面路徑**：角色管理的權限矩陣視窗，每個功能項目現在會標示 `frontend\xxx.html` 完整路徑，取代原本模糊的「頁面：xxx」
+- **導覽選單改為開合式設計**：`js/nav.js` 把「前台功能」「後台管理」各自做成可收合區塊，展開狀態記在瀏覽器 `localStorage`；目前所在頁面所屬的分區會強制展開
+- **可命名的配色主題系統**：
+  - 新增 4 組主題（森林綠/海洋藍/暖橘/石墨灰），定義在 `frontend/css/style.css` 的 `[data-theme="xxx"]` 區塊
+  - 新增 `SystemSetting` 通用 key-value 資料表，`GET/PUT /system-settings/theme` API（GET 不需登入，登入頁也能套用主題；PUT 僅限管理者）
+  - 新增 `frontend/js/theme.js`，所有頁面 `<head>` 載入時套用目前主題
+  - 管理者可在「系統設定」頁面即時切換主題，全站套用
+
+### 部署注意事項
+
+需要重新執行遷移腳本（新增了 `system_settings` 資料表，以及 F0-16 功能項目、既有功能項目的頁面路徑調整）：
+
+```bash
+$env:DATABASE_URL="你的 Neon 連線字串"
+python -m app.migrate_schema
+```
+
+## v1.10.0 — 2026-07-31（「功能項目管理」併入「權限矩陣」，移除重複頁面）
+
+### 問題
+
+角色管理的「權限矩陣」（設定單一角色的 can_view/can_execute）跟獨立的「功能項目管理」頁面（設定全站共用的 enabled/show_frontend/show_backend）都在管理同一份 `features` 資料，兩個入口容易搞混。
+
+### 變更
+
+- **移除** `frontend/features.html`、`frontend/js/features.js`，以及對應的導覽項目 F0-14
+- **角色管理「權限矩陣」視窗整合為單一表格**：同時顯示、編輯「這個角色專屬」的可見/可執行權限，以及「全站共用」的啟用/前台/後台/導覽文字/排序設定，一次儲存
+- 後端 `GET /roles/{id}/permissions`、`PUT /roles/{id}/permissions` 擴充：回傳與接受全站功能設定欄位（`enabled`/`show_frontend`/`show_backend`/`nav_label`/`page_url`/`sort_order`），PUT 時全站欄位只在有帶值時才更新，避免其他角色沒帶這些欄位時被意外清空
+- `/features` 系列 API（GET/POST/PUT/DELETE）維持不變，供未來程式化管理使用
+
+### 部署注意事項
+
+需要重新執行遷移腳本，這次除了照常回填欄位，還會**清除既有資料庫裡的舊版 F0-14**（含它的角色權限紀錄）：
+
+```bash
+$env:DATABASE_URL="你的 Neon 連線字串"
+python -m app.migrate_schema
+```
+
 ## v1.9.1 — 2026-07-31（Dashboard 小工具支援前台/後台差異化顯示）
 
 ### 問題

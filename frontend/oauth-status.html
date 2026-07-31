@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>第三方登入整合狀態 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<style>
+  .provider-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .provider-row:last-child { border-bottom: none; }
+  .provider-name { font-weight: 600; font-size: 14px; }
+  .status-tag { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .status-done { background: #e8f3ec; color: #1f4f37; }
+  .status-partial { background: #fdf3e0; color: #8a5a00; }
+  .status-none { background: #f2f2f2; color: #777; }
+</style>
+</head>
+<body data-current-page="oauth-status.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">第三方登入整合狀態</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <p class="hint-msg" style="margin-top:0;">對應功能項目「第三方登入整合」（F0-6）。這裡是目前串接狀態的總覽，實際的登入按鈕在登入頁（index.html）。</p>
+
+      <div class="provider-row">
+        <div>
+          <div class="provider-name">Google</div>
+          <div class="host-detail">Authorization Code Flow，已完整串接，可正常登入/自動建立待審核帳號</div>
+        </div>
+        <span class="status-tag status-done">✓ 已完成</span>
+      </div>
+
+      <div class="provider-row">
+        <div>
+          <div class="provider-name">Facebook</div>
+          <div class="host-detail">尚未開發，需另外申請 Facebook App 並實作 OAuth 流程</div>
+        </div>
+        <span class="status-tag status-none">未開始</span>
+      </div>
+
+      <div class="provider-row">
+        <div>
+          <div class="provider-name">小紅書（RED）</div>
+          <div class="host-detail">僅有資料表綁定關係骨架（<code>/oauth-accounts</code>），無正式 OAuth 流程；開發者資格需另外確認</div>
+        </div>
+        <span class="status-tag status-partial">骨架</span>
+      </div>
+
+      <div class="provider-row">
+        <div>
+          <div class="provider-name">WeChat</div>
+          <div class="host-detail">僅有資料表綁定關係骨架（<code>/oauth-accounts</code>），無正式 OAuth 流程；開發者資格需另外確認</div>
+        </div>
+        <span class="status-tag status-partial">骨架</span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script>
+async function loadUserInfo() {
+  try {
+    const data = await api("/dashboard");
+    document.getElementById("userInfo").textContent =
+      `${data.account}（${(data.role_names || []).join("、") || "無角色"}）`;
+  } catch (err) {}
+}
+loadUserInfo();
+</script>
+</body>
+</html>

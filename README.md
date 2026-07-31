@@ -1,6 +1,6 @@
 # TCM 中藥腫瘤篩選平台 — 目標零後台系統
 
-**目前版本：v1.9.1**（已通過使用者本機測試審查並正式上版，詳見 [CHANGELOG.md](./CHANGELOG.md)）
+**目前版本：v1.11.0**（已通過使用者本機測試審查並正式上版，詳見 [CHANGELOG.md](./CHANGELOG.md)）
 
 本次交付內容：**目標零（帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄）** 後端 API + 對應前端頁面，以及登入後可見的 **Dashboard（施工中佔位頁）**。
 
@@ -27,7 +27,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 | 功能清單項目 | 後端 API | 前端頁面 |
 |---|---|---|
-| F0-14 功能項目管理（啟用/顯示前台/顯示後台） | `/features`（GET/POST/PUT/DELETE） | `features.html` |
+| 功能項目顯示控制（啟用/顯示前台/顯示後台，併入權限矩陣統一編輯） | `/features`（GET/POST/PUT/DELETE）、`/roles/{id}/permissions` | `roles.html`（權限矩陣視窗） |
 | 動態導覽選單（依角色權限顯示前台/後台項目） | `/nav/menu` | `js/nav.js`（所有頁面共用） |
 | F0-2 角色管理（新增/編輯/刪除/查詢，含查看角色底下帳號） | `/roles`, `/roles/{id}/users` | `roles.html` |
 | 權限矩陣（can_view / can_execute） | `/features`, `/roles/{id}/permissions` | `roles.html`（權限矩陣 Modal） |

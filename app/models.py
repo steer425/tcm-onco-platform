@@ -312,6 +312,15 @@ class TcmspTargetDisease(Base):
     dis_id = Column(String, ForeignKey("tcmsp_diseases.dis_id"), nullable=False, index=True)
 
 
+class SystemSetting(Base):
+    """通用系統設定（key-value），目前用於主題配色，未來其他全站設定也可共用這張表"""
+    __tablename__ = "system_settings"
+
+    key = Column(String, primary_key=True)
+    value = Column(String, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class LoginLog(Base):
     __tablename__ = "login_logs"
 

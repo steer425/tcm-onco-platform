@@ -10,6 +10,28 @@
   --warn: #b8860b;
 }
 
+/* ---------------------------------------------------------------------
+   命名主題：由後台「系統設定」頁面切換，寫在 <html data-theme="..."> 上。
+   新增主題時，在這裡加一組 [data-theme="xxx"] 覆寫 CSS 變數即可，
+   不需要動到其他任何頁面或元件的樣式規則。
+   --------------------------------------------------------------------- */
+[data-theme="forest"] {
+  --primary: #2f6f4f; --primary-dark: #1f4f37; --bg: #f5f7f5;
+  --card-bg: #ffffff; --border: #dfe5e0; --text: #24312a; --muted: #6b7a70;
+}
+[data-theme="ocean"] {
+  --primary: #2563a8; --primary-dark: #173f6b; --bg: #f2f6fa;
+  --card-bg: #ffffff; --border: #dbe6f0; --text: #1c2b38; --muted: #66788a;
+}
+[data-theme="sunset"] {
+  --primary: #c97a2f; --primary-dark: #8a4f1f; --bg: #faf6f0;
+  --card-bg: #ffffff; --border: #ecdfd0; --text: #3a2c1c; --muted: #8a7a68;
+}
+[data-theme="slate"] {
+  --primary: #52606d; --primary-dark: #323f4b; --bg: #f4f5f6;
+  --card-bg: #ffffff; --border: #dde1e4; --text: #1f2933; --muted: #7b8794;
+}
+
 * { box-sizing: border-box; }
 
 body {
@@ -60,6 +82,9 @@ body {
   text-transform: uppercase;
 }
 .sidebar nav .nav-section-label:first-child { padding-top: 6px; }
+.sidebar nav .nav-section-toggle { cursor: pointer; user-select: none; }
+.sidebar nav .nav-section-toggle:hover { color: rgba(255,255,255,0.7); }
+.sidebar nav .nav-caret { display: inline-block; width: 10px; }
 
 .main {
   flex: 1;
@@ -191,3 +216,5 @@ th { color: var(--muted); font-weight: 600; }
 
 .perm-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
 .perm-row label { margin: 0; }
+.host-detail { color: #8a958f; font-size: 11.5px; }
+.chk-cell { text-align: center; }

@@ -59,12 +59,12 @@ def delete_feature(feature_id: str, db: Session = Depends(get_db), admin: models
 # ---- Role <-> Feature permission matrix ----
 
 @router.get("/roles/{role_id}/permissions", response_model=List[schemas.RolePermissionOut],
-            summary="查詢角色的權限矩陣")
+            summary="查詢角色的權限矩陣（含全站功能設定，供同一視窗一併編輯）")
 def get_role_permissions(role_id: str, db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
     role = db.query(models.Role).filter(models.Role.id == role_id).first()
     if not role:
         raise HTTPException(status_code=404, detail="找不到角色")
-    features = db.query(models.Feature).all()
+    features = db.query(models.Feature).order_by(models.Feature.sort_order).all()
     existing = {p.feature_id: p for p in role.permissions}
     result = []
     for f in features:
@@ -74,11 +74,13 @@ def get_role_permissions(role_id: str, db: Session = Depends(get_db), admin: mod
             can_view=p.can_view if p else False,
             can_execute=p.can_execute if p else False,
             notes=p.notes if p else None,
+            enabled=f.enabled, show_frontend=f.show_frontend, show_backend=f.show_backend,
+            nav_label=f.nav_label, page_url=f.page_url, sort_order=f.sort_order,
         ))
     return result
 
 
-@router.put("/roles/{role_id}/permissions", summary="設定（覆寫）角色的權限矩陣")
+@router.put("/roles/{role_id}/permissions", summary="設定（覆寫）角色的權限矩陣，並同步更新全站功能設定")
 def set_role_permissions(role_id: str, payload: schemas.RolePermissionBulkUpdate,
                           db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
     role = db.query(models.Role).filter(models.Role.id == role_id).first()
@@ -101,7 +103,22 @@ def set_role_permissions(role_id: str, payload: schemas.RolePermissionBulkUpdate
                 role_id=role_id, feature_id=item.feature_id,
                 can_view=item.can_view, can_execute=item.can_execute, notes=item.notes,
             ))
+
+        # 全站共用設定（不分角色），有帶值才更新，避免其他角色沒帶這些欄位時被意外清空
+        feature = db.query(models.Feature).filter(models.Feature.id == item.feature_id).first()
+        if feature:
+            if item.enabled is not None:
+                feature.enabled = item.enabled
+            if item.show_frontend is not None:
+                feature.show_frontend = item.show_frontend
+            if item.show_backend is not None:
+                feature.show_backend = item.show_backend
+            if item.nav_label is not None:
+                feature.nav_label = item.nav_label
+            if item.sort_order is not None:
+                feature.sort_order = item.sort_order
+
     db.commit()
     write_audit_log(db, admin, "update_role_permissions", "role", role_id,
-                     f"更新角色 {role.name} 的權限矩陣（{len(payload.permissions)} 項）")
+                     f"更新角色 {role.name} 的權限矩陣（{len(payload.permissions)} 項，含全站功能設定）")
     return {"message": "權限矩陣已更新"}

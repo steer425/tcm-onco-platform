@@ -40,12 +40,12 @@ FEATURE_CONFIG = [
     {"code": "F0-4", "module": "目標零", "name": "帳號審核",
      "nav_label": "帳號審核", "page_url": "applications.html",
      "show_frontend": False, "show_backend": True, "sort_order": 40},
-    {"code": "F0-14", "module": "目標零", "name": "功能項目管理",
-     "nav_label": "功能項目管理", "page_url": "features.html",
-     "show_frontend": False, "show_backend": True, "sort_order": 45},
     {"code": "F0-11", "module": "目標零", "name": "稽核與登入紀錄查詢",
      "nav_label": "稽核 / 登入紀錄", "page_url": "logs.html",
      "show_frontend": False, "show_backend": True, "sort_order": 90},
+    {"code": "F0-16", "module": "目標零", "name": "系統設定（配色主題）",
+     "nav_label": "系統設定", "page_url": "system-settings.html",
+     "show_frontend": False, "show_backend": True, "sort_order": 100},
 
     # ---- 目標五：中藥行 ----
     {"code": "F5-1", "module": "目標五", "name": "中藥行資料管理（後台）",
@@ -55,7 +55,9 @@ FEATURE_CONFIG = [
      "nav_label": "中藥行地理推薦", "page_url": "finder.html",
      "show_frontend": True, "show_backend": False, "sort_order": 60},
     {"code": "F5-3", "module": "目標五", "name": "評價管理（後台）",
-     "nav_label": None, "page_url": None,
+     # 功能已內建在「中藥行管理」（F5-1）頁面裡，這裡只標記對應頁面路徑，
+     # 前台/後台皆不顯示，避免導覽選單出現兩個一模一樣的連結。
+     "nav_label": "評價管理", "page_url": "pharmacies.html",
      "show_frontend": False, "show_backend": False, "sort_order": 0},
 
     # ---- 目標一/二：TCMSP ----
@@ -63,21 +65,32 @@ FEATURE_CONFIG = [
      "nav_label": "TCMSP 藥材關聯查詢站", "page_url": "tcmsp_query.html",
      "show_frontend": True, "show_backend": False, "sort_order": 70},
 
-    # ---- 其餘目標零基礎建設項目（無獨立頁面，僅供權限矩陣文件用途）----
+    # ---- 其餘目標零基礎建設項目：現在都有對應頁面可查看/設定 ----
     {"code": "F0-1", "module": "目標零", "name": "前後台架構規劃",
-     "nav_label": None, "page_url": None, "show_frontend": False, "show_backend": False, "sort_order": 0},
+     "nav_label": "系統架構規劃", "page_url": "architecture.html",
+     "show_frontend": False, "show_backend": True, "sort_order": 95},
     {"code": "F0-3", "module": "目標零", "name": "後台登入權限控管",
-     "nav_label": None, "page_url": None, "show_frontend": False, "show_backend": False, "sort_order": 0},
-    {"code": "F0-6", "module": "目標零", "name": "第三方登入整合",
-     "nav_label": None, "page_url": None, "show_frontend": False, "show_backend": False, "sort_order": 0},
-    {"code": "F0-7", "module": "目標零", "name": "資安規劃",
-     "nav_label": None, "page_url": None, "show_frontend": False, "show_backend": False, "sort_order": 0},
-    {"code": "F0-8", "module": "目標零", "name": "報表設計",
-     "nav_label": None, "page_url": None, "show_frontend": False, "show_backend": False, "sort_order": 0},
+     # 與 F0-1 共用同一份架構說明頁，這裡不重複顯示於導覽選單（避免出現兩個一樣的連結）
+     "nav_label": "後台登入權限控管", "page_url": "architecture.html",
+     "show_frontend": False, "show_backend": False, "sort_order": 0},
     {"code": "F0-9", "module": "目標零", "name": "全站CRUD後台管理",
-     "nav_label": None, "page_url": None, "show_frontend": False, "show_backend": False, "sort_order": 0},
+     "nav_label": "全站CRUD後台管理", "page_url": "architecture.html",
+     "show_frontend": False, "show_backend": False, "sort_order": 0},
+    {"code": "F0-6", "module": "目標零", "name": "第三方登入整合",
+     "nav_label": "第三方登入狀態", "page_url": "oauth-status.html",
+     "show_frontend": False, "show_backend": True, "sort_order": 96},
+    {"code": "F0-7", "module": "目標零", "name": "資安規劃",
+     "nav_label": "資安規劃", "page_url": "security.html",
+     "show_frontend": False, "show_backend": True, "sort_order": 97},
+    {"code": "F0-8", "module": "目標零", "name": "報表設計",
+     "nav_label": "報表設計", "page_url": "reports.html",
+     "show_frontend": False, "show_backend": True, "sort_order": 98},
     {"code": "F0-10", "module": "目標零", "name": "資料庫備份與還原",
-     "nav_label": None, "page_url": None, "show_frontend": False, "show_backend": False, "sort_order": 0},
+     # 備份紀錄查詢已內建在「稽核/登入紀錄」（F0-11）頁面的分頁籤裡
+     "nav_label": "資料庫備份與還原", "page_url": "logs.html",
+     "show_frontend": False, "show_backend": False, "sort_order": 0},
     {"code": "F0-12", "module": "目標零", "name": "登入紀錄查詢",
-     "nav_label": None, "page_url": None, "show_frontend": False, "show_backend": False, "sort_order": 0},
+     # 已內建在「稽核/登入紀錄」（F0-11）頁面裡，不重複顯示
+     "nav_label": "登入紀錄查詢", "page_url": "logs.html",
+     "show_frontend": False, "show_backend": False, "sort_order": 0},
 ]

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>系統設定 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<style>
+  .theme-grid { display: flex; gap: 16px; flex-wrap: wrap; }
+  .theme-option { border: 2px solid var(--border); border-radius: 10px; padding: 14px; width: 160px; cursor: pointer; text-align: center; }
+  .theme-option.active { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(0,0,0,0.03); }
+  .theme-swatch { height: 40px; border-radius: 6px; margin-bottom: 8px; display: flex; overflow: hidden; }
+  .theme-swatch div { flex: 1; }
+</style>
+</head>
+<body data-current-page="system-settings.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">系統設定</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">配色主題</h3>
+      <p class="hint-msg" style="margin-top:0;">切換後全站（登入頁、Dashboard、所有後台頁面）立即套用新配色，對所有使用者生效。</p>
+      <div class="theme-grid" id="themeGrid">載入中...</div>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/system-settings.js"></script>
+</body>
+</html>

@@ -97,27 +97,48 @@ window.deleteRole = async (id) => {
   }
 };
 
-// ---- 權限矩陣 ----
+// ---- 權限矩陣（含全站功能設定）----
 window.openPermModal = async (roleId, roleName) => {
   document.getElementById("permRoleName").textContent = roleName;
   document.getElementById("permModal").dataset.roleId = roleId;
   document.getElementById("permMsg").textContent = "";
   const perms = await api(`/roles/${roleId}/permissions`);
   const list = document.getElementById("permList");
-  list.innerHTML = "";
-  perms.forEach((p) => {
-    const row = document.createElement("div");
-    row.className = "perm-row";
-    row.innerHTML = `
-      <span>${p.feature_code} ${p.feature_name}</span>
-      <span>
-        <label style="display:inline;"><input type="checkbox" data-feature="${p.feature_id}" data-type="view" ${p.can_view ? "checked" : ""}/> 可見</label>
-        &nbsp;
-        <label style="display:inline;"><input type="checkbox" data-feature="${p.feature_id}" data-type="execute" ${p.can_execute ? "checked" : ""}/> 可執行</label>
-      </span>
-    `;
-    list.appendChild(row);
-  });
+
+  const rows = perms.map(p => `
+    <tr data-feature="${p.feature_id}">
+      <td>
+        <div style="font-weight:600;">${p.feature_code}</div>
+        <div class="host-detail">${p.feature_name}</div>
+        ${p.page_url ? `<div class="host-detail">路徑：frontend\\${p.page_url}</div>` : '<div class="host-detail">（Dashboard 小工具，非獨立頁面）</div>'}
+      </td>
+      <td class="chk-cell"><input type="checkbox" data-field="can_view" ${p.can_view ? "checked" : ""}></td>
+      <td class="chk-cell"><input type="checkbox" data-field="can_execute" ${p.can_execute ? "checked" : ""}></td>
+      <td class="chk-cell"><input type="checkbox" data-field="enabled" ${p.enabled ? "checked" : ""}></td>
+      <td class="chk-cell"><input type="checkbox" data-field="show_frontend" ${p.show_frontend ? "checked" : ""}></td>
+      <td class="chk-cell"><input type="checkbox" data-field="show_backend" ${p.show_backend ? "checked" : ""}></td>
+      <td><input type="text" data-field="nav_label" value="${p.nav_label || ""}" style="width:110px;" placeholder="(用名稱)"></td>
+      <td><input type="number" data-field="sort_order" value="${p.sort_order}" style="width:56px;"></td>
+    </tr>
+  `).join("");
+
+  list.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>功能項目</th>
+          <th>可見<br><span class="host-detail">（此角色）</span></th>
+          <th>可執行<br><span class="host-detail">（此角色）</span></th>
+          <th>啟用<br><span class="host-detail">（全站）</span></th>
+          <th>前台<br><span class="host-detail">（全站）</span></th>
+          <th>後台<br><span class="host-detail">（全站）</span></th>
+          <th>導覽文字<br><span class="host-detail">（全站）</span></th>
+          <th>排序<br><span class="host-detail">（全站）</span></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
   document.getElementById("permModal").style.display = "flex";
 };
 
@@ -127,15 +148,17 @@ document.getElementById("permCancel").addEventListener("click", () => {
 
 document.getElementById("permSave").addEventListener("click", async () => {
   const roleId = document.getElementById("permModal").dataset.roleId;
-  const checkboxes = document.querySelectorAll("#permList input[type=checkbox]");
-  const byFeature = {};
-  checkboxes.forEach((cb) => {
-    const fid = cb.dataset.feature;
-    byFeature[fid] = byFeature[fid] || { feature_id: fid, can_view: false, can_execute: false };
-    if (cb.dataset.type === "view") byFeature[fid].can_view = cb.checked;
-    if (cb.dataset.type === "execute") byFeature[fid].can_execute = cb.checked;
-  });
-  const permissions = Object.values(byFeature);
+  const rows = document.querySelectorAll("#permList tbody tr");
+  const permissions = Array.from(rows).map((tr) => ({
+    feature_id: tr.dataset.feature,
+    can_view: tr.querySelector('[data-field="can_view"]').checked,
+    can_execute: tr.querySelector('[data-field="can_execute"]').checked,
+    enabled: tr.querySelector('[data-field="enabled"]').checked,
+    show_frontend: tr.querySelector('[data-field="show_frontend"]').checked,
+    show_backend: tr.querySelector('[data-field="show_backend"]').checked,
+    nav_label: tr.querySelector('[data-field="nav_label"]').value || null,
+    sort_order: parseInt(tr.querySelector('[data-field="sort_order"]').value, 10) || 0,
+  }));
   try {
     await api(`/roles/${roleId}/permissions`, {
       method: "PUT",

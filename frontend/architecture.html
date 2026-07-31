@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>系統架構規劃 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<style>
+  .markdown-body { font-size: 13.5px; line-height: 1.7; color: var(--text); }
+  .markdown-body h1, .markdown-body h2, .markdown-body h3 { color: var(--primary-dark); margin-top: 20px; }
+  .markdown-body code { background: #f0f3f1; padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+  .markdown-body table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+  .markdown-body th, .markdown-body td { border: 1px solid var(--border); padding: 6px 8px; font-size: 12.5px; }
+</style>
+</head>
+<body data-current-page="architecture.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">系統架構規劃</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <p class="hint-msg" style="margin-top:0;">
+        本頁對應「前後台架構規劃」（F0-1）、「後台登入權限控管」（F0-3）、「全站CRUD後台管理」（F0-9）三個規劃項目——
+        這三項屬於系統整體架構設計，不是單獨的操作頁面，內容直接呈現專案的開發規範文件（rules.md）。
+      </p>
+      <div class="markdown-body" id="rulesBody">載入中...</div>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script>
+async function loadUserInfo() {
+  try {
+    const data = await api("/dashboard");
+    document.getElementById("userInfo").textContent =
+      `${data.account}（${(data.role_names || []).join("、") || "無角色"}）`;
+  } catch (err) {}
+}
+async function loadRules() {
+  const el = document.getElementById("rulesBody");
+  try {
+    const doc = await api("/project-info/docs/rules");
+    el.innerHTML = marked.parse(doc.content || "");
+  } catch (err) {
+    el.innerHTML = `<p class="hint-msg">載入失敗：${err.message}</p>`;
+  }
+}
+loadUserInfo();
+loadRules();
+</script>
+</body>
+</html>

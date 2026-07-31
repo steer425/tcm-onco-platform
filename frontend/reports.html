@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>報表設計 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<style>
+  .plan-item { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+  .plan-item:last-child { border-bottom: none; }
+</style>
+</head>
+<body data-current-page="reports.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">報表設計</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card construction">
+      <div class="icon">🚧</div>
+      <h3>報表設計（F0-8）尚未開始開發</h3>
+      <p style="color:var(--muted); max-width:600px; margin:0 auto;">目前系統資料都能透過「稽核/登入紀錄」頁面查詢原始紀錄，但還沒有彙整成報表/圖表的功能。以下是規劃中的報表項目。</p>
+    </div>
+
+    <div class="card">
+      <div class="plan-item"><b>系統使用報表</b>　各角色/帳號使用頻率、活躍度統計</div>
+      <div class="plan-item"><b>角色權限異動報表</b>　彙整權限矩陣的歷史變更紀錄</div>
+      <div class="plan-item"><b>帳號申請/審核歷程報表</b>　審核通過率、平均審核時間等</div>
+      <div class="plan-item"><b>系統存取稽核報表</b>　彙整稽核紀錄成可視化圖表</div>
+      <div class="plan-item"><b>（目標三/四）醫師審核紀錄報表</b>　待目標三/四啟動後一併規劃</div>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script>
+async function loadUserInfo() {
+  try {
+    const data = await api("/dashboard");
+    document.getElementById("userInfo").textContent =
+      `${data.account}（${(data.role_names || []).join("、") || "無角色"}）`;
+  } catch (err) {}
+}
+loadUserInfo();
+</script>
+</body>
+</html>
