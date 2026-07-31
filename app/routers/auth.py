@@ -16,13 +16,9 @@ from app.oauth_google import (
     FRONTEND_BASE_URL, build_google_auth_url, exchange_code_for_userinfo as google_exchange_code_for_userinfo,
     google_oauth_configured,
 )
-from app.security import create_access_token, hash_password, verify_password
+from app.security import create_access_token, create_oauth_state_token, hash_password, verify_oauth_state_token, verify_password
 
 router = APIRouter(prefix="/auth", tags=["登入與帳號申請"])
-
-# 簡易 CSRF state 暫存：僅適合單一伺服器程序執行的情境。
-# 若日後改用多 worker/多實例部署，需要改為 Redis 等跨程序共享的暫存機制。
-_oauth_states: set = set()
 
 
 def _redirect_oauth_error(code_str: str) -> RedirectResponse:
@@ -155,8 +151,7 @@ def google_enabled():
 
 @router.get("/google/login", summary="導向 Google 登入頁")
 def google_login():
-    state = secrets.token_urlsafe(16)
-    _oauth_states.add(state)
+    state = create_oauth_state_token()
     return RedirectResponse(build_google_auth_url(state))
 
 
@@ -164,9 +159,10 @@ def google_login():
 async def google_callback(code: str = None, state: str = None, error: str = None, db: Session = Depends(get_db)):
     if error:
         return _redirect_oauth_error("google_denied")
-    if not code or not state or state not in _oauth_states:
+    if not verify_oauth_state_token(state):
         return _redirect_oauth_error("invalid_state")
-    _oauth_states.discard(state)
+    if not code:
+        return _redirect_oauth_error("missing_code")
 
     try:
         userinfo = await google_exchange_code_for_userinfo(code)
@@ -188,8 +184,7 @@ def facebook_enabled():
 
 @router.get("/facebook/login", summary="導向 Facebook 登入頁")
 def facebook_login():
-    state = secrets.token_urlsafe(16)
-    _oauth_states.add(state)
+    state = create_oauth_state_token()
     return RedirectResponse(build_facebook_auth_url(state))
 
 
@@ -197,9 +192,10 @@ def facebook_login():
 async def facebook_callback(code: str = None, state: str = None, error: str = None, db: Session = Depends(get_db)):
     if error:
         return _redirect_oauth_error("facebook_denied")
-    if not code or not state or state not in _oauth_states:
+    if not verify_oauth_state_token(state):
         return _redirect_oauth_error("invalid_state")
-    _oauth_states.discard(state)
+    if not code:
+        return _redirect_oauth_error("missing_code")
 
     try:
         userinfo = await facebook_exchange_code_for_userinfo(code)

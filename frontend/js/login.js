@@ -79,6 +79,7 @@ document.getElementById("facebookLoginBtn").addEventListener("click", () => {
     facebook_denied: "已取消 Facebook 登入授權。",
     facebook_no_email: "這個 Facebook 帳號沒有提供 email，無法建立系統帳號，請改用其他登入方式。",
     invalid_state: "登入驗證逾時或失效，請重新嘗試。",
+    missing_code: "第三方服務沒有回傳授權碼，請重新嘗試。",
     token_exchange_failed: "與第三方服務交換登入憑證失敗，請重新嘗試。",
     missing_profile: "無法取得帳號資訊，請確認已授權必要的權限。",
   };

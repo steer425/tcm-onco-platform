@@ -1,6 +1,6 @@
 # TCM 中藥腫瘤篩選平台 — 目標零後台系統
 
-**目前版本：v1.13.0**（已通過使用者本機測試審查並正式上版，詳見 [CHANGELOG.md](./CHANGELOG.md)）
+**目前版本：v1.13.1**（已通過使用者本機測試審查並正式上版，詳見 [CHANGELOG.md](./CHANGELOG.md)）
 
 本次交付內容：**目標零（帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄）** 後端 API + 對應前端頁面，以及登入後可見的 **Dashboard（施工中佔位頁）**。
 
@@ -232,7 +232,6 @@ python -m app.import_tcmsp_data data_import/tcmsp_data.json
 
 ### 已知限制
 
-- CSRF state 目前用伺服器記憶體內的 `set` 暫存，只適合單一伺服器程序運作；如果之後 Render 服務改成多 worker/多實例，需要改用 Redis 等跨程序共享的暫存機制
 - 小紅書（RED）、WeChat 的第三方登入尚未實作，仍是先前的資料表 CRUD 骨架（`/oauth-accounts`），需要另外確認這兩個平台的開發者資格與串接規範
 
 ## 十、Facebook OAuth 設定（第三方登入）
