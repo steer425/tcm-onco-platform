@@ -1,5 +1,5 @@
 // 共用 API 呼叫工具
-const API_BASE = ""; // 與後端同源部署時留空；若前後端分離，改成後端網址，例如 "http://localhost:8000"
+const API_BASE = "https://tcm-onco-backend.onrender.com"; // 已部署於 Render 的後端 API 網址
 
 function getToken() {
   return localStorage.getItem("tcm_token");

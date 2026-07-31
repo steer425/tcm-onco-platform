@@ -1,5 +1,15 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.2.0 — 2026-07-31（前後端分離部署：Render + Cloudflare Pages）
+
+- 後端已部署上線：`https://tcm-onco-backend.onrender.com`（Render Blueprint 部署）
+- 前端 `js/api.js` 的 `API_BASE` 改為指向線上後端網址，不再依賴與後端同源
+- CORS 設定從允許所有來源（`*`）收緊為僅允許：
+  - `https://fwc-tcmsp.pages.dev`（Cloudflare Pages 正式網址）
+  - `https://*.fwc-tcmsp.pages.dev`（Cloudflare Pages 預覽部署網址，正規表示式比對）
+  - `http://localhost:8000` / `http://127.0.0.1:8000`（本機測試）
+- ⚠️ 提醒：Render 免費方案為暫時性檔案系統，重新部署或服務休眠喚醒後 SQLite 資料會被重置（沿用 v1.1.1 的已知限制，尚未解決）
+
 ## v1.1.1 — 2026-07-31（新增 Render 部署設定）
 
 - 新增 `render.yaml`，可透過 Render 的 Blueprint 功能一鍵部署後端 API
