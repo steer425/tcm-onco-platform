@@ -4,6 +4,7 @@ services:
     env: python
     plan: free
     region: singapore
+    branch: main
     buildCommand: "pip install -r requirements.txt"
     startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
@@ -12,7 +13,7 @@ services:
       - key: TCM_JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
-        sync: false  # 請於 Render 網頁後台手動填入雲端 PostgreSQL 連線字串，不寫入 git 版本控制
+        sync: false  # 請於 Render 網頁後台手動填入「正式」Neon PostgreSQL 連線字串，不寫入 git 版本控制
       - key: GOOGLE_CLIENT_ID
         sync: false  # 請於 Render 後台手動填入 Google Cloud Console 取得的 Client ID
       - key: GOOGLE_CLIENT_SECRET
@@ -22,3 +23,32 @@ services:
       - key: FRONTEND_BASE_URL
         value: https://fwc-tcmsp.pages.dev
     autoDeploy: true
+
+  # ---------------------------------------------------------------------
+  # 測試站（staging）：目前暫停使用，先專心搞定正式站。
+  # 之後要重新啟用時，把下面這整段的每行開頭 "# " 拿掉即可（保持縮排一致）。
+  # ---------------------------------------------------------------------
+  # - type: web
+  #   name: tcm-onco-backend-staging
+  #   env: python
+  #   plan: free
+  #   region: singapore
+  #   branch: staging
+  #   buildCommand: "pip install -r requirements.txt"
+  #   startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+  #   envVars:
+  #     - key: PYTHON_VERSION
+  #       value: 3.12.0
+  #     - key: TCM_JWT_SECRET
+  #       generateValue: true
+  #     - key: DATABASE_URL
+  #       sync: false
+  #     - key: GOOGLE_CLIENT_ID
+  #       sync: false
+  #     - key: GOOGLE_CLIENT_SECRET
+  #       sync: false
+  #     - key: GOOGLE_REDIRECT_URI
+  #       value: https://tcm-onco-backend-staging.onrender.com/auth/google/callback
+  #     - key: FRONTEND_BASE_URL
+  #       value: https://fwc-tcmsp-staging.pages.dev
+  #   autoDeploy: true

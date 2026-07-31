@@ -1,5 +1,32 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.7.1 — 2026-07-31（暫停 staging 環境，先專心搞定正式站）
+
+v1.7.0 建置的正式站／測試站分離架構評估後覺得太複雜，暫時停用，先集中處理正式站：
+
+- `render.yaml`：staging 服務整段註解掉（設定保留，之後要恢復把每行開頭的 `# ` 拿掉即可）
+- `frontend/js/api.js`：拿掉依網域判斷 API 位置的邏輯，改回固定指向正式站後端
+- `app/main.py`：CORS 移除 staging 網域，只保留正式站與本機測試
+- README「正式站／測試站分離」章節保留供之後參考，並加註目前暫停使用
+
+## v1.7.0 — 2026-07-31（正式站／測試站環境分離）
+
+### 新增功能
+
+- `render.yaml` 新增第二個服務 `tcm-onco-backend-staging`，綁定 `staging` 分支，環境變數與正式站完全獨立（各自的 `DATABASE_URL`、`FRONTEND_BASE_URL`、`GOOGLE_REDIRECT_URI`、`TCM_JWT_SECRET`）
+- `app/main.py` CORS 設定新增允許 `https://fwc-tcmsp-staging.pages.dev`（含其 Cloudflare Pages 預覽網址）
+- `frontend/js/api.js` 新增 `resolveApiBase()`：依前端目前部署的網域（正式站/測試站/本機）自動決定要呼叫哪個後端 API，同一份前端程式碼可以同時部署到兩個環境
+- README 新增完整「正式站／測試站分離」設定章節，涵蓋 Git 分支策略、Neon 測試專用資料庫、Render Blueprint 新增服務、Google OAuth 多加一筆重新導向 URI、Cloudflare Pages 新建獨立專案等步驟
+
+### 使用方式
+
+日常開發／測試都先 push 到 `staging` 分支，在 `https://fwc-tcmsp-staging.pages.dev` 驗證沒問題後，再合併回 `main` 觸發正式站更新，降低直接動到正式環境的風險。
+
+### 已知限制
+
+- 兩個環境目前共用同一組 Google OAuth 用戶端（只是在 Google Cloud Console 多加一筆測試站的重新導向 URI），如果之後想讓兩邊完全獨立（例如不同的 OAuth 應用程式審核狀態），需要另外申請一組新的 Client ID/Secret
+- 測試站的 TCMSP 資料、帳號、角色等都需要在測試資料庫另外手動建置/匯入一次，不會自動從正式站同步
+
 ## v1.6.0 — 2026-07-31（TCMSP 藥材關聯資料改為資料庫化，取代本機端 JSON 檔案）
 
 ### 背景

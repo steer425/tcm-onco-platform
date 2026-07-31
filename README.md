@@ -1,6 +1,6 @@
 # TCM 中藥腫瘤篩選平台 — 目標零後台系統
 
-**目前版本：v1.6.0**（已通過使用者本機測試審查並正式上版，詳見 [CHANGELOG.md](./CHANGELOG.md)）
+**目前版本：v1.7.1**（已通過使用者本機測試審查並正式上版，詳見 [CHANGELOG.md](./CHANGELOG.md)）
 
 本次交付內容：**目標零（帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄）** 後端 API + 對應前端頁面，以及登入後可見的 **Dashboard（施工中佔位頁）**。
 
@@ -123,7 +123,71 @@ python -m app.import_tcmsp_data data_import/tcmsp_data.json
 
 管理者可在後台查詢藥材列表、編輯備注、下架（軟刪除）藥材（下架後不會出現在前台查詢站）。成分/靶點/疾病/各類關聯表資料量龐大且屬於批次匯入的參考資料，目前不提供逐筆後台編輯，如需更新內容，請重新執行上述匯入腳本。
 
-## 八、Google OAuth 設定（第三方登入）
+## 八、正式站／測試站分離（Staging 環境）
+
+> ⚠️ **目前暫停使用**，先專心把正式站搞定。以下步驟保留供之後需要時參考，`render.yaml` 裡對應的 staging 服務設定也已整段註解掉。
+
+系統現在分為兩個完全獨立的環境：
+
+| | 正式站 | 測試站（staging） |
+|---|---|---|
+| 前端 | `https://fwc-tcmsp.pages.dev` | `https://fwc-tcmsp-staging.pages.dev` |
+| 後端 | `https://tcm-onco-backend.onrender.com` | `https://tcm-onco-backend-staging.onrender.com` |
+| 資料庫 | Neon 正式 project | Neon 另一個獨立 project |
+| Git 分支 | `main` | `staging` |
+
+前端會依照瀏覽網址自動判斷要打哪個後端（`frontend/js/api.js` 的 `resolveApiBase()`），不需要分別維護兩份前端程式碼。
+
+### 建置步驟
+
+**1. 建立 `staging` 分支**
+```bash
+cd tcm_backend
+git checkout -b staging
+git push -u origin staging
+```
+之後平常開發都先 push 到 `staging` 測試，確認沒問題再合併回 `main` 觸發正式站更新：
+```bash
+git checkout main
+git merge staging
+git push
+```
+
+**2. 在 Neon 另外建一個測試專用的 Project**
+跟正式站一樣的申請流程（見上面「Google OAuth 設定」前的資料庫章節），但這次建一個新的 Neon project，例如命名 `tcm-onco-staging`，取得獨立的連線字串。
+
+**3. Render 後端：Blueprint 會自動偵測到 `render.yaml` 裡新增的 `tcm-onco-backend-staging` 服務**
+- 回到 Render 的 Blueprint 頁面，重新整理應該會看到新服務可以建立（跟著畫面指示 Apply 即可），它會綁定 `staging` 分支
+- 部署完成後，到這個新服務的 Environment 頁面，手動填入：
+  - `DATABASE_URL`：剛才 Neon 測試 project 的連線字串
+  - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`：可以跟正式站共用同一組（見下一步）
+
+**4. Google Cloud Console：多加一筆重新導向 URI**
+回到當初申請 OAuth 用戶端的頁面，在「已授權的重新導向 URI」清單裡**多加一筆**（不要刪掉正式站那筆）：
+```
+https://tcm-onco-backend-staging.onrender.com/auth/google/callback
+```
+
+**5. Cloudflare Pages：新建一個獨立的 Pages 專案**
+- Cloudflare Dashboard → Workers & Pages → **新建 Pages 專案**（不是編輯現有的 `fwc-tcmsp` 專案）
+- 連接到同一個 GitHub repo：`steer425/tcm-onco-platform`
+- **Production branch 選 `staging`**（這是跟正式站設定唯一不同的地方）
+- Build output directory：`frontend`
+- 專案名稱建議取 `fwc-tcmsp-staging`，這樣網址會自動變成 `fwc-tcmsp-staging.pages.dev`
+
+**6. 測試站的資料匯入**
+TCMSP 資料需要對測試資料庫另外匯入一次：
+```bash
+$env:DATABASE_URL="測試站的 Neon 連線字串"
+python -m app.import_tcmsp_data data_import/tcmsp_data.json
+```
+
+### 使用方式
+
+- 日常開發／測試：改動程式碼 → push 到 `staging` 分支 → 在 `https://fwc-tcmsp-staging.pages.dev` 測試
+- 確認沒問題：合併 `staging` 到 `main` → push → 正式站自動更新
+
+## 九、Google OAuth 設定（第三方登入）
 
 系統已實作真正的 Google OAuth 2.0 登入（Authorization Code Flow），需要你自己申請一組 Google OAuth 用戶端，步驟如下：
 

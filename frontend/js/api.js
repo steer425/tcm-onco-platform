@@ -1,5 +1,7 @@
 // 共用 API 呼叫工具
-const API_BASE = "https://tcm-onco-backend.onrender.com"; // 已部署於 Render 的後端 API 網址
+// 測試站（staging）功能目前暫停使用，先固定指向正式站後端。
+// 之後要恢復雙站環境時，可以參考 CHANGELOG v1.7.0 的 resolveApiBase() 寫法。
+const API_BASE = "https://tcm-onco-backend.onrender.com";
 
 function getToken() {
   return localStorage.getItem("tcm_token");
