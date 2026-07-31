@@ -189,15 +189,12 @@ let molsByHerb, targetsByMol, diseasesByTar, herbsWithData;
 async function bootstrapData(){
   const herbListEl = document.getElementById('herbList');
   herbListEl.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:12.5px;">資料載入中，請稍候...</div>';
-  let res;
   try {
-    res = await fetch('data/tcmsp_data.json');
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    DATA = await api('/tcmsp/data/full');
   } catch (e) {
     herbListEl.innerHTML = '<div style="padding:20px;color:#e08080;font-size:12.5px;">資料載入失敗：' + e.message + '</div>';
     return;
   }
-  DATA = await res.json();
 
   // ---------- Index / lookup maps ----------
   herbsById = new Map(DATA.herbs.map(h => [h.herb_id, h]));

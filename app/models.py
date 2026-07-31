@@ -209,6 +209,97 @@ class PharmacyReview(Base):
     user = relationship("User")
 
 
+# ---------- 目標一/二：TCMSP 藥材關聯資料庫（正式資料庫化，取代原本本機端 JSON 檔案） ----------
+
+class TcmspHerb(Base):
+    __tablename__ = "tcmsp_herbs"
+
+    id = Column(Integer, primary_key=True)  # 沿用原始資料的 herb_id
+    herb_cn_name = Column(String, nullable=True)
+    herb_pinyin = Column(String, nullable=True)
+    herb_en_name = Column(String, nullable=False, index=True)
+    child_cn_name = Column(String, nullable=True)
+    child_en_name = Column(String, nullable=True)
+    status = Column(String, default="active", nullable=False)  # active / inactive（軟刪除）
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TcmspIngredient(Base):
+    __tablename__ = "tcmsp_ingredients"
+
+    mol_id = Column(String, primary_key=True)  # 例如 MOL000001
+    molecule_name = Column(String, nullable=True)
+    mw = Column(String, nullable=True)
+    hdon = Column(String, nullable=True)
+    hacc = Column(String, nullable=True)
+    alogp = Column(String, nullable=True)
+    halflife = Column(String, nullable=True)
+    ob = Column(String, nullable=True)
+    caco2 = Column(String, nullable=True)
+    bbb = Column(String, nullable=True)
+    dl = Column(String, nullable=True)
+    fasa = Column(String, nullable=True)
+    tpsa = Column(String, nullable=True)
+    rbn = Column(String, nullable=True)
+    source = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+
+
+class TcmspTarget(Base):
+    __tablename__ = "tcmsp_targets"
+
+    tar_id = Column(String, primary_key=True)  # 例如 TAR00002
+    target_id = Column(Integer, nullable=True)
+    drugbank_id = Column(String, nullable=True)
+    target_name = Column(String, nullable=True)
+    kegg = Column(String, nullable=True)
+    source = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+
+
+class TcmspDisease(Base):
+    __tablename__ = "tcmsp_diseases"
+
+    dis_id = Column(String, primary_key=True)  # 例如 DIS00001
+    disease_id = Column(Integer, nullable=True)
+    disease_name = Column(String, nullable=True)
+    icd9 = Column(String, nullable=True)
+    icd10 = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+
+
+class TcmspHerbIngredient(Base):
+    __tablename__ = "tcmsp_herb_ingredient"
+    __table_args__ = (UniqueConstraint("herb_id", "mol_id", name="uq_tcmsp_herb_mol"),)
+
+    id = Column(String, primary_key=True, default=gen_id)
+    herb_id = Column(Integer, ForeignKey("tcmsp_herbs.id"), nullable=False, index=True)
+    mol_id = Column(String, ForeignKey("tcmsp_ingredients.mol_id"), nullable=False, index=True)
+
+
+class TcmspIngredientTarget(Base):
+    __tablename__ = "tcmsp_ingredient_target"
+    __table_args__ = (UniqueConstraint("mol_id", "tar_id", name="uq_tcmsp_mol_tar"),)
+
+    id = Column(String, primary_key=True, default=gen_id)
+    mol_id = Column(String, ForeignKey("tcmsp_ingredients.mol_id"), nullable=False, index=True)
+    tar_id = Column(String, ForeignKey("tcmsp_targets.tar_id"), nullable=False, index=True)
+    validated = Column(String, nullable=True)
+    svm_score = Column(String, nullable=True)
+    rf_score = Column(String, nullable=True)
+
+
+class TcmspTargetDisease(Base):
+    __tablename__ = "tcmsp_target_disease"
+    __table_args__ = (UniqueConstraint("tar_id", "dis_id", name="uq_tcmsp_tar_dis"),)
+
+    id = Column(String, primary_key=True, default=gen_id)
+    tar_id = Column(String, ForeignKey("tcmsp_targets.tar_id"), nullable=False, index=True)
+    dis_id = Column(String, ForeignKey("tcmsp_diseases.dis_id"), nullable=False, index=True)
+
+
 class LoginLog(Base):
     __tablename__ = "login_logs"
 

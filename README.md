@@ -1,6 +1,6 @@
 # TCM 中藥腫瘤篩選平台 — 目標零後台系統
 
-**目前版本：v1.5.1**（已通過使用者本機測試審查並正式上版，詳見 [CHANGELOG.md](./CHANGELOG.md)）
+**目前版本：v1.6.0**（已通過使用者本機測試審查並正式上版，詳見 [CHANGELOG.md](./CHANGELOG.md)）
 
 本次交付內容：**目標零（帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄）** 後端 API + 對應前端頁面，以及登入後可見的 **Dashboard（施工中佔位頁）**。
 
@@ -104,7 +104,26 @@ Render **免費方案的檔案系統是「暫時性」的**：
 2. 把 `frontend/` 這個資料夾內容部署到 Cloudflare Pages（在 Cloudflare Pages 專案設定裡，Build output directory 設為 `frontend`）
 3. 回到後端 `app/main.py`，把 CORS 設定從允許所有來源（`allow_origins=["*"]`），改成只允許你的 Cloudflare Pages 網域，例如 `https://fwc-tcmsp.pages.dev`，安全性更好（此步驟屬於上線前建議，非必要但建議）
 
-## 七、Google OAuth 設定（第三方登入）
+## 七、TCMSP 藥材關聯資料匯入（目標一/二）
+
+v1.6.0 起，TCMSP 藥材關聯資料已改為存放在資料庫（不再是前端讀取的本機端 JSON 檔案），透過 `/tcmsp/data/full` API 提供。
+
+### 首次建置或更新資料
+
+原始資料檔放在 `data_import/tcmsp_data.json`（不會隨前端部署到 Cloudflare Pages，僅供匯入使用）。執行：
+
+```bash
+cd tcm_backend
+python -m app.import_tcmsp_data data_import/tcmsp_data.json
+```
+
+這個腳本會清空既有 TCMSP 相關資料表後重新匯入，可重複執行（idempotent）。**正式環境（接了 Neon PostgreSQL 之後）也是執行同一個指令**，只是要先確保執行當下的 `DATABASE_URL` 環境變數有指向正式的雲端資料庫（可以在本機終端機用 `export DATABASE_URL=...` 暫時設定後再執行匯入指令，這樣腳本會連到雲端資料庫寫入，而不是本機 SQLite）。
+
+### 後台管理
+
+管理者可在後台查詢藥材列表、編輯備注、下架（軟刪除）藥材（下架後不會出現在前台查詢站）。成分/靶點/疾病/各類關聯表資料量龐大且屬於批次匯入的參考資料，目前不提供逐筆後台編輯，如需更新內容，請重新執行上述匯入腳本。
+
+## 八、Google OAuth 設定（第三方登入）
 
 系統已實作真正的 Google OAuth 2.0 登入（Authorization Code Flow），需要你自己申請一組 Google OAuth 用戶端，步驟如下：
 

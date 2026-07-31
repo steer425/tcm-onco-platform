@@ -1,5 +1,27 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.6.0 — 2026-07-31（TCMSP 藥材關聯資料改為資料庫化，取代本機端 JSON 檔案）
+
+### 背景
+
+先前版本（v1.4.0～v1.5.1）的 TCMSP 藥材關聯資料是直接放在前端可讀取的靜態 JSON 檔案（`frontend/data/tcmsp_data.json`），純粹由瀏覽器端 fetch 讀取後在本機運算查詢/篩選，資料庫本身完全沒有這批資料，也無法透過後台管理。這次依需求把資料正式匯入資料庫，並改由後端 API 提供查詢。
+
+### 新增功能
+
+- `app/models.py` 新增 6 張 TCMSP 相關資料表：`tcmsp_herbs`（藥材）、`tcmsp_ingredients`（成分）、`tcmsp_targets`（靶點）、`tcmsp_diseases`（疾病）、`tcmsp_herb_ingredient`（藥材-成分關聯）、`tcmsp_ingredient_target`（成分-靶點關聯）、`tcmsp_target_disease`（靶點-疾病關聯）
+- 新增 `app/import_tcmsp_data.py` 匯入腳本：`python -m app.import_tcmsp_data data_import/tcmsp_data.json`，可重複執行（先清空再匯入），本機 SQLite 測試匯入全部資料（502 藥材、13,728 成分、1,751 靶點、564 疾病、共約 9 萬筆關聯）耗時約 4.5 秒
+- 新增後端 API：
+  - `GET /tcmsp/data/full`（登入即可查詢，供前台查詢站使用，取代原本讀取靜態 JSON 檔案）
+  - `GET /tcmsp/herbs`、`PUT /tcmsp/herbs/{id}`、`DELETE /tcmsp/herbs/{id}`（後台管理，僅限管理者：查詢/編輯備注與狀態/軟刪除下架）
+- `tcmsp_query.html` 改為呼叫 `/tcmsp/data/full` API，不再讀取本機端 JSON 檔案
+- 原始資料檔搬移到 `data_import/tcmsp_data.json`（不會隨前端部署到 Cloudflare Pages，只作為匯入來源保留）
+
+### 已知限制
+
+- 成分/靶點/疾病/各類關聯表資料量龐大（合計約 9 萬筆），屬於批次匯入的參考資料，暫不提供逐筆後台編輯介面；如需更新內容，需重新執行匯入腳本（會清空重建）
+- `/tcmsp/data/full` 目前是即時查詢資料庫組裝完整資料回傳（未加快取），資料量大時每次請求都需要重新查詢組裝，如果之後使用者數增加、效能出現問題，可考慮加上伺服器端快取
+- 正式環境（Render + Neon）需要手動執行一次匯入腳本（並指向正式的 `DATABASE_URL`），才會有資料；程式碼部署本身不會自動觸發資料匯入
+
 ## v1.5.1 — 2026-07-31（修正：改用真正的原始完整資料取代重建版本）
 
 ### 背景
