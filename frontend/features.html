@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>功能項目管理 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  table.feature-table th, table.feature-table td { vertical-align: middle; }
+  .chk-cell { text-align: center; }
+  input.nav-label-input { width: 140px; }
+  input.sort-input { width: 60px; }
+  .module-badge { display:inline-block; background:#e8f3ec; color:#1f4f37; border-radius:4px; padding:1px 8px; font-size:11px; }
+</style>
+</head>
+<body data-current-page="features.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">功能項目管理</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <p class="hint-msg" style="margin-top:0;">
+        控制每個功能項目是否啟用、是否顯示在前台／後台導覽選單。停用（啟用取消勾選）後，該項目對所有人（含管理者）都會消失。
+        Dashboard 小工具（主機資訊／版本資訊／專案文件／2026年目標）只受「啟用」欄位控制，前台/後台勾選對它們無作用。
+        <br>要控制「哪些角色」能看到某個已啟用的功能，請到<a href="roles.html">角色管理</a>頁面設定該角色的權限矩陣（can_view）。
+      </p>
+      <table class="feature-table">
+        <thead>
+          <tr>
+            <th>代碼</th><th>模組</th><th>名稱</th><th>導覽文字</th>
+            <th>頁面</th><th>啟用</th><th>前台</th><th>後台</th><th>排序</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="featureTableBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/features.js"></script>
+</body>
+</html>

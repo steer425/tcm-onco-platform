@@ -39,21 +39,11 @@
   .dash-card a.link:hover { text-decoration: underline; }
 </style>
 </head>
-<body>
+<body data-current-page="dashboard.html">
 <div class="layout">
   <aside class="sidebar">
     <h1>TCM 中藥腫瘤篩選平台</h1>
-    <nav>
-      <a href="dashboard.html" class="active">Dashboard</a>
-      <a href="roles.html">角色管理</a>
-      <a href="users.html">帳號管理</a>
-      <a href="applications.html">帳號審核</a>
-      <a href="pharmacies.html">中藥行管理</a>
-      <a href="finder.html">中藥行地理推薦（前台）</a>
-      <a href="tcmsp_query.html">TCMSP 藥材關聯查詢站</a>
-      <a href="logs.html">稽核 / 登入紀錄</a>
-      <a href="#" id="logoutLink">登出</a>
-    </nav>
+    <nav id="navContainer"></nav>
   </aside>
   <main class="main">
     <div class="topbar">
@@ -62,22 +52,22 @@
     </div>
 
     <div class="dash-grid">
-      <div class="card dash-card">
+      <div class="card dash-card" id="cardHosts">
         <h3>🖥️ 主機資訊</h3>
         <div id="hostsList">載入中...</div>
       </div>
 
-      <div class="card dash-card">
+      <div class="card dash-card" id="cardVersion">
         <h3>🏷️ 版本資訊　<span class="version-badge" id="currentVersionBadge">v...</span></h3>
         <div class="version-list" id="versionList">載入中...</div>
       </div>
 
-      <div class="card dash-card">
+      <div class="card dash-card" id="cardDocs">
         <h3>📄 專案文件</h3>
         <div class="doc-list-btns" id="docList">載入中...</div>
       </div>
 
-      <div class="card dash-card">
+      <div class="card dash-card" id="cardGoals">
         <h3>🎯 2026 年工作目標</h3>
         <div id="goalsList">載入中...</div>
         <div style="margin-top:10px; text-align:right;">
@@ -111,6 +101,7 @@
 </div>
 
 <script src="js/api.js"></script>
+<script src="js/nav.js"></script>
 <script src="js/dashboard.js"></script>
 </body>
 </html>

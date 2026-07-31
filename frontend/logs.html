@@ -10,21 +10,11 @@
   .tabs button.active { background:#2f6f4f; color:#fff; }
 </style>
 </head>
-<body>
+<body data-current-page="logs.html">
 <div class="layout">
   <aside class="sidebar">
     <h1>TCM 中藥腫瘤篩選平台</h1>
-    <nav>
-      <a href="dashboard.html">Dashboard</a>
-      <a href="roles.html">角色管理</a>
-      <a href="users.html">帳號管理</a>
-      <a href="applications.html">帳號審核</a>
-      <a href="pharmacies.html">中藥行管理</a>
-      <a href="finder.html">中藥行地理推薦（前台）</a>
-      <a href="tcmsp_query.html">TCMSP 藥材關聯查詢站</a>
-      <a href="logs.html" class="active">稽核 / 登入紀錄</a>
-      <a href="#" id="logoutLink">登出</a>
-    </nav>
+    <nav id="navContainer"></nav>
   </aside>
   <main class="main">
     <div class="topbar">
@@ -67,6 +57,7 @@
 </div>
 
 <script src="js/api.js"></script>
+<script src="js/nav.js"></script>
 <script src="js/logs.js"></script>
 </body>
 </html>

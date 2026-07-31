@@ -11,7 +11,7 @@ router = APIRouter(prefix="/project-info", tags=["Dashboard：專案資訊"])
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-APP_VERSION = "1.8.0"  # 與 app/main.py 的 FastAPI(version=...) 保持同步
+APP_VERSION = "1.9.0"  # 與 app/main.py 的 FastAPI(version=...) 保持同步
 
 SUMMARY_MAX_LEN = 60  # 版本摘要固定長度（超過用刪節號截斷）
 
@@ -19,6 +19,7 @@ DOCS = [
     {"id": "readme", "title": "README", "path": "README.md"},
     {"id": "changelog", "title": "版本更新紀錄", "path": "CHANGELOG.md"},
     {"id": "goals2026", "title": "2026 年工作目標", "path": "docs/2026_goals.md"},
+    {"id": "rules", "title": "開發規範（rules.md）", "path": "rules.md"},
 ]
 
 

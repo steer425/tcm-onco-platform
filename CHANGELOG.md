@@ -1,5 +1,35 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.9.0 — 2026-07-31（功能項目顯示控制、前台/後台導覽區隔、動態選單）
+
+### 新增功能
+
+- **功能項目管理**（新頁面 `features.html`，F0-14）：管理者可對每個功能項目勾選「啟用」「顯示於前台」「顯示於後台」，並編輯導覽文字與排序，即時生效
+- **Dashboard 小工具開關**：Dashboard 四張卡片（主機資訊/版本資訊/專案文件/2026年目標）現在各自對應一個功能代碼（F0-13-1~F0-13-4），可在「功能項目管理」個別停用/啟用
+- **前台／後台導覽區隔**：新增 `GET /nav/menu`，依目前使用者的角色權限（管理者永遠全見；一般角色需要 `can_view` 權限）動態回傳可見的功能項目，側邊選單改由 `js/nav.js` 統一動態渲染，分成「前台功能」「後台管理」兩區塊
+- 「一般使用者」角色種子資料現在會自動取得所有 `show_frontend=true` 功能的 `can_view` 權限（目前為：Dashboard、中藥行地理推薦、TCMSP 藥材關聯查詢站）
+- `Feature` 資料表新增欄位：`enabled`、`show_frontend`、`show_backend`、`nav_label`、`page_url`、`sort_order`
+- 新增 `app/feature_config.py`：全站功能項目設定單一資料來源，`seed.py` 與 `migrate_schema.py` 共用
+- 新增 `app/migrate_schema.py`：既有資料庫（尤其正式環境 Neon）需要手動執行一次，補齊 `features` 資料表新欄位並回填正確的導覽設定
+- 新增 `/features` PUT 端點（先前只有新增/刪除，沒有編輯）
+- 新增 `rules.md`：記錄「每個功能獨立頁面」「功能顯示控制三層機制」等開發規範，並列入 Dashboard 專案文件清單
+
+### 部署注意事項
+
+**正式環境（Render + Neon）這次更新後，除了照常 push 程式碼，還需要額外執行一次遷移指令**：
+
+```bash
+$env:DATABASE_URL="你的 Neon 連線字串"
+python -m app.migrate_schema
+```
+
+沒有執行的話，`features` 資料表會缺少新欄位，`/nav/menu`、`/features` 等 API 會報錯。
+
+### 已知限制
+
+- 目前只有「選單看不看得到」是動態控制的，個別 API 的存取權限仍然是各自路由用 `require_admin`／`require_permission()` 明確檢查——兩者需要一起維護，不能只靠隱藏選單當作安全機制
+- 按鈕層級的操作權限（`can_execute`）後端已有檢查機制，但前端還沒有依此動態隱藏「編輯/刪除」按鈕
+
 ## v1.8.0 — 2026-07-31（Dashboard 全面改版：不再是施工中佔位頁）
 
 ### 新增功能

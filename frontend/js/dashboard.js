@@ -1,12 +1,3 @@
-requireLogin();
-
-document.getElementById("logoutLink").addEventListener("click", async (e) => {
-  e.preventDefault();
-  try { await api(`/auth/logout?login_log_id=${getLoginLogId()}`, { method: "POST" }); } catch (err) {}
-  clearSession();
-  window.location.href = "index.html";
-});
-
 (async () => {
   try {
     const data = await api("/dashboard");
@@ -118,7 +109,30 @@ function renderGoals() {
   `).join("");
 }
 
+// ---------- 依後台「功能項目管理」設定，決定要顯示哪些 Dashboard 小工具 ----------
+const WIDGET_CARD_MAP = {
+  "F0-13-1": "cardHosts",
+  "F0-13-2": "cardVersion",
+  "F0-13-3": "cardDocs",
+  "F0-13-4": "cardGoals",
+};
+
+async function applyWidgetVisibility() {
+  try {
+    const menu = await api("/nav/menu");
+    const visibleCodes = new Set(menu.map(i => i.code));
+    for (const [code, cardId] of Object.entries(WIDGET_CARD_MAP)) {
+      const el = document.getElementById(cardId);
+      if (!el) continue;
+      el.style.display = visibleCodes.has(code) ? "" : "none";
+    }
+  } catch (err) {
+    // 取得失敗時保守作法：全部照常顯示，不影響既有使用體驗
+  }
+}
+
 loadHosts();
 loadVersion();
 loadDocs();
 renderGoals();
+applyWidgetVisibility();

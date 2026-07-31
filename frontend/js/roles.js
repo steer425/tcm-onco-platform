@@ -1,5 +1,3 @@
-requireLogin();
-
 let allRoles = [];
 
 async function loadUserInfo() {
@@ -9,13 +7,6 @@ async function loadUserInfo() {
       `${data.account}（${(data.role_names || []).join("、") || "無角色"}）`;
   } catch (err) { /* ignore */ }
 }
-
-document.getElementById("logoutLink").addEventListener("click", async (e) => {
-  e.preventDefault();
-  try { await api(`/auth/logout?login_log_id=${getLoginLogId()}`, { method: "POST" }); } catch (e) {}
-  clearSession();
-  window.location.href = "index.html";
-});
 
 async function loadRoles() {
   allRoles = await api("/roles");

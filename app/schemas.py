@@ -90,6 +90,24 @@ class FeatureCreate(BaseModel):
     name: str
     description: Optional[str] = None
     notes: Optional[str] = None
+    nav_label: Optional[str] = None
+    page_url: Optional[str] = None
+    show_frontend: bool = False
+    show_backend: bool = True
+    sort_order: int = 0
+
+
+class FeatureUpdate(BaseModel):
+    module: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    notes: Optional[str] = None
+    nav_label: Optional[str] = None
+    page_url: Optional[str] = None
+    enabled: Optional[bool] = None
+    show_frontend: Optional[bool] = None
+    show_backend: Optional[bool] = None
+    sort_order: Optional[int] = None
 
 
 class FeatureOut(BaseModel):
@@ -99,6 +117,12 @@ class FeatureOut(BaseModel):
     name: str
     description: Optional[str]
     notes: Optional[str]
+    enabled: bool
+    show_frontend: bool
+    show_backend: bool
+    nav_label: Optional[str]
+    page_url: Optional[str]
+    sort_order: int
 
     class Config:
         from_attributes = True

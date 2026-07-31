@@ -84,7 +84,12 @@ class UserRole(Base):
 
 
 class Feature(Base):
-    """對應各功能模組/頁面，例如 F0-2 角色管理頁面"""
+    """對應各功能模組/頁面，例如 F0-2 角色管理頁面
+
+    is_admin() 角色一律可見全部已啟用（enabled）的功能；一般角色需搭配 RolePermission.can_view。
+    show_frontend / show_backend 控制這個功能出現在「前台」或「後台」導覽選單（可同時勾選兩者）。
+    page_url 為 None 時代表這不是一個獨立頁面（例如 Dashboard 小工具），僅用於「啟用/停用」控制。
+    """
     __tablename__ = "features"
 
     id = Column(String, primary_key=True, default=gen_id)
@@ -93,6 +98,13 @@ class Feature(Base):
     name = Column(String, nullable=False)                # e.g. 角色管理
     description = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
+
+    enabled = Column(Boolean, default=True, nullable=False)          # 總開關：停用後全站都看不到（含管理者）
+    show_frontend = Column(Boolean, default=False, nullable=False)   # 顯示於前台導覽
+    show_backend = Column(Boolean, default=True, nullable=False)     # 顯示於後台導覽
+    nav_label = Column(String, nullable=True)             # 導覽選單顯示文字（空白時退回用 name）
+    page_url = Column(String, nullable=True)              # 對應的獨立 HTML 頁面（None = 非頁面項目，如 Dashboard 小工具）
+    sort_order = Column(Integer, default=0, nullable=False)
 
     permissions = relationship("RolePermission", back_populates="feature", cascade="all, delete-orphan")
 

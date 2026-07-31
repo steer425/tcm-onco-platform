@@ -1,5 +1,3 @@
-requireLogin();
-
 let pharmacies = [];
 let myLocation = null; // { lat, lng }
 let currentUserId = null;
@@ -14,13 +12,6 @@ async function loadUserInfo() {
     currentUserId = me.id;
   } catch (err) {}
 }
-
-document.getElementById("logoutLink").addEventListener("click", async (e) => {
-  e.preventDefault();
-  try { await api(`/auth/logout?login_log_id=${getLoginLogId()}`, { method: "POST" }); } catch (e) {}
-  clearSession();
-  window.location.href = "index.html";
-});
 
 // Haversine 距離計算（公里）
 function distanceKm(lat1, lng1, lat2, lng2) {

@@ -30,6 +30,21 @@ def create_feature(payload: schemas.FeatureCreate, db: Session = Depends(get_db)
     return feature
 
 
+@router.put("/features/{feature_id}", response_model=schemas.FeatureOut, summary="編輯功能項目（啟用/顯示前台/顯示後台/導覽文字/排序）")
+def update_feature(feature_id: str, payload: schemas.FeatureUpdate, db: Session = Depends(get_db),
+                    admin: models.User = Depends(require_admin)):
+    feature = db.query(models.Feature).filter(models.Feature.id == feature_id).first()
+    if not feature:
+        raise HTTPException(status_code=404, detail="找不到功能項目")
+    data = payload.model_dump(exclude_unset=True)
+    for field, value in data.items():
+        setattr(feature, field, value)
+    db.commit()
+    db.refresh(feature)
+    write_audit_log(db, admin, "update_feature", "feature", feature.id, f"編輯功能項目 {feature.code}")
+    return feature
+
+
 @router.delete("/features/{feature_id}", summary="刪除功能項目")
 def delete_feature(feature_id: str, db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
     feature = db.query(models.Feature).filter(models.Feature.id == feature_id).first()

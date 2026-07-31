@@ -52,6 +52,15 @@ body {
   color: #fff;
 }
 
+.sidebar nav .nav-section-label {
+  padding: 14px 20px 4px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,0.45);
+  text-transform: uppercase;
+}
+.sidebar nav .nav-section-label:first-child { padding-top: 6px; }
+
 .main {
   flex: 1;
   padding: 28px 36px;
