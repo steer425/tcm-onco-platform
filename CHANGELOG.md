@@ -1,5 +1,11 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.1.1 — 2026-07-31（新增 Render 部署設定）
+
+- 新增 `render.yaml`，可透過 Render 的 Blueprint 功能一鍵部署後端 API
+- README 新增「部署到 Render」「Cloudflare Pages 前端串接」兩個章節，說明完整部署流程
+- ⚠️ 記錄已知限制：Render 免費方案檔案系統為暫時性，SQLite 資料庫會在重新部署/服務喚醒時被重置，正式上線前需改接雲端 PostgreSQL（已列入待辦）
+
 ## v1.1.0 — 2026-07-31（目標五：中藥行地理推薦，前台 + 後台）
 
 ### 新增功能

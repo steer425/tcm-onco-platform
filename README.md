@@ -1,6 +1,6 @@
 # TCM 中藥腫瘤篩選平台 — 目標零後台系統
 
-**目前版本：v1.1.0**（已通過使用者本機測試審查並正式上版，詳見 [CHANGELOG.md](./CHANGELOG.md)）
+**目前版本：v1.1.1**（已通過使用者本機測試審查並正式上版，詳見 [CHANGELOG.md](./CHANGELOG.md)）
 
 本次交付內容：**目標零（帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄）** 後端 API + 對應前端頁面，以及登入後可見的 **Dashboard（施工中佔位頁）**。
 
@@ -55,3 +55,51 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - [ ] JWT 撤銷/黑名單機制（目前登出僅記錄登出時間，token 本身在到期前仍可使用，屬已知限制）
 - [ ] 自動化測試（pytest）覆蓋所有 API
 - [ ] 部署腳本與正式環境設定（環境變數管理 SECRET_KEY、資料庫改為 PostgreSQL 等）
+
+## 五、部署到 Render（後端 API 上線）
+
+本專案已附上 `render.yaml`，可直接用 Render 的「Blueprint」功能一鍵讀取設定並部署。
+
+### 步驟
+
+1. 前往 https://render.com 註冊/登入（可以直接用 GitHub 帳號登入，比較快）
+2. 右上角 **New +** → 選擇 **Blueprint**
+3. 選擇要連接的 GitHub repo：`steer425/tcm-onco-platform`
+   - 如果是第一次連接，Render 會要求安裝 GitHub App 並授權存取這個 repo（只需授權這一個 repo 即可，不用給全部 repo 權限）
+4. Render 會自動讀到專案裡的 `render.yaml`，顯示即將建立的服務 `tcm-onco-backend`，確認後點 **Apply**
+5. 等待幾分鐘讓它跑完 `pip install` 並啟動，狀態變成 **Live** 就代表部署成功
+6. 部署完成後，Render 會給你一個網址，格式類似：
+   ```
+   https://tcm-onco-backend.onrender.com
+   ```
+   把這個網址記下來，等一下要填到前端的 `API_BASE`
+
+### 部署後驗證
+
+打開瀏覽器輸入：
+```
+https://tcm-onco-backend.onrender.com/docs
+```
+如果看到 Swagger API 文件頁面，就代表後端已經成功在線上運作。
+
+### ⚠️ 重要限制：免費方案的資料庫問題
+
+Render **免費方案的檔案系統是「暫時性」的**：
+- 每次重新部署（push 新程式碼）、或服務閒置一段時間被喚醒時，**SQLite 資料庫檔案（`tcm_platform.db`）會被重置成初始狀態**（只剩下 seed 產生的預設管理者帳號跟範例中藥行資料，之前建立的角色/帳號/評價等資料都會消失）
+- 這對「本機測試」沒問題，但**正式上線給真實使用者用之前，必須換成雲端資料庫（例如 Render 提供的付費 PostgreSQL，或其他雲端 MySQL/PostgreSQL 服務）**，否則資料會不斷遺失
+- 這件事已列入待辦事項，等你確認要正式上線的時間點，我再協助把 `app/database.py` 改接 PostgreSQL
+
+### 環境變數說明
+
+`render.yaml` 已設定 `TCM_JWT_SECRET` 由 Render 自動產生一組隨機值（比程式碼裡預設的 `dev-secret-change-me-in-production` 安全），不需要手動填寫。
+
+## 六、Cloudflare Pages 前端串接（部署後端之後再做）
+
+後端在 Render 上線、拿到網址後，需要：
+
+1. 修改 `frontend/js/api.js` 裡的 `API_BASE`，從空字串改成 Render 給的網址：
+   ```js
+   const API_BASE = "https://tcm-onco-backend.onrender.com";
+   ```
+2. 把 `frontend/` 這個資料夾內容部署到 Cloudflare Pages（在 Cloudflare Pages 專案設定裡，Build output directory 設為 `frontend`）
+3. 回到後端 `app/main.py`，把 CORS 設定從允許所有來源（`allow_origins=["*"]`），改成只允許你的 Cloudflare Pages 網域，例如 `https://fwc-tcmsp.pages.dev`，安全性更好（此步驟屬於上線前建議，非必要但建議）
