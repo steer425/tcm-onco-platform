@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>TCM 中藥腫瘤篩選平台 - 登入</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <h2>TCM 中藥腫瘤篩選平台</h2>
+    <p style="color:#6b7a70;font-size:13px;margin:0;">後台管理系統登入</p>
+
+    <form id="loginForm">
+      <label for="account">帳號</label>
+      <input id="account" required autocomplete="username" />
+
+      <label for="password">密碼</label>
+      <input id="password" type="password" required autocomplete="current-password" />
+
+      <div style="margin-top:20px; display:flex; gap:10px;">
+        <button type="submit" style="flex:1;">登入</button>
+        <button type="button" class="secondary" id="applyBtn" style="flex:1;">申請新帳號</button>
+      </div>
+    </form>
+    <div id="errorMsg" class="error-msg"></div>
+    <p class="hint-msg">測試帳號：admin / 0000（僅供本機測試，正式環境請務必更改密碼）</p>
+  </div>
+</div>
+
+<!-- 申請新帳號 Modal -->
+<div id="applyModal" class="modal-backdrop" style="display:none;">
+  <div class="modal">
+    <h3>申請新帳號</h3>
+    <label>帳號</label>
+    <input id="applyAccount" />
+    <label>密碼</label>
+    <input id="applyPassword" type="password" />
+    <label>備注（選填）</label>
+    <textarea id="applyNotes" rows="3"></textarea>
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="secondary" id="applyCancel">取消</button>
+      <button id="applySubmit">送出申請</button>
+    </div>
+    <div id="applyMsg" class="hint-msg"></div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>稽核 / 登入 / 備份紀錄 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .tabs { display:flex; gap:6px; margin-bottom:16px; }
+  .tabs button { background:#fff; color:#2f6f4f; border:1px solid #2f6f4f; }
+  .tabs button.active { background:#2f6f4f; color:#fff; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="roles.html">角色管理</a>
+      <a href="users.html">帳號管理</a>
+      <a href="applications.html">帳號審核</a>
+      <a href="pharmacies.html">中藥行管理</a>
+      <a href="finder.html">中藥行地理推薦（前台）</a>
+      <a href="logs.html" class="active">稽核 / 登入紀錄</a>
+      <a href="#" id="logoutLink">登出</a>
+    </nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">稽核 / 登入 / 備份紀錄</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="tabs">
+      <button class="active" data-tab="audit">稽核紀錄</button>
+      <button data-tab="login">登入紀錄</button>
+      <button data-tab="backup">資料庫備份紀錄</button>
+    </div>
+
+    <div class="card" id="tab-audit">
+      <input id="auditFilter" placeholder="依操作者帳號搜尋" style="max-width:220px; margin-bottom:12px;" />
+      <table>
+        <thead><tr><th>時間</th><th>操作者</th><th>動作</th><th>對象</th><th>詳情</th><th>備注</th><th></th></tr></thead>
+        <tbody id="auditBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card" id="tab-login" style="display:none;">
+      <input id="loginFilter" placeholder="依帳號搜尋" style="max-width:220px; margin-bottom:12px;" />
+      <table>
+        <thead><tr><th>帳號</th><th>IP</th><th>裝置識別</th><th>登入時間</th><th>登出時間</th><th>停留(秒)</th><th>備注</th><th></th></tr></thead>
+        <tbody id="loginBody"></tbody>
+      </table>
+      <p class="hint-msg">裝置識別為瀏覽器端產生的指紋字串；基於瀏覽器隱私限制，無法取得真實網卡（MAC）位址。</p>
+    </div>
+
+    <div class="card" id="tab-backup" style="display:none;">
+      <button id="triggerBackupBtn" style="margin-bottom:12px;">手動觸發備份紀錄</button>
+      <table>
+        <thead><tr><th>開始時間</th><th>結束時間</th><th>狀態</th><th>檔案路徑</th><th>備注</th><th></th></tr></thead>
+        <tbody id="backupBody"></tbody>
+      </table>
+      <p class="hint-msg">目前為紀錄骨架，尚未串接實際自動備份程序（需維運端建置排程並回寫結果）。</p>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/logs.js"></script>
+</body>
+</html>

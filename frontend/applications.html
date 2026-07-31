@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>帳號審核 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="roles.html">角色管理</a>
+      <a href="users.html">帳號管理</a>
+      <a href="applications.html" class="active">帳號審核</a>
+      <a href="pharmacies.html">中藥行管理</a>
+      <a href="finder.html">中藥行地理推薦（前台）</a>
+      <a href="logs.html">稽核 / 登入紀錄</a>
+      <a href="#" id="logoutLink">登出</a>
+    </nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">帳號申請審核</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <select id="statusFilter" style="max-width:160px; margin-bottom:14px;">
+        <option value="pending">審核中</option>
+        <option value="approved">已核准</option>
+        <option value="rejected">已駁回</option>
+        <option value="">全部</option>
+      </select>
+      <table>
+        <thead>
+          <tr><th>申請帳號</th><th>狀態</th><th>備注</th><th>申請時間</th><th style="width:220px;">操作</th></tr>
+        </thead>
+        <tbody id="appTableBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/applications.js"></script>
+</body>
+</html>

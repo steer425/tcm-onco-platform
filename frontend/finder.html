@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>中藥行地理推薦 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .pharmacy-list { display: grid; gap: 14px; }
+  .pharmacy-item { border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .pharmacy-item h4 { margin: 0 0 6px; }
+  .pharmacy-meta { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+  .stars { color: #d69e2e; }
+  .review-box { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+  .review-line { font-size: 13px; margin-bottom: 6px; }
+  .rating-select { display: flex; gap: 6px; margin: 8px 0; }
+  .rating-select button { padding: 4px 8px; background: #fff; border: 1px solid var(--border); color: #d69e2e; }
+  .rating-select button.selected { background: #d69e2e; color: #fff; border-color: #d69e2e; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="roles.html">角色管理</a>
+      <a href="users.html">帳號管理</a>
+      <a href="applications.html">帳號審核</a>
+      <a href="pharmacies.html">中藥行管理</a>
+      <a href="finder.html" class="active">中藥行地理推薦（前台）</a>
+      <a href="logs.html">稽核 / 登入紀錄</a>
+      <a href="#" id="logoutLink">登出</a>
+    </nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">中藥行地理推薦</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <p id="locationStatus" style="margin:0; color:#6b7a70; font-size:13px;">尚未取得您的位置</p>
+        <button id="locateBtn">取得目前位置並依距離排序</button>
+      </div>
+      <p class="hint-msg">需要瀏覽器授權「使用您的位置」才能依距離排序；若不授權，仍可瀏覽全部中藥行清單（依名稱排序）。</p>
+    </div>
+
+    <div class="pharmacy-list" id="pharmacyList"></div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/finder.js"></script>
+</body>
+</html>

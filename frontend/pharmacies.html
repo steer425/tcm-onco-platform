@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>中藥行管理 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="roles.html">角色管理</a>
+      <a href="users.html">帳號管理</a>
+      <a href="applications.html">帳號審核</a>
+      <a href="pharmacies.html" class="active">中藥行管理</a>
+      <a href="finder.html">中藥行地理推薦（前台）</a>
+      <a href="logs.html">稽核 / 登入紀錄</a>
+      <a href="#" id="logoutLink">登出</a>
+    </nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">中藥行管理（後台）</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <input id="searchInput" placeholder="搜尋中藥行名稱" style="max-width:240px;" />
+        <button id="newBtn">＋ 新增中藥行</button>
+      </div>
+      <table>
+        <thead>
+          <tr><th>名稱</th><th>地址</th><th>電話</th><th>狀態</th><th>評價</th><th>備注</th><th style="width:220px;">操作</th></tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<div id="pharmacyModal" class="modal-backdrop" style="display:none;">
+  <div class="modal">
+    <h3 id="modalTitle">新增中藥行</h3>
+    <input type="hidden" id="pharmacyId" />
+    <label>名稱</label>
+    <input id="fName" />
+    <label>地址</label>
+    <input id="fAddress" />
+    <label>電話</label>
+    <input id="fPhone" />
+    <label>營業時間</label>
+    <input id="fHours" placeholder="例如 09:00-18:00" />
+    <label>緯度 Latitude</label>
+    <input id="fLat" type="number" step="any" placeholder="例如 25.0330" />
+    <label>經度 Longitude</label>
+    <input id="fLng" type="number" step="any" placeholder="例如 121.5654" />
+    <label>簡介</label>
+    <textarea id="fDesc" rows="2"></textarea>
+    <label>狀態</label>
+    <select id="fStatus">
+      <option value="active">上架</option>
+      <option value="inactive">下架</option>
+    </select>
+    <label>備注</label>
+    <textarea id="fNotes" rows="2"></textarea>
+    <p class="hint-msg">
+      不確定經緯度？可以到 Google 地圖上右鍵點選地點，選單第一行會顯示座標，複製貼上即可。
+    </p>
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="secondary" id="modalCancel">取消</button>
+      <button id="modalSave">儲存</button>
+    </div>
+    <div id="modalMsg" class="hint-msg"></div>
+  </div>
+</div>
+
+<div id="reviewsModal" class="modal-backdrop" style="display:none;">
+  <div class="modal">
+    <h3>評價管理：<span id="reviewsPharmacyName"></span></h3>
+    <table>
+      <thead><tr><th>帳號</th><th>星等</th><th>內容</th><th>備注</th><th></th></tr></thead>
+      <tbody id="reviewsBody"></tbody>
+    </table>
+    <div style="margin-top:16px; text-align:right;">
+      <button class="secondary" id="reviewsClose">關閉</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/pharmacies.js"></script>
+</body>
+</html>

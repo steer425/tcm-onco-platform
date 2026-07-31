@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>帳號管理 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="roles.html">角色管理</a>
+      <a href="users.html" class="active">帳號管理</a>
+      <a href="applications.html">帳號審核</a>
+      <a href="pharmacies.html">中藥行管理</a>
+      <a href="finder.html">中藥行地理推薦（前台）</a>
+      <a href="logs.html">稽核 / 登入紀錄</a>
+      <a href="#" id="logoutLink">登出</a>
+    </nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">帳號管理</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px;">
+        <input id="searchInput" placeholder="搜尋帳號" style="max-width:220px;" />
+        <select id="statusFilter" style="max-width:160px;">
+          <option value="">全部狀態</option>
+          <option value="pending">審核中</option>
+          <option value="active">啟用</option>
+          <option value="suspended">停用中</option>
+        </select>
+        <button id="newUserBtn" style="margin-left:auto;">＋ 新增帳號</button>
+      </div>
+      <table>
+        <thead>
+          <tr><th>帳號</th><th>狀態</th><th>角色</th><th>停用原因</th><th>備注</th><th style="width:180px;">操作</th></tr>
+        </thead>
+        <tbody id="userTableBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<div id="userModal" class="modal-backdrop" style="display:none;">
+  <div class="modal">
+    <h3 id="userModalTitle">新增帳號</h3>
+    <input type="hidden" id="userId" />
+    <label>帳號</label>
+    <input id="userAccount" />
+    <label>密碼<span id="pwHint" style="color:#6b7a70;"></span></label>
+    <input id="userPassword" type="password" />
+    <label>狀態</label>
+    <select id="userStatus">
+      <option value="active">啟用</option>
+      <option value="pending">審核中</option>
+      <option value="suspended">停用中</option>
+    </select>
+    <label>停用原因（狀態為停用時填寫）</label>
+    <input id="userSuspendReason" />
+    <label>角色（可複選）</label>
+    <select id="userRoles" multiple size="4"></select>
+    <label>備注</label>
+    <textarea id="userNotes" rows="3"></textarea>
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="secondary" id="userModalCancel">取消</button>
+      <button id="userModalSave">儲存</button>
+    </div>
+    <div id="userModalMsg" class="hint-msg"></div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/users.js"></script>
+</body>
+</html>

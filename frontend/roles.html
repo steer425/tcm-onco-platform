@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>角色管理 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="roles.html" class="active">角色管理</a>
+      <a href="users.html">帳號管理</a>
+      <a href="applications.html">帳號審核</a>
+      <a href="pharmacies.html">中藥行管理</a>
+      <a href="finder.html">中藥行地理推薦（前台）</a>
+      <a href="logs.html">稽核 / 登入紀錄</a>
+      <a href="#" id="logoutLink">登出</a>
+    </nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">角色管理</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <input id="searchInput" placeholder="搜尋角色名稱" style="max-width:240px;" />
+        <button id="newRoleBtn">＋ 新增角色</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>角色名稱</th><th>說明</th><th>備注</th><th>帳號數</th><th>類型</th><th style="width:260px;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="roleTableBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- 新增/編輯角色 Modal -->
+<div id="roleModal" class="modal-backdrop" style="display:none;">
+  <div class="modal">
+    <h3 id="roleModalTitle">新增角色</h3>
+    <input type="hidden" id="roleId" />
+    <label>角色名稱</label>
+    <input id="roleName" />
+    <label>說明</label>
+    <input id="roleDesc" />
+    <label>備注</label>
+    <textarea id="roleNotes" rows="3"></textarea>
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="secondary" id="roleModalCancel">取消</button>
+      <button id="roleModalSave">儲存</button>
+    </div>
+    <div id="roleModalMsg" class="hint-msg"></div>
+  </div>
+</div>
+
+<!-- 權限矩陣 Modal -->
+<div id="permModal" class="modal-backdrop" style="display:none;">
+  <div class="modal">
+    <h3>設定權限矩陣：<span id="permRoleName"></span></h3>
+    <div id="permList"></div>
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="secondary" id="permCancel">取消</button>
+      <button id="permSave">儲存</button>
+    </div>
+    <div id="permMsg" class="hint-msg"></div>
+  </div>
+</div>
+
+<!-- 角色底下帳號 Modal -->
+<div id="usersModal" class="modal-backdrop" style="display:none;">
+  <div class="modal">
+    <h3>角色底下已設定帳號：<span id="usersRoleName"></span></h3>
+    <table>
+      <thead><tr><th>帳號</th><th>狀態</th></tr></thead>
+      <tbody id="usersListBody"></tbody>
+    </table>
+    <div style="margin-top:16px; text-align:right;">
+      <button class="secondary" id="usersCancel">關閉</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/roles.js"></script>
+</body>
+</html>
