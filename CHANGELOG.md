@@ -1,5 +1,54 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.5.1 — 2026-07-31（修正：改用真正的原始完整資料取代重建版本）
+
+### 背景
+
+v1.4.0 因為手上只有 `tcmsp_herb_details_merged_500.json`（原始爬取資料，未含中文名稱與 ICD 編碼），只能自己寫轉換腳本重建一份簡化版資料，並在多處用預設值/推斷值頂替缺漏欄位（例如 495 種藥材沒有中文名稱、疾病沒有 ICD9/10）。
+
+使用者後續提供了完整的原始專案原始碼（`HERB_Q_1.7z`），裡面的 `tcmsp_herb_query_site.html` 是當時實際上線運作的完整版本，內嵌了真正正式的資料。比對後發現核心關聯數量（成分/靶點/疾病/各類關聯表）完全一致，證實資料源頭相同，但正式版額外包含：
+
+- **全部 502 種藥材的正式中文名稱、拼音、分類**（v1.4.0 版本只有人參屬 5 種藥材有中文名稱，其餘用英文學名頂替）
+- **疾病的 ICD9 / ICD10 編碼**（v1.4.0 版本此欄位全部是空值）
+- 靶點的 DrugBank ID、KEGG 對照等額外欄位
+- 成分的 TPSA、RBN 等額外 ADME 欄位
+- 標準化的 `TAR00002`／`DIS00001` 格式編號（v1.4.0 版本靶點編號是未加前綴的原始數字）
+
+### 修正內容
+
+- `frontend/data/tcmsp_data.json` 改為直接使用從 `tcmsp_herb_query_site.html` 抽取出的正式資料（11.8MB），取代 v1.4.0 用腳本重建的簡化版（9.1MB）
+- 頁面程式碼（`tcmsp_query.html`）與資料載入邏輯不需變動，直接相容新資料
+
+### 已知限制（更新）
+
+- 前一版「495 種藥材沒有中文名稱」「疾病沒有 ICD 編碼」的限制已解決
+- 其餘限制維持不變：純前端運作、後台無法編輯此資料集，需要更新須替換 `tcmsp_data.json` 檔案本身
+
+## v1.5.0 — 2026-07-31（真正的 Google OAuth 登入，取代先前的骨架）
+
+### 新增功能
+
+- 實作完整 Google OAuth 2.0 Authorization Code Flow：
+  - `GET /auth/google/enabled` — 查詢是否已設定 Google 金鑰（供前端判斷是否顯示按鈕）
+  - `GET /auth/google/login` — 導向 Google 登入頁（含 CSRF state 保護）
+  - `GET /auth/google/callback` — Google 導回後交換 token、取得使用者 email，完成登入或建立待審核帳號
+- 新增 `app/oauth_google.py`：封裝 Google OAuth 的網址建構與 token/使用者資訊交換邏輯
+- 登入頁（`index.html`）新增「使用 Google 帳號登入」按鈕，僅在後端已設定 Google 金鑰時顯示
+- 新增 `oauth_callback.html` 中繼頁面，處理 Google 登入完成後的 token 寫入與導轉
+- **帳號治理與一般註冊一致**：第一次用 Google 登入會建立「審核中」帳號＋一筆帳號申請紀錄，需管理者於「帳號審核」頁核准後才能登入；若 Google email 對應到既有帳號則自動綁定
+- `render.yaml` 新增 `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`（皆為 `sync: false`，需於 Render 後台手動填入）、`GOOGLE_REDIRECT_URI`、`FRONTEND_BASE_URL` 環境變數
+- README 新增完整「Google OAuth 設定」章節，含 Google Cloud Console 申請步驟
+
+### 重要說明：修正先前的誤解
+
+先前對話中容易被誤以為「第三方登入已經完成」，但實際上此前只有：(1) 早期規劃文件把它列為 F0-6 待辦項目、(2) 一個純資料表 CRUD 骨架（`/oauth-accounts`，只能手動輸入 provider_user_id，沒有真正的登入按鈕與授權流程）。本版本才是第一次真正實作可運作的 Google 登入。
+
+### 已知限制
+
+- CSRF state 使用伺服器記憶體內暫存，僅適合單一伺服器程序；多 worker/多實例部署需改用 Redis 等共享暫存
+- 小紅書（RED）、WeChat 第三方登入仍未實作，維持先前的資料表 CRUD 骨架，需另外確認開發者資格與串接規範
+- 尚未實測真實 Google 帳號完整登入流程（本次僅完成程式碼邏輯與錯誤路徑的自動化測試），需要你申請好 Client ID/Secret 後實際跑一次才能最終確認
+
 ## v1.4.0 — 2026-07-31（整合 TCMSP 藥材關聯查詢站，目標一/二）
 
 ### 新增功能

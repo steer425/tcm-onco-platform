@@ -1,6 +1,6 @@
 # TCM 中藥腫瘤篩選平台 — 目標零後台系統
 
-**目前版本：v1.4.0**（已通過使用者本機測試審查並正式上版，詳見 [CHANGELOG.md](./CHANGELOG.md)）
+**目前版本：v1.5.1**（已通過使用者本機測試審查並正式上版，詳見 [CHANGELOG.md](./CHANGELOG.md)）
 
 本次交付內容：**目標零（帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄）** 後端 API + 對應前端頁面，以及登入後可見的 **Dashboard（施工中佔位頁）**。
 
@@ -103,3 +103,49 @@ Render **免費方案的檔案系統是「暫時性」的**：
    ```
 2. 把 `frontend/` 這個資料夾內容部署到 Cloudflare Pages（在 Cloudflare Pages 專案設定裡，Build output directory 設為 `frontend`）
 3. 回到後端 `app/main.py`，把 CORS 設定從允許所有來源（`allow_origins=["*"]`），改成只允許你的 Cloudflare Pages 網域，例如 `https://fwc-tcmsp.pages.dev`，安全性更好（此步驟屬於上線前建議，非必要但建議）
+
+## 七、Google OAuth 設定（第三方登入）
+
+系統已實作真正的 Google OAuth 2.0 登入（Authorization Code Flow），需要你自己申請一組 Google OAuth 用戶端，步驟如下：
+
+### 申請 Google OAuth 用戶端
+
+1. 前往 https://console.cloud.google.com 並登入你的 Google 帳號
+2. 建立一個新專案（或使用既有專案），例如命名為 `tcm-onco-platform`
+3. 左側選單「API 和服務」→「OAuth 同意畫面」：
+   - 使用者類型選 **外部**
+   - 填寫應用程式名稱（例如「TCM 中藥腫瘤篩選平台」）、使用者支援電子郵件
+   - Scopes 新增 `email`、`profile`、`openid`
+   - 若應用程式還在測試階段，記得在「測試使用者」加入你自己與其他要測試的 Google 帳號 email（測試階段只有加入的帳號能登入成功）
+4. 左側選單「憑證」→「建立憑證」→「OAuth 用戶端 ID」：
+   - 應用程式類型選 **網頁應用程式**
+   - 已授權的重新導向 URI 填入：
+     ```
+     https://tcm-onco-backend.onrender.com/auth/google/callback
+     ```
+     （本機測試則另外加一筆 `http://localhost:8000/auth/google/callback`）
+5. 建立完成後會拿到 **用戶端 ID（Client ID）** 與 **用戶端密鑰（Client Secret）**，請妥善保管，不要提交進版本控制或貼在任何對話/聊天工具裡
+
+### 填入 Render 環境變數
+
+到 Render 的 `tcm-onco-backend` 服務 → **Environment** → 新增/編輯：
+
+| Key | Value |
+|---|---|
+| `GOOGLE_CLIENT_ID` | 剛才取得的 Client ID |
+| `GOOGLE_CLIENT_SECRET` | 剛才取得的 Client Secret |
+| `GOOGLE_REDIRECT_URI` | `https://tcm-onco-backend.onrender.com/auth/google/callback`（`render.yaml` 已預設此值，通常不需要改） |
+| `FRONTEND_BASE_URL` | `https://fwc-tcmsp.pages.dev`（`render.yaml` 已預設此值，通常不需要改） |
+
+儲存後 Render 會自動重新部署。部署完成後，登入頁應該會自動出現「使用 Google 帳號登入」按鈕（前端會呼叫 `/auth/google/enabled` 判斷是否顯示，未設定金鑰時按鈕不會出現）。
+
+### 帳號治理規則（與一般帳密註冊一致）
+
+- **第一次**用 Google 登入的人，系統會自動建立一筆帳號（帳號欄位＝Google email），狀態為「審核中」，並產生一筆帳號申請紀錄，管理者需要到「帳號審核」頁面核准後，該使用者才能登入成功
+- 如果這個 Google email 剛好等於某個既有帳號（例如管理者手動建立過同名帳號），系統會自動把這次 Google 登入綁定到該既有帳號，之後這個人可以繼續用密碼或 Google 兩種方式登入
+- 帳號被停用時，即使用 Google 登入也一樣會被擋下
+
+### 已知限制
+
+- CSRF state 目前用伺服器記憶體內的 `set` 暫存，只適合單一伺服器程序運作；如果之後 Render 服務改成多 worker/多實例，需要改用 Redis 等跨程序共享的暫存機制
+- 小紅書（RED）、WeChat 的第三方登入尚未實作，仍是先前的資料表 CRUD 骨架（`/oauth-accounts`），需要另外確認這兩個平台的開發者資格與串接規範

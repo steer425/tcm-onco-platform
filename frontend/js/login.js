@@ -38,3 +38,35 @@ document.getElementById("applySubmit").addEventListener("click", async () => {
     msg.textContent = "申請失敗：" + err.message;
   }
 });
+
+// 檢查 Google 登入是否已啟用（後端有設定 GOOGLE_CLIENT_ID/SECRET 才會顯示按鈕）
+(async () => {
+  try {
+    const data = await api("/auth/google/enabled");
+    if (data.enabled) {
+      document.getElementById("googleLoginWrap").style.display = "block";
+    }
+  } catch (err) {
+    // 查詢失敗就不顯示 Google 登入按鈕，不影響一般帳密登入
+  }
+})();
+
+document.getElementById("googleLoginBtn").addEventListener("click", () => {
+  window.location.href = (API_BASE || "") + "/auth/google/login";
+});
+
+// 顯示 Google 登入失敗/待審核等錯誤訊息（從 oauth_callback.html 轉導回登入頁時帶的參數）
+(() => {
+  const params = new URLSearchParams(window.location.search);
+  const err = params.get("google_error");
+  if (!err) return;
+  const messages = {
+    pending_review: "帳號審核中，請等待管理者審核通過後再登入。",
+    suspended: "此帳號已被停用，請聯繫管理者。",
+    google_denied: "已取消 Google 登入授權。",
+    invalid_state: "登入驗證逾時或失效，請重新嘗試。",
+    token_exchange_failed: "與 Google 交換登入憑證失敗，請重新嘗試。",
+    missing_profile: "無法取得 Google 帳號資訊，請確認已授權 email 權限。",
+  };
+  document.getElementById("errorMsg").textContent = messages[err] || ("Google 登入失敗：" + err);
+})();

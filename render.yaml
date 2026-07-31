@@ -13,4 +13,12 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false  # 請於 Render 網頁後台手動填入雲端 PostgreSQL 連線字串，不寫入 git 版本控制
+      - key: GOOGLE_CLIENT_ID
+        sync: false  # 請於 Render 後台手動填入 Google Cloud Console 取得的 Client ID
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false  # 請於 Render 後台手動填入 Google Cloud Console 取得的 Client Secret
+      - key: GOOGLE_REDIRECT_URI
+        value: https://tcm-onco-backend.onrender.com/auth/google/callback
+      - key: FRONTEND_BASE_URL
+        value: https://fwc-tcmsp.pages.dev
     autoDeploy: true

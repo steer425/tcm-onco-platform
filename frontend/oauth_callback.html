@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>登入中... - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card" style="text-align:center;">
+    <h2>登入處理中...</h2>
+    <p style="color:#6b7a70; font-size:13px;">正在完成 Google 登入，請稍候。</p>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+(() => {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("token");
+  const loginLogId = params.get("login_log_id");
+  const error = params.get("error");
+
+  if (token) {
+    setSession(token, loginLogId || "");
+    window.location.href = "dashboard.html";
+    return;
+  }
+
+  const errorCode = error || "unknown";
+  window.location.href = "index.html?google_error=" + encodeURIComponent(errorCode);
+})();
+</script>
+</body>
+</html>
