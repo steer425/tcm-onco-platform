@@ -1,6 +1,6 @@
 # TCM 中藥腫瘤篩選平台 — 目標零後台系統
 
-**目前版本：v1.12.1**（已通過使用者本機測試審查並正式上版，詳見 [CHANGELOG.md](./CHANGELOG.md)）
+**目前版本：v1.13.0**（已通過使用者本機測試審查並正式上版，詳見 [CHANGELOG.md](./CHANGELOG.md)）
 
 本次交付內容：**目標零（帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄）** 後端 API + 對應前端頁面，以及登入後可見的 **Dashboard（施工中佔位頁）**。
 
@@ -234,3 +234,36 @@ python -m app.import_tcmsp_data data_import/tcmsp_data.json
 
 - CSRF state 目前用伺服器記憶體內的 `set` 暫存，只適合單一伺服器程序運作；如果之後 Render 服務改成多 worker/多實例，需要改用 Redis 等跨程序共享的暫存機制
 - 小紅書（RED）、WeChat 的第三方登入尚未實作，仍是先前的資料表 CRUD 骨架（`/oauth-accounts`），需要另外確認這兩個平台的開發者資格與串接規範
+
+## 十、Facebook OAuth 設定（第三方登入）
+
+跟 Google 一樣是真正的 OAuth 2.0 Authorization Code Flow，需要申請一組 Facebook App。
+
+### 申請 Facebook App
+
+1. 前往 https://developers.facebook.com/apps 並登入你的 Facebook 帳號
+2. 點 **建立應用程式**，類型選 **消費者** 或 **其他**（依畫面選項，目的是要能用「Facebook 登入」產品）
+3. 建立完成後，在應用程式左側選單新增 **Facebook 登入** 產品
+4. 「Facebook 登入」→「設定」，在「**有效的 OAuth 重新導向 URI**」填入：
+   ```
+   https://tcm-onco-backend.onrender.com/auth/facebook/callback
+   ```
+   （本機測試則另外加一筆 `http://localhost:8000/auth/facebook/callback`）
+5. 左側選單「應用程式設定」→「基本資料」，可以取得 **應用程式編號（App ID）** 與 **應用程式密鑰（App Secret）**
+6. 應用程式預設是「開發模式」，只有你自己跟加到「測試人員」名單的帳號能登入成功；要開放給所有人使用，需要送 Facebook 審核（申請 `email` 這個 Scope 的存取權限），這步驟這裡先不處理，測試階段用開發模式即可
+
+### 填入 Render 環境變數
+
+| Key | Value |
+|---|---|
+| `FACEBOOK_CLIENT_ID` | 剛才取得的應用程式編號（App ID） |
+| `FACEBOOK_CLIENT_SECRET` | 剛才取得的應用程式密鑰（App Secret） |
+| `FACEBOOK_REDIRECT_URI` | `https://tcm-onco-backend.onrender.com/auth/facebook/callback`（`render.yaml` 已預設此值，通常不需要改） |
+
+儲存後 Render 會自動重新部署，登入頁會自動出現「使用 Facebook 帳號登入」按鈕。
+
+### 已知限制
+
+- 部分 Facebook 帳號沒有綁定 email（例如只用手機號碼註冊），這種帳號登入時會被系統擋下並提示「這個 Facebook 帳號沒有提供 email」，因為本系統的帳號體系是以 email 作為帳號識別，沒有 email 就無法建立有意義的帳號名稱
+- 應用程式在「開發模式」下，只有你自己與加到測試人員名單的 Facebook 帳號能成功登入；要開放給一般大眾使用需要送 Facebook 審核
+- 帳號治理規則（首次登入建立待審核帳號、email 相同自動綁定既有帳號等）跟 Google 完全一致，詳見上一節說明

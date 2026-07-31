@@ -8,8 +8,13 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.database import get_db
 from app.deps import get_current_user, write_audit_log
+from app.oauth_facebook import (
+    build_facebook_auth_url, exchange_code_for_userinfo as facebook_exchange_code_for_userinfo,
+    facebook_oauth_configured,
+)
 from app.oauth_google import (
-    FRONTEND_BASE_URL, build_google_auth_url, exchange_code_for_userinfo, google_oauth_configured,
+    FRONTEND_BASE_URL, build_google_auth_url, exchange_code_for_userinfo as google_exchange_code_for_userinfo,
+    google_oauth_configured,
 )
 from app.security import create_access_token, hash_password, verify_password
 
@@ -18,6 +23,65 @@ router = APIRouter(prefix="/auth", tags=["登入與帳號申請"])
 # 簡易 CSRF state 暫存：僅適合單一伺服器程序執行的情境。
 # 若日後改用多 worker/多實例部署，需要改為 Redis 等跨程序共享的暫存機制。
 _oauth_states: set = set()
+
+
+def _redirect_oauth_error(code_str: str) -> RedirectResponse:
+    return RedirectResponse(f"{FRONTEND_BASE_URL}/oauth_callback.html?error={code_str}")
+
+
+def _handle_oauth_login(db: Session, provider: models.OAuthProvider, provider_user_id: str,
+                         email: str, provider_label: str) -> RedirectResponse:
+    """Google／Facebook 共用的帳號綁定與登入邏輯：
+    - 已綁定過 → 直接登入該帳號
+    - 沒綁定過但 email 對應到既有帳號 → 自動綁定該帳號（第三方已驗證 email 擁有權，視為可信）
+    - 都沒有 → 建立新帳號（狀態：審核中），走跟一般註冊一樣的帳號審核流程
+    """
+    link = db.query(models.OAuthAccount).filter(
+        models.OAuthAccount.provider == provider,
+        models.OAuthAccount.provider_user_id == provider_user_id,
+    ).first()
+
+    if link:
+        user = db.query(models.User).filter(models.User.id == link.user_id).first()
+    else:
+        user = db.query(models.User).filter(models.User.account == email).first()
+        is_new_user = user is None
+        if is_new_user:
+            user = models.User(
+                account=email,
+                password_hash=hash_password(secrets.token_urlsafe(24)),  # 佔位密碼，使用者僅會透過第三方登入
+                status=models.UserStatus.pending,
+                notes=f"透過 {provider_label} 登入自動建立帳號，待管理者審核",
+            )
+            db.add(user)
+            db.flush()
+            db.add(models.AccountApplication(account=email, user_id=user.id, notes=f"{provider_label} 第三方登入自動申請"))
+        db.add(models.OAuthAccount(
+            user_id=user.id, provider=provider,
+            provider_user_id=provider_user_id, notes=f"{provider_label} email: {email}",
+        ))
+        db.commit()
+        db.refresh(user)
+        write_audit_log(db, None, f"{provider.value}_oauth_link", "user", user.id,
+                         f"{email} 首次以 {provider_label} 登入並綁定帳號")
+
+    if not user:
+        return _redirect_oauth_error("user_not_found")
+    if user.status == models.UserStatus.pending:
+        return _redirect_oauth_error("pending_review")
+    if user.status == models.UserStatus.suspended:
+        return _redirect_oauth_error("suspended")
+
+    login_log = models.LoginLog(
+        user_id=user.id, account=user.account, ip_address=None, user_agent=f"{provider.value}-oauth",
+    )
+    db.add(login_log)
+    db.commit()
+    db.refresh(login_log)
+
+    token = create_access_token({"sub": user.id, "acc": user.account})
+    write_audit_log(db, user, f"login_{provider.value}", "user", user.id, f"{user.account} 以 {provider_label} 帳號登入")
+    return RedirectResponse(f"{FRONTEND_BASE_URL}/oauth_callback.html?token={token}&login_log_id={login_log.id}")
 
 
 @router.post("/apply", response_model=schemas.ApplicationOut, summary="申請新帳號")
@@ -98,70 +162,60 @@ def google_login():
 
 @router.get("/google/callback", summary="Google 登入回呼（由 Google 導回，不需前端直接呼叫）")
 async def google_callback(code: str = None, state: str = None, error: str = None, db: Session = Depends(get_db)):
-    def redirect_err(code_str: str):
-        return RedirectResponse(f"{FRONTEND_BASE_URL}/oauth_callback.html?error={code_str}")
-
     if error:
-        return redirect_err("google_denied")
+        return _redirect_oauth_error("google_denied")
     if not code or not state or state not in _oauth_states:
-        return redirect_err("invalid_state")
+        return _redirect_oauth_error("invalid_state")
     _oauth_states.discard(state)
 
     try:
-        userinfo = await exchange_code_for_userinfo(code)
+        userinfo = await google_exchange_code_for_userinfo(code)
     except HTTPException:
-        return redirect_err("token_exchange_failed")
+        return _redirect_oauth_error("token_exchange_failed")
 
     google_sub = userinfo.get("sub")
     email = userinfo.get("email")
     if not google_sub or not email:
-        return redirect_err("missing_profile")
+        return _redirect_oauth_error("missing_profile")
 
-    link = db.query(models.OAuthAccount).filter(
-        models.OAuthAccount.provider == models.OAuthProvider.google,
-        models.OAuthAccount.provider_user_id == google_sub,
-    ).first()
+    return _handle_oauth_login(db, models.OAuthProvider.google, google_sub, email, "Google")
 
-    if link:
-        user = db.query(models.User).filter(models.User.id == link.user_id).first()
-    else:
-        user = db.query(models.User).filter(models.User.account == email).first()
-        is_new_user = user is None
-        if is_new_user:
-            user = models.User(
-                account=email,
-                password_hash=hash_password(secrets.token_urlsafe(24)),  # 佔位密碼，使用者僅會透過 Google 登入
-                status=models.UserStatus.pending,
-                notes="透過 Google 登入自動建立帳號，待管理者審核",
-            )
-            db.add(user)
-            db.flush()
-            db.add(models.AccountApplication(account=email, user_id=user.id, notes="Google 第三方登入自動申請"))
-        db.add(models.OAuthAccount(
-            user_id=user.id, provider=models.OAuthProvider.google,
-            provider_user_id=google_sub, notes=f"Google email: {email}",
-        ))
-        db.commit()
-        db.refresh(user)
-        write_audit_log(db, None, "google_oauth_link", "user", user.id, f"{email} 首次以 Google 登入並綁定帳號")
 
-    if not user:
-        return redirect_err("user_not_found")
-    if user.status == models.UserStatus.pending:
-        return redirect_err("pending_review")
-    if user.status == models.UserStatus.suspended:
-        return redirect_err("suspended")
+@router.get("/facebook/enabled", summary="查詢 Facebook 登入是否已啟用（供前台判斷是否顯示按鈕）")
+def facebook_enabled():
+    return {"enabled": facebook_oauth_configured()}
 
-    login_log = models.LoginLog(
-        user_id=user.id, account=user.account, ip_address=None, user_agent="google-oauth",
-    )
-    db.add(login_log)
-    db.commit()
-    db.refresh(login_log)
 
-    token = create_access_token({"sub": user.id, "acc": user.account})
-    write_audit_log(db, user, "login_google", "user", user.id, f"{user.account} 以 Google 帳號登入")
-    return RedirectResponse(f"{FRONTEND_BASE_URL}/oauth_callback.html?token={token}&login_log_id={login_log.id}")
+@router.get("/facebook/login", summary="導向 Facebook 登入頁")
+def facebook_login():
+    state = secrets.token_urlsafe(16)
+    _oauth_states.add(state)
+    return RedirectResponse(build_facebook_auth_url(state))
+
+
+@router.get("/facebook/callback", summary="Facebook 登入回呼（由 Facebook 導回，不需前端直接呼叫）")
+async def facebook_callback(code: str = None, state: str = None, error: str = None, db: Session = Depends(get_db)):
+    if error:
+        return _redirect_oauth_error("facebook_denied")
+    if not code or not state or state not in _oauth_states:
+        return _redirect_oauth_error("invalid_state")
+    _oauth_states.discard(state)
+
+    try:
+        userinfo = await facebook_exchange_code_for_userinfo(code)
+    except HTTPException:
+        return _redirect_oauth_error("token_exchange_failed")
+
+    facebook_id = userinfo.get("id")
+    email = userinfo.get("email")
+    if not facebook_id:
+        return _redirect_oauth_error("missing_profile")
+    if not email:
+        # 部分 Facebook 帳號沒有綁定 email（例如手機號碼註冊），這裡直接擋下並提示，
+        # 因為本系統的帳號體系以 email 作為帳號識別，無法用純數字 ID 建立有意義的帳號名稱。
+        return _redirect_oauth_error("facebook_no_email")
+
+    return _handle_oauth_login(db, models.OAuthProvider.facebook, facebook_id, email, "Facebook")
 
 
 @router.get("/me", response_model=schemas.UserOut, summary="取得目前登入者資訊")

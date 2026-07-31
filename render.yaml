@@ -20,6 +20,12 @@ services:
         sync: false  # 請於 Render 後台手動填入 Google Cloud Console 取得的 Client Secret
       - key: GOOGLE_REDIRECT_URI
         value: https://tcm-onco-backend.onrender.com/auth/google/callback
+      - key: FACEBOOK_CLIENT_ID
+        sync: false  # 請於 Render 後台手動填入 Facebook App 的「應用程式編號」
+      - key: FACEBOOK_CLIENT_SECRET
+        sync: false  # 請於 Render 後台手動填入 Facebook App 的「應用程式密鑰」
+      - key: FACEBOOK_REDIRECT_URI
+        value: https://tcm-onco-backend.onrender.com/auth/facebook/callback
       - key: FRONTEND_BASE_URL
         value: https://fwc-tcmsp.pages.dev
     autoDeploy: true

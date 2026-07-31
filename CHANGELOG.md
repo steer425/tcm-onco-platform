@@ -1,5 +1,34 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.13.0 — 2026-07-31（Facebook OAuth 登入、Render 主機資訊連結改指向 Swagger）
+
+### 新增功能
+
+- **真正的 Facebook OAuth 登入**（比照 Google 的 Authorization Code Flow）：
+  - `GET /auth/facebook/enabled`、`GET /auth/facebook/login`、`GET /auth/facebook/callback`
+  - 新增 `app/oauth_facebook.py` 封裝 Facebook OAuth 網址建構與 token/使用者資訊交換邏輯
+  - 登入頁新增「使用 Facebook 帳號登入」按鈕，僅在後端已設定 Facebook 金鑰時顯示
+  - 帳號治理規則跟 Google 完全一致（首次登入建立待審核帳號、email 相同自動綁定既有帳號、帳號停用一樣會被擋下）
+  - Google／Facebook 共用的登入綁定邏輯抽成 `_handle_oauth_login()`，避免重複程式碼
+  - `render.yaml` 新增 `FACEBOOK_CLIENT_ID`／`FACEBOOK_CLIENT_SECRET`（`sync: false`，需於 Render 後台手動填入）、`FACEBOOK_REDIRECT_URI`
+  - README 新增完整「Facebook OAuth 設定」章節，含 Facebook App 申請步驟
+  - `oauth-status.html` 更新 Facebook 的串接狀態為「已完成」
+- Dashboard「主機資訊」卡片的 Render 項目連結，從單純的網址改為直接開啟 Swagger API 文件頁（`/docs`）
+
+### 部署注意事項
+
+這次資料庫變動除了 `features` 表照常回填，還新增了 `OAuthProvider` enum 型別的 `facebook` 列舉值。**正式環境（Neon PostgreSQL）需要重新執行遷移腳本**，腳本已更新為會自動處理這個 enum 新增（SQLite 環境會自動略過這步，不影響本機測試）：
+
+```bash
+$env:DATABASE_URL="你的 Neon 連線字串"
+python -m app.migrate_schema
+```
+
+### 已知限制
+
+- 部分 Facebook 帳號沒有綁定 email（例如手機號碼註冊），登入時會被系統擋下，因為帳號體系以 email 作為識別
+- Facebook App 預設為「開發模式」，只有加到測試人員名單的帳號能登入，要開放一般大眾使用需要送 Facebook 審核（這部分需要你自己在 Facebook Developers 後台操作，程式碼已就緒）
+
 ## v1.12.1 — 2026-07-31（修正公告時區 bug，Dashboard 支援直接編輯版面）
 
 ### 問題與修正

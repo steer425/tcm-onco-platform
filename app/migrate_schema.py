@@ -26,7 +26,16 @@ ALTER_STATEMENTS = [
 
 
 def run():
-    print("步驟 1／2：補齊 features 資料表欄位...")
+    print("步驟 0/3：為 oauthprovider enum 型別新增 'facebook' 列舉值（僅 PostgreSQL 需要，SQLite 會直接略過）...")
+    # ALTER TYPE ... ADD VALUE 不能包在一般交易區塊裡執行，這裡用 AUTOCOMMIT 隔離等級單獨跑。
+    try:
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            conn.execute(text("ALTER TYPE oauthprovider ADD VALUE IF NOT EXISTS 'facebook'"))
+        print("  已新增（或本來就存在）")
+    except Exception as e:
+        print("  略過（可能是 SQLite 環境，或型別/數值已存在）：", str(e)[:150])
+
+    print("步驟 1／3：補齊 features 資料表欄位...")
     with engine.begin() as conn:
         for stmt in ALTER_STATEMENTS:
             try:
@@ -35,7 +44,7 @@ def run():
             except Exception as e:
                 print("  略過（可能欄位已存在）：", stmt, "-", str(e)[:120])
 
-    print("步驟 2／2：依 FEATURE_CONFIG 回填既有功能項目的導覽資料...")
+    print("步驟 2/3：依 FEATURE_CONFIG 回填既有功能項目的導覽資料...")
     db = SessionLocal()
     try:
         # v1.10.0：移除已併入「權限矩陣」的舊版「功能項目管理」獨立頁面（F0-14）

@@ -28,6 +28,7 @@ class ApplicationStatus(str, enum.Enum):
 
 class OAuthProvider(str, enum.Enum):
     google = "google"
+    facebook = "facebook"
     xiaohongshu = "xiaohongshu"
     wechat = "wechat"
 

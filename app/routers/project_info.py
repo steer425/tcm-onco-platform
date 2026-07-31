@@ -11,7 +11,7 @@ router = APIRouter(prefix="/project-info", tags=["Dashboard：專案資訊"])
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-APP_VERSION = "1.12.1"  # 與 app/main.py 的 FastAPI(version=...) 保持同步
+APP_VERSION = "1.13.0"  # 與 app/main.py 的 FastAPI(version=...) 保持同步
 
 SUMMARY_MAX_LEN = 60  # 版本摘要固定長度（超過用刪節號截斷）
 
@@ -38,8 +38,8 @@ def get_hosts(current_user: models.User = Depends(get_current_user)):
         },
         {
             "id": "render", "name": "Render", "role": "後端 API 服務",
-            "url": "https://tcm-onco-backend.onrender.com",
-            "detail": "免費方案，閒置一段時間會休眠，喚醒約需 30~60 秒",
+            "url": "https://tcm-onco-backend.onrender.com/docs",
+            "detail": "免費方案，閒置一段時間會休眠，喚醒約需 30~60 秒（點「開啟」會進入 Swagger API 文件頁）",
         },
         {
             "id": "neon", "name": "Neon PostgreSQL", "role": "雲端資料庫",
