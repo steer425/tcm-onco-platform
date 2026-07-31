@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+tcm_platform.db
+tcm_platform.db-journal
+.env
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/

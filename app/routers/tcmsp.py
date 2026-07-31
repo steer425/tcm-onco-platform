@@ -1,6 +1,9 @@
+import json
+import time
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app import models, schemas
@@ -8,6 +11,18 @@ from app.database import get_db
 from app.deps import get_current_user, require_admin, write_audit_log
 
 router = APIRouter(prefix="/tcmsp", tags=["目標一/二：TCMSP 藥材關聯資料庫"])
+
+# 完整資料量約 10 萬筆關聯，每次即時查詢+序列化組裝耗時較久，改用簡易記憶體快取，
+# 直接快取「已序列化好的 JSON bytes」，命中快取時完全跳過查詢與序列化開銷。
+# 資料只會透過「後台下架藥材」或「重新執行匯入腳本」變動，變動頻率低，
+# 快取 TTL 設定 10 分鐘；後台下架藥材時另外主動清除快取，確保立即生效。
+_full_data_cache = {"json_bytes": None, "expires_at": 0}
+_CACHE_TTL_SECONDS = 600
+
+
+def _invalidate_full_data_cache():
+    _full_data_cache["json_bytes"] = None
+    _full_data_cache["expires_at"] = 0
 
 
 def _val(v):
@@ -26,8 +41,12 @@ def _val(v):
 # 前台／一般登入使用者：查詢用（供 tcmsp_query.html 使用）
 # ---------------------------------------------------------------------------
 
-@router.get("/data/full", summary="取得完整 TCMSP 關聯資料（前台查詢站使用）")
+@router.get("/data/full", summary="取得完整 TCMSP 關聯資料（前台查詢站使用，內建快取）")
 def get_full_data(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    now = time.time()
+    if _full_data_cache["json_bytes"] is not None and _full_data_cache["expires_at"] > now:
+        return Response(content=_full_data_cache["json_bytes"], media_type="application/json")
+
     herbs = db.query(models.TcmspHerb).filter(models.TcmspHerb.status == "active").all()
     ingredients = db.query(models.TcmspIngredient).all()
     targets = db.query(models.TcmspTarget).all()
@@ -38,7 +57,7 @@ def get_full_data(current_user: models.User = Depends(get_current_user), db: Ses
 
     active_herb_ids = {h.id for h in herbs}
 
-    return {
+    result = {
         "herbs": [
             {
                 "herb_id": h.id, "herb_cn_name": h.herb_cn_name, "herb_pinyin": h.herb_pinyin,
@@ -83,6 +102,10 @@ def get_full_data(current_user: models.User = Depends(get_current_user), db: Ses
         "target_disease": [{"tar_id": r.tar_id, "dis_id": r.dis_id} for r in target_disease],
     }
 
+    _full_data_cache["json_bytes"] = json.dumps(result, ensure_ascii=False).encode("utf-8")
+    _full_data_cache["expires_at"] = now + _CACHE_TTL_SECONDS
+    return Response(content=_full_data_cache["json_bytes"], media_type="application/json")
+
 
 # ---------------------------------------------------------------------------
 # 後台管理（僅限管理者）：藥材資料 CRUD（依 F0-9 全站 CRUD 規範）
@@ -124,6 +147,7 @@ def admin_update_herb(herb_id: int, payload: dict, db: Session = Depends(get_db)
     if "notes" in payload:
         herb.notes = payload["notes"]
     db.commit()
+    _invalidate_full_data_cache()
     write_audit_log(db, admin, "update_tcmsp_herb", "tcmsp_herb", str(herb_id), f"編輯藥材 {herb.herb_en_name}")
     return {"message": "已更新"}
 
@@ -135,5 +159,6 @@ def admin_delete_herb(herb_id: int, db: Session = Depends(get_db), admin: models
         raise HTTPException(status_code=404, detail="找不到藥材資料")
     herb.status = "inactive"
     db.commit()
+    _invalidate_full_data_cache()
     write_audit_log(db, admin, "delete_tcmsp_herb_soft", "tcmsp_herb", str(herb_id), f"下架藥材 {herb.herb_en_name}")
     return {"message": "已下架（軟刪除）"}
