@@ -119,12 +119,19 @@ const WIDGET_CARD_MAP = {
 
 async function applyWidgetVisibility() {
   try {
-    const menu = await api("/nav/menu");
-    const visibleCodes = new Set(menu.map(i => i.code));
+    const [menu, me] = await Promise.all([api("/nav/menu"), api("/auth/me")]);
+    const isAdmin = (me.role_names || []).includes("管理者");
+    const byCode = {};
+    menu.forEach(i => { byCode[i.code] = i; });
+
     for (const [code, cardId] of Object.entries(WIDGET_CARD_MAP)) {
       const el = document.getElementById(cardId);
       if (!el) continue;
-      el.style.display = visibleCodes.has(code) ? "" : "none";
+      const item = byCode[code];
+      // 管理者檢查「顯示於後台」欄位，一般使用者檢查「顯示於前台」欄位——
+      // 這樣同一個 Dashboard 頁面，管理者跟一般使用者可以看到不同組合的小工具。
+      const visible = item ? (isAdmin ? item.show_backend : item.show_frontend) : false;
+      el.style.display = visible ? "" : "none";
     }
   } catch (err) {
     // 取得失敗時保守作法：全部照常顯示，不影響既有使用體驗

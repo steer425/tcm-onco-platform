@@ -39,7 +39,14 @@
 
 ## 四、Dashboard 小工具
 
-Dashboard 頁面的四張卡片（主機資訊／版本資訊／專案文件／2026年工作目標）也是走 `features` 機制，代碼為 `F0-13-1` ~ `F0-13-4`，`page_url` 為 `null`（非獨立頁面）。管理者在「功能項目管理」頁面把某張卡片的 `enabled` 取消勾選，該卡片就會從 Dashboard 消失。
+Dashboard 頁面的四張卡片（主機資訊／版本資訊／專案文件／2026年工作目標）也是走 `features` 機制，代碼為 `F0-13-1` ~ `F0-13-4`，`page_url` 為 `null`（非獨立頁面）。
+
+因為 Dashboard 是同一個頁面同時給管理者跟一般使用者看，小工具的 `show_frontend` / `show_backend` 欄位語意跟一般頁面不同：
+
+- 管理者登入看 Dashboard 時，只看 `show_backend = true` 的小工具
+- 一般使用者登入看 Dashboard 時，只看 `show_frontend = true` 的小工具
+
+所以同一張卡片，可以設定成「只給管理者看」「只給一般使用者看」「兩邊都看」「兩邊都不看（＝直接關掉 enabled）」，在「功能項目管理」頁面個別勾選即可，不需要區分是不是有 `page_url`。
 
 ## 五、待補強事項
 

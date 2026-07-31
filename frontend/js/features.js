@@ -28,8 +28,8 @@ function renderFeatures() {
         <td><input class="nav-label-input" data-field="nav_label" value="${f.nav_label || ""}" placeholder="(用名稱)"></td>
         <td>${f.page_url ? f.page_url : '<span class="hint-msg">（小工具，非頁面）</span>'}</td>
         <td class="chk-cell"><input type="checkbox" data-field="enabled" ${f.enabled ? "checked" : ""}></td>
-        <td class="chk-cell"><input type="checkbox" data-field="show_frontend" ${f.show_frontend ? "checked" : ""} ${f.page_url ? "" : "disabled"}></td>
-        <td class="chk-cell"><input type="checkbox" data-field="show_backend" ${f.show_backend ? "checked" : ""} ${f.page_url ? "" : "disabled"}></td>
+        <td class="chk-cell"><input type="checkbox" data-field="show_frontend" ${f.show_frontend ? "checked" : ""}></td>
+        <td class="chk-cell"><input type="checkbox" data-field="show_backend" ${f.show_backend ? "checked" : ""}></td>
         <td><input class="sort-input" type="number" data-field="sort_order" value="${f.sort_order}"></td>
         <td><button onclick="saveFeature('${f.id}', this)">儲存</button></td>
       `;
