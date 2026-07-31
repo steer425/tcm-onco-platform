@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.database import Base, SessionLocal, engine
 from app.routers import (
     account_applications, audit_logs, auth, backup_jobs,
-    dashboard, login_logs, oauth_accounts, permissions, pharmacies, roles, tcmsp, users,
+    dashboard, login_logs, oauth_accounts, permissions, pharmacies, project_info, roles, tcmsp, users,
 )
 from app.seed import seed_default_data
 
@@ -17,7 +17,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="TCM 中藥腫瘤篩選平台 - 後台系統 API（目標零）",
     description="帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄",
-    version="1.7.3",
+    version="1.8.0",
 )
 
 ALLOWED_ORIGINS = [
@@ -49,6 +49,7 @@ app.include_router(login_logs.router)
 app.include_router(dashboard.router)
 app.include_router(pharmacies.router)
 app.include_router(tcmsp.router)
+app.include_router(project_info.router)
 
 
 @app.on_event("startup")

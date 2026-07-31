@@ -1,5 +1,21 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.8.0 — 2026-07-31（Dashboard 全面改版：不再是施工中佔位頁）
+
+### 新增功能
+
+- **主機資訊卡片**：列出 GitHub、Cloudflare Pages、Render、Neon 四個服務的角色說明與連結（`GET /project-info/hosts`）
+- **版本資訊卡片**：顯示目前版本號徽章，下方列出所有歷史版本，每筆固定長度摘要 + 「詳細」按鈕開啟 Modal 顯示該版本完整 CHANGELOG 內容（Markdown 渲染）。後端新增 `GET /project-info/version`，會自動解析 `CHANGELOG.md` 切成結構化版本清單，不需要手動維護重複資料
+- **專案文件卡片**：README、版本更新紀錄、2026 年工作目標三份文件，點按鈕開啟 Modal 直接閱讀（Markdown 渲染），後端新增 `GET /project-info/docs`、`GET /project-info/docs/{doc_id}`，直接讀取專案內對應的 `.md` 檔案內容
+- **2026 年工作目標卡片**：五大目標摘要 + 完成狀態標示（目標五已完成，其餘進行中/規劃中），可點「查看完整文件」看完整內容
+- 新增 `docs/2026_goals.md`：整理五大目標的詳細說明與目前狀態
+- 前端加入 `marked.js`（CDN）做 Markdown 轉 HTML 渲染
+
+### 已知限制
+
+- 「2026 年工作目標」摘要卡片的五筆資料是寫死在前端 JS 裡（`GOALS_SUMMARY`），跟 `docs/2026_goals.md` 內容需要手動保持同步；如果之後目標異動頻繁，可考慮改成後端統一解析
+- 版本資訊的「摘要」是取 CHANGELOG 標題括號內文字，若某版本沒有標題文字，會退回取內文第一行，可能不夠精簡
+
 ## v1.7.3 — 2026-07-31（TCMSP 查詢站效能優化 + 移除「本地資料庫版」字樣）
 
 ### 效能優化
