@@ -38,6 +38,12 @@
   .full-modal-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .dash-card a.link { color: #2f6f4f; text-decoration: none; font-weight: 600; }
   .dash-card a.link:hover { text-decoration: underline; }
+  .ann-item { padding: 10px 0; border-bottom: 1px solid #eef1ef; font-size: 13.5px; }
+  .ann-item:last-child { border-bottom: none; }
+  .ann-title { font-weight: 600; }
+  .ann-meta { color: #8a958f; font-size: 11.5px; margin-top: 2px; }
+  .ann-files { margin-top: 4px; }
+  .ann-files a { font-size: 12px; margin-right: 10px; }
 </style>
 </head>
 <body data-current-page="dashboard.html">
@@ -74,6 +80,11 @@
         <div style="margin-top:10px; text-align:right;">
           <button class="secondary" onclick="openDoc('goals2026')">查看完整文件</button>
         </div>
+      </div>
+
+      <div class="card dash-card" id="cardAnnouncements" style="grid-column: 1 / -1;">
+        <h3>📢 公告</h3>
+        <div id="announcementsList">載入中...</div>
       </div>
     </div>
   </main>

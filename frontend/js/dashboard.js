@@ -109,12 +109,57 @@ function renderGoals() {
   `).join("");
 }
 
+// ---------- 公告 ----------
+function fmtAnnDate(dt) {
+  if (!dt) return "不自動下架";
+  return new Date(dt).toLocaleString("zh-Hant", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+async function loadAnnouncements() {
+  const list = document.getElementById("announcementsList");
+  try {
+    const items = await api("/announcements/public/active");
+    if (!items.length) {
+      list.innerHTML = '<p class="hint-msg" style="margin:0;">目前沒有公告</p>';
+      return;
+    }
+    list.innerHTML = items.map(a => `
+      <div class="ann-item">
+        <div class="ann-title">${a.title}</div>
+        <div class="ann-meta">${fmtAnnDate(a.start_at)} ～ ${fmtAnnDate(a.end_at)}</div>
+        <div>${(a.content || "").replace(/\n/g, "<br>")}</div>
+        ${a.files.length ? `<div class="ann-files">${a.files.map(f => `<a href="#" onclick="downloadAnnFile('${f.id}','${f.filename.replace(/'/g, "\\'")}'); return false;">📎 ${f.filename}</a>`).join("")}</div>` : ""}
+      </div>
+    `).join("");
+  } catch (err) {
+    list.innerHTML = `<p class="hint-msg">載入失敗：${err.message}</p>`;
+  }
+}
+
+window.downloadAnnFile = async (fileId, filename) => {
+  try {
+    const token = getToken();
+    const res = await fetch((API_BASE || "") + `/announcements/files/${fileId}/download`, {
+      headers: { "Authorization": "Bearer " + token },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+  } catch (err) {
+    alert("下載失敗：" + err.message);
+  }
+};
+
 // ---------- 依後台「功能項目管理」設定，決定要顯示哪些 Dashboard 小工具 ----------
 const WIDGET_CARD_MAP = {
   "F0-13-1": "cardHosts",
   "F0-13-2": "cardVersion",
   "F0-13-3": "cardDocs",
   "F0-13-4": "cardGoals",
+  "F0-13-5": "cardAnnouncements",
 };
 
 async function applyWidgetVisibility() {
@@ -142,4 +187,5 @@ loadHosts();
 loadVersion();
 loadDocs();
 renderGoals();
+loadAnnouncements();
 applyWidgetVisibility();

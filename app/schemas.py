@@ -334,3 +334,49 @@ class LoginLogOut(BaseModel):
 
 class LoginLogNoteUpdate(BaseModel):
     notes: str
+
+
+# ---------- 公告 ----------
+
+class AnnouncementCreate(BaseModel):
+    title: str
+    content: Optional[str] = None
+    start_at: datetime
+    end_at: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
+class AnnouncementUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    start_at: Optional[datetime] = None
+    end_at: Optional[datetime] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class AnnouncementFileOut(BaseModel):
+    id: str
+    filename: str
+    content_type: Optional[str]
+    file_size: Optional[int]
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AnnouncementOut(BaseModel):
+    id: str
+    title: str
+    content: Optional[str]
+    start_at: datetime
+    end_at: Optional[datetime]
+    status: str
+    notes: Optional[str]
+    is_currently_visible: bool = False  # 依目前時間 + start_at/end_at + status 即時計算，於 router 內覆寫
+    created_at: datetime
+    files: List[AnnouncementFileOut] = []
+
+    class Config:
+        from_attributes = True

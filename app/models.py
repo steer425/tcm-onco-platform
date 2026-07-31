@@ -321,6 +321,39 @@ class SystemSetting(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class Announcement(Base):
+    """公告：依 start_at/end_at 決定是否顯示於前台，時間到自動下架（不需要手動操作，查詢時即時判斷）"""
+    __tablename__ = "announcements"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=True)
+    start_at = Column(DateTime, nullable=False)   # 開始顯示時間
+    end_at = Column(DateTime, nullable=True)       # 結束顯示時間（None = 不自動下架，永久顯示直到手動下架）
+    status = Column(String, default="active", nullable=False)  # active / inactive（管理者手動下架，軟刪除）
+    notes = Column(Text, nullable=True)
+    created_by = Column(String, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    files = relationship("AnnouncementFile", back_populates="announcement", cascade="all, delete-orphan")
+
+
+class AnnouncementFile(Base):
+    """公告附件：內容直接以 base64 存資料庫（避免 Render 免費方案檔案系統不持久的問題，Neon 才是唯一可靠儲存）"""
+    __tablename__ = "announcement_files"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    announcement_id = Column(String, ForeignKey("announcements.id"), nullable=False)
+    filename = Column(String, nullable=False)
+    content_type = Column(String, nullable=True)
+    file_size = Column(Integer, nullable=True)
+    file_data_base64 = Column(Text, nullable=False)
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+
+    announcement = relationship("Announcement", back_populates="files")
+
+
 class LoginLog(Base):
     __tablename__ = "login_logs"
 

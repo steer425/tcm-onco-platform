@@ -29,6 +29,9 @@ FEATURE_CONFIG = [
     {"code": "F0-13-4", "module": "目標零", "name": "Dashboard-2026目標小工具",
      "nav_label": "2026年工作目標", "page_url": None,
      "show_frontend": True, "show_backend": True, "sort_order": 14},
+    {"code": "F0-13-5", "module": "目標零", "name": "Dashboard-公告小工具",
+     "nav_label": "公告", "page_url": None,
+     "show_frontend": True, "show_backend": True, "sort_order": 15},
 
     # ---- 後台管理頁面 ----
     {"code": "F0-2", "module": "目標零", "name": "角色管理",
@@ -46,6 +49,9 @@ FEATURE_CONFIG = [
     {"code": "F0-16", "module": "目標零", "name": "系統設定（配色主題）",
      "nav_label": "系統設定", "page_url": "system-settings.html",
      "show_frontend": False, "show_backend": True, "sort_order": 100},
+    {"code": "F0-17", "module": "目標零", "name": "公告管理",
+     "nav_label": "公告管理", "page_url": "announcements.html",
+     "show_frontend": False, "show_backend": True, "sort_order": 46},
 
     # ---- 目標五：中藥行 ----
     {"code": "F5-1", "module": "目標五", "name": "中藥行資料管理（後台）",

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>公告管理 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<style>
+  .status-pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:600; }
+  .status-live { background:#e8f3ec; color:#1f4f37; }
+  .status-scheduled { background:#eaf1fb; color:#2563a8; }
+  .status-expired { background:#f2f2f2; color:#888; }
+  .status-off { background:#fdecea; color:#c0392b; }
+  .file-chip { display:inline-flex; align-items:center; gap:6px; background:#f0f3f1; border-radius:6px; padding:3px 8px; font-size:12px; margin:2px 4px 2px 0; }
+  .file-chip button { padding:1px 6px; font-size:11px; }
+</style>
+</head>
+<body data-current-page="announcements.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">公告管理</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px;">
+        <input id="searchInput" placeholder="搜尋公告標題" style="max-width:220px;" />
+        <select id="statusFilter" style="max-width:160px;">
+          <option value="">全部（含歷史）</option>
+          <option value="true">目前顯示中</option>
+          <option value="false">未顯示（含已過期/未開始/已下架）</option>
+        </select>
+        <button id="newBtn" style="margin-left:auto;">＋ 新增公告</button>
+      </div>
+      <table>
+        <thead>
+          <tr><th>標題</th><th>顯示期間</th><th>狀態</th><th>附件</th><th>備注</th><th style="width:200px;">操作</th></tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<div id="annModal" class="modal-backdrop" style="display:none;">
+  <div class="modal" style="max-width:560px;">
+    <h3 id="annModalTitle">新增公告</h3>
+    <input type="hidden" id="annId" />
+    <label>標題</label>
+    <input id="annTitle" />
+    <label>內容</label>
+    <textarea id="annContent" rows="4"></textarea>
+    <label>開始顯示時間</label>
+    <input id="annStart" type="datetime-local" />
+    <label>結束顯示時間（留空＝不自動下架，永久顯示直到手動下架）</label>
+    <input id="annEnd" type="datetime-local" />
+    <label>備注</label>
+    <textarea id="annNotes" rows="2"></textarea>
+
+    <div id="annFilesSection" style="display:none; margin-top:10px;">
+      <label>附件</label>
+      <div id="annFilesList"></div>
+      <input type="file" id="annFileInput" style="margin-top:6px;" />
+      <button type="button" id="annFileUploadBtn" class="secondary" style="margin-top:6px;">上傳附件</button>
+      <p class="hint-msg">單檔上限 5MB。新增公告時請先「儲存」，儲存後才能上傳附件。</p>
+    </div>
+
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="secondary" id="annModalCancel">關閉</button>
+      <button id="annModalSave">儲存</button>
+    </div>
+    <div id="annModalMsg" class="hint-msg"></div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/announcements.js"></script>
+</body>
+</html>

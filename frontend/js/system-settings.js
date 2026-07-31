@@ -46,3 +46,54 @@ window.applyTheme = async (themeId) => {
 
 loadUserInfo();
 loadThemes();
+loadDashboardWidgets();
+
+// ---------- Dashboard 顯示規則（直接對應 F0-13-1 ~ F0-13-5，不用繞去角色管理）----------
+const DASH_WIDGET_LABELS = {
+  "F0-13-1": "🖥️ 主機資訊",
+  "F0-13-2": "🏷️ 版本資訊",
+  "F0-13-3": "📄 專案文件",
+  "F0-13-4": "🎯 2026年工作目標",
+  "F0-13-5": "📢 公告",
+};
+
+async function loadDashboardWidgets() {
+  const tbody = document.getElementById("dashWidgetsBody");
+  try {
+    const features = await api("/features");
+    const widgets = Object.keys(DASH_WIDGET_LABELS)
+      .map(code => features.find(f => f.code === code))
+      .filter(Boolean);
+    tbody.innerHTML = widgets.map(f => `
+      <tr data-id="${f.id}">
+        <td>${DASH_WIDGET_LABELS[f.code] || f.name}</td>
+        <td class="chk-cell"><input type="checkbox" data-field="enabled" ${f.enabled ? "checked" : ""}></td>
+        <td class="chk-cell"><input type="checkbox" data-field="show_frontend" ${f.show_frontend ? "checked" : ""}></td>
+        <td class="chk-cell"><input type="checkbox" data-field="show_backend" ${f.show_backend ? "checked" : ""}></td>
+        <td><button onclick="saveDashWidget(this)">儲存</button></td>
+      </tr>
+    `).join("");
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="hint-msg">載入失敗：${err.message}</td></tr>`;
+  }
+}
+
+window.saveDashWidget = async (btn) => {
+  const tr = btn.closest("tr");
+  const id = tr.dataset.id;
+  const payload = {
+    enabled: tr.querySelector('[data-field="enabled"]').checked,
+    show_frontend: tr.querySelector('[data-field="show_frontend"]').checked,
+    show_backend: tr.querySelector('[data-field="show_backend"]').checked,
+  };
+  const original = btn.textContent;
+  btn.textContent = "儲存中..."; btn.disabled = true;
+  try {
+    await api(`/features/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+    btn.textContent = "已儲存 ✓";
+    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1200);
+  } catch (err) {
+    alert("儲存失敗：" + err.message);
+    btn.textContent = original; btn.disabled = false;
+  }
+};
