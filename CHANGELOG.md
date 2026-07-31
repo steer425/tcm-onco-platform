@@ -1,6 +1,30 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.3.0 — 2026-07-31（支援雲端 PostgreSQL，解決資料庫重置問題）
+
+### 新增功能
+
+- `app/database.py` 改為讀取環境變數 `DATABASE_URL`：
+  - 有設定時連接雲端 PostgreSQL（正式環境用）
+  - 未設定時自動退回本機 SQLite 檔案（本機開發測試用，行為與之前版本相同）
+  - 自動將 `postgres://` 開頭的連線字串轉換為 SQLAlchemy 2.0 要求的 `postgresql://`
+- `requirements.txt` 新增 `psycopg2-binary`（PostgreSQL 驅動）
+- `render.yaml` 新增 `DATABASE_URL` 環境變數欄位（`sync: false`，不寫入版本控制，需於 Render 後台手動填入）
+
+### ⚠️ 重要提醒：Render 自帶的免費 PostgreSQL 也會過期，並非長久解法
+
+原本以為「換成 PostgreSQL」就能徹底解決資料庫被重置的問題，但查證後發現：**Render 自己附的免費 PostgreSQL 資料庫本身只保留 30 天，到期後 14 天內沒升級為付費方案，資料庫連同所有資料會被整個刪除**。這跟原本 SQLite 在免費方案上「重新部署就重置」的問題性質類似，只是把期限從「每次重啟」延後到「30 天」，並非真正的永久解法。
+
+**建議做法**：改接**永久免費**的第三方 PostgreSQL 服務（例如 Neon、Supabase 皆有不到期的免費額度），Render 後端只需要一組連線字串即可連接，資料庫實際放在哪個平台跟後端部署位置無關。這部分已經完成程式碼支援，下一步需要你選定要用哪家 Postgres 服務、建立資料庫後把連線字串填入 Render 的 `DATABASE_URL` 環境變數即可。
+
+### 已知限制
+
+- 尚未實測連接真實 PostgreSQL（本次僅完成程式碼層級的相容性修改與 URL 轉換邏輯測試），待你選定 Postgres 服務並提供連線字串後，需要再做一次實際連線測試
+- SQLAlchemy 的 Enum 型別在 PostgreSQL 會建立原生 ENUM 型別，未來若要異動欄位選項（例如新增角色狀態），需要額外處理資料庫遷移（migration），目前專案尚未導入 Alembic 等遷移工具
+
 ## v1.2.0 — 2026-07-31（前後端分離部署：Render + Cloudflare Pages）
+
+**狀態：已通過使用者正式環境驗證** —— 前端 `https://fwc-tcmsp.pages.dev/`（Cloudflare Pages，GitHub 自動部署）+ 後端 `https://tcm-onco-backend.onrender.com`（Render，GitHub 自動部署，Blueprint 方式）已成功串接，使用 `admin`/`0000` 登入後台驗證通過，Dashboard 與左側選單（角色管理／帳號管理／帳號審核／中藥行管理／中藥行地理推薦／稽核登入紀錄）皆正常顯示。
 
 - 後端已部署上線：`https://tcm-onco-backend.onrender.com`（Render Blueprint 部署）
 - 前端 `js/api.js` 的 `API_BASE` 改為指向線上後端網址，不再依賴與後端同源

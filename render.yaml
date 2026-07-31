@@ -11,4 +11,6 @@ services:
         value: 3.12.0
       - key: TCM_JWT_SECRET
         generateValue: true
+      - key: DATABASE_URL
+        sync: false  # 請於 Render 網頁後台手動填入雲端 PostgreSQL 連線字串，不寫入 git 版本控制
     autoDeploy: true
