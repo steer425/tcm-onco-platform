@@ -1,0 +1,1311 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>TCMSP 藥材關聯查詢站（本地資料庫）</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/standalone/umd/vis-network.min.js"></script>
+<style>
+:root{--bg:#0f1115;--panel:#171a20;--line:#2a2d34;--muted:#8a8f98;--herb:#c99a3d;--mol:#3b82c4;--tgt:#3a9d63;--dis:#c0533e;}
+html,body{margin:0;padding:0;background:var(--bg);color:#eee;font-family:"Noto Sans TC","Helvetica Neue",Arial,sans-serif;}
+#header{padding:14px 22px 10px;border-bottom:1px solid var(--line);}
+#header h1{margin:0 0 4px;font-size:18px;font-weight:600;}
+#header p{margin:0;font-size:12px;color:var(--muted);line-height:1.6;}
+#layout{display:flex;height:calc(100vh - 116px);min-height:600px;}
+#herbPanel{width:340px;flex-shrink:0;border-right:1px solid var(--line);display:flex;flex-direction:column;}
+#herbSearch{margin:10px;padding:8px 10px;background:#1c1f26;border:1px solid #3a3d44;color:#eee;border-radius:6px;font-size:13px;}
+#herbStats{padding:0 12px 6px;font-size:11.5px;color:var(--muted);}
+#herbList{flex:1;overflow-y:auto;border-top:1px solid var(--line);}
+.herbRow{padding:8px 12px;border-bottom:1px solid #1e2128;cursor:pointer;font-size:12.5px;}
+.herbRow:hover{background:#1a1d23;}
+.herbRow.active{background:#20303f;}
+.herbRow .cn{font-weight:600;}
+.herbRow .en{color:var(--muted);font-size:11.5px;}
+.badge{display:inline-block;background:#204a33;color:#8be0af;border-radius:4px;padding:0 5px;font-size:10.5px;margin-left:6px;}
+#main{flex:1;display:flex;flex-direction:column;min-width:0;overflow-y:auto;}
+#herbHeader{padding:14px 20px;border-bottom:1px solid var(--line);}
+#herbHeader h2{margin:0 0 4px;font-size:17px;}
+#herbHeader .meta{color:var(--muted);font-size:12.5px;}
+#noData{padding:30px;text-align:center;color:var(--muted);}
+#noData a{color:#7db8e8;}
+#emptyState{padding:60px 20px;text-align:center;color:var(--muted);font-size:14px;}
+.kpi{display:flex;gap:12px;padding:12px 20px;flex-wrap:wrap;}
+.kpi div{background:#1c1f26;border:1px solid #2a2d34;border-radius:10px;padding:10px 16px;min-width:110px;}
+.kpi b{display:block;font-size:20px;}
+.kpi span{font-size:11px;color:var(--muted);}
+#toolbar2{display:flex;gap:8px;padding:8px 20px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line);}
+button{background:#26292f;border:1px solid #3a3d44;color:#eee;padding:6px 11px;border-radius:6px;font-size:12px;cursor:pointer;}
+button:hover{background:#31353c;}
+button.primary{background:#2f5c8a;border-color:#3d70a3;}
+button.primary:hover{background:#396d9e;}
+select{background:#1c1f26;color:#eee;border:1px solid #3a3d44;border-radius:6px;padding:5px 8px;font-size:12px;}
+#body{display:flex;flex:1;min-height:0;}
+#pickerCol{width:260px;flex-shrink:0;border-right:1px solid var(--line);overflow-y:auto;}
+#pickerCol .pick-row{display:flex;gap:6px;padding:5px 12px;font-size:12px;cursor:pointer;}
+#pickerCol .pick-row:hover{background:#1a1d23;}
+#contentCol{flex:1;display:flex;flex-direction:column;min-width:0;}
+#network{height:380px;border-bottom:1px solid var(--line);position:relative;flex-shrink:0;}
+#network .placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:20px;}
+.tabs{display:flex;gap:6px;padding:8px 16px 0;}
+.tabs button{background:#1c1f26;}
+.tabs button.active{background:#2f5c8a;border-color:#3d70a3;}
+#tableWrap{flex:1;overflow:auto;padding:8px 16px 16px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{position:sticky;top:0;background:#1c1f26;text-align:left;padding:7px 8px;color:#bcd;border-bottom:1px solid var(--line);white-space:nowrap;}
+td{padding:6px 8px;border-bottom:1px solid #23262c;vertical-align:top;}
+tr:hover td{background:#171a20;}
+.tag{display:inline-block;background:#22303f;color:#8fc3ea;border-radius:4px;padding:1px 6px;margin:1px 3px 1px 0;font-size:11px;}
+.tag.supp{background:#3a2a1a;color:#f0c98a;}
+.na{color:#666;font-style:italic;}
+a.link{color:#7db8e8;text-decoration:none;}
+a.link:hover{text-decoration:underline;}
+.small{font-size:11px;color:var(--muted);}
+a.term-link{color:#7db8e8;text-decoration:underline;cursor:pointer;}
+a.term-link:hover{color:#a9d2f5;}
+#termInfoModal,#networkModal,.modal-overlay{display:none;position:fixed;inset:0;z-index:9999;}
+#termInfoModal,.modal-overlay{align-items:center;justify-content:center;background:rgba(0,0,0,.6);}
+#termInfoBox,.modal-box{background:#171a20;border:1px solid #3a3d44;border-radius:12px;padding:20px 22px;max-width:420px;box-shadow:0 20px 50px rgba(0,0,0,.5);}
+#termInfoBox h3,.modal-box h3{margin:0 0 10px;font-size:15px;color:#fff;}
+#termInfoBox p,.modal-box p{margin:0 0 14px;font-size:13px;line-height:1.7;color:#cbd5e1;}
+#networkModal{flex-direction:column;background:#0b0d11;}
+#networkModalBar{display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);flex-shrink:0;flex-wrap:wrap;}
+#networkModalBar b{color:#eee;font-size:14px;flex:1;}
+#networkModalLayerBar{display:flex;gap:10px;align-items:center;padding:6px 16px;border-bottom:1px solid var(--line);flex-shrink:0;flex-wrap:wrap;background:#10131a;}
+#networkModalMain{flex:1;display:flex;min-height:0;}
+#networkModalCanvas{flex:1;min-height:0;}
+#networkNodeDetail{display:none;width:300px;flex-shrink:0;border-left:1px solid var(--line);overflow:auto;padding:14px;background:#12151b;color:#eee;}
+#networkNodeDetail table td{border-bottom:1px solid #23262c;}
+#versionBadge{position:fixed;bottom:8px;left:10px;font-size:11px;color:var(--muted);cursor:pointer;z-index:60;padding:3px 8px;border:1px solid #333;border-radius:6px;background:rgba(23,26,32,.9);}
+#versionBadge:hover{color:#eee;border-color:#555;}
+.versionEntry{border-bottom:1px solid #2a2d34;padding:10px 0;}
+.versionEntry:last-child{border-bottom:none;}
+.versionEntry h4{margin:0 0 4px;font-size:13.5px;color:#fff;}
+.versionEntry ul{margin:6px 0;padding-left:18px;font-size:12px;color:#cbd5e1;line-height:1.7;}
+.herbNameLink{margin-left:8px;}
+.col-resizer{position:absolute;right:0;top:0;bottom:0;width:6px;cursor:col-resize;user-select:none;}
+.col-resizer:hover{background:rgba(125,184,232,.4);}
+#netResizeHandle{height:7px;cursor:row-resize;background:#1c1f26;border-bottom:1px solid var(--line);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#555;font-size:10px;letter-spacing:2px;}
+#netResizeHandle:hover{background:#242830;color:#7db8e8;}
+#tableWrap table{table-layout:fixed;}
+#tableWrap th{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#platformNav{display:flex;align-items:center;gap:16px;padding:8px 22px;background:#20303f;border-bottom:1px solid var(--line);font-size:12.5px;}
+#platformNav a{color:#8fc3ea;text-decoration:none;}
+#platformNav a:hover{text-decoration:underline;}
+#platformNav span{color:var(--muted);}
+</style>
+</head>
+<body>
+<div id="platformNav">
+  <a href="dashboard.html">← 返回 Dashboard</a>
+  <span>|</span>
+  <span>TCM 中藥腫瘤篩選平台 — 目標一/二　TCMSP 藥材關聯查詢站</span>
+  <span style="flex:1"></span>
+  <a href="#" id="platformLogout">登出</a>
+</div>
+<div id="header">
+  <h1>TCMSP 藥材關聯查詢站（本地資料庫版）</h1>
+  <p>比照 <code>tcmsp-e.com/browse.php?qc=herbs</code> 的瀏覽方式：左側選一個藥材，右側顯示它的 Ingredients／Related Targets／Related Diseases 完整關聯與網絡圖。資料來源：使用者自行抓取之 TCMSP Kendo Grid 匯出（Browse 彙總表 + 藥材詳情頁）。</p>
+</div>
+<div id="layout">
+  <div id="herbPanel">
+    <input id="herbSearch" type="text" placeholder="搜尋藥材（中文/拼音/英文學名）...">
+    <div id="herbStats"></div>
+    <div id="herbList"></div>
+  </div>
+  <div id="main">
+    <div id="emptyState">← 請從左側選擇一個藥材</div>
+  </div>
+</div>
+
+<div id="termInfoModal">
+  <div id="termInfoBox">
+    <h3 id="termInfoTitle"></h3>
+    <p id="termInfoBody"></p>
+    <button class="primary" onclick="closeTermInfo()">關閉</button>
+  </div>
+</div>
+
+<div id="networkModal">
+  <div id="networkModalBar">
+    <b id="networkModalTitle">關聯圖</b>
+    <button id="netPrintBtn">🖨️ 列印</button>
+    <button id="netDownloadBtn">⭳ 下載圖片</button>
+    <button class="primary" id="netCloseBtn">✕ 關閉，回主頁</button>
+  </div>
+  <div id="networkModalLayerBar">
+    <span class="small">顯示層級：</span>
+    <label class="small" style="display:inline-flex;align-items:center;gap:4px;"><input type="checkbox" id="showIngredientsFs" checked> Ingredients</label>
+    <label class="small" style="display:inline-flex;align-items:center;gap:4px;"><input type="checkbox" id="showTargetsFs" checked> Related Targets</label>
+    <label class="small" style="display:inline-flex;align-items:center;gap:4px;"><input type="checkbox" id="showDiseasesFs" checked> Related Diseases</label>
+    <span class="small" style="color:#f0c98a;">規則：Herb → Ingredients → Related Targets → Related Diseases 是逐層關係，上層不顯示時，下層會一併自動隱藏（並鎖定勾選框）</span>
+    <span style="flex:1"></span>
+    <span class="small">點擊節點可查看詳細資訊 →</span>
+  </div>
+  <div id="networkModalMain">
+    <div id="networkModalCanvas"></div>
+    <div id="networkNodeDetail"></div>
+  </div>
+</div>
+
+<div id="photoModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:640px;max-height:80vh;overflow:auto;">
+    <h3 id="photoModalTitle"></h3>
+    <div id="photoModalBody"></div>
+    <button class="primary" onclick="closePhotoModal()" style="margin-top:14px;">關閉</button>
+  </div>
+</div>
+
+<div id="diseaseInfoModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:420px;">
+    <h3 id="diseaseInfoModalTitle"></h3>
+    <div id="diseaseInfoModalBody"></div>
+    <button class="primary" onclick="closeDiseaseInfoModal()" style="margin-top:14px;">關閉</button>
+  </div>
+</div>
+
+<div id="versionModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:600px;max-height:80vh;overflow:auto;">
+    <h3>版本歷史</h3>
+    <div id="versionModalBody"></div>
+    <button class="primary" onclick="closeVersionModal()" style="margin-top:14px;">關閉</button>
+  </div>
+</div>
+
+<div id="versionBadge" onclick="openVersionModal()">v00.01.05</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// 統一登入驗證（沿用平台共用的 js/api.js，確保這個頁面也受同一套帳號系統保護）
+if (!localStorage.getItem("tcm_token")) {
+  window.location.href = "index.html";
+}
+</script>
+<script src="js/api.js"></script>
+<script>
+let DATA = null;
+let herbsById, ingredientsById, targetsById, diseasesById;
+let molsByHerb, targetsByMol, diseasesByTar, herbsWithData;
+
+async function bootstrapData(){
+  const herbListEl = document.getElementById('herbList');
+  herbListEl.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:12.5px;">資料載入中，請稍候...</div>';
+  let res;
+  try {
+    res = await fetch('data/tcmsp_data.json');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+  } catch (e) {
+    herbListEl.innerHTML = '<div style="padding:20px;color:#e08080;font-size:12.5px;">資料載入失敗：' + e.message + '</div>';
+    return;
+  }
+  DATA = await res.json();
+
+  // ---------- Index / lookup maps ----------
+  herbsById = new Map(DATA.herbs.map(h => [h.herb_id, h]));
+  ingredientsById = new Map(DATA.ingredients.map(i => [i.mol_id, i]));
+  targetsById = new Map(DATA.targets.map(t => [t.tar_id, t]));
+  diseasesById = new Map(DATA.diseases.map(d => [d.dis_id, d]));
+
+  molsByHerb = new Map();
+  DATA.herb_ingredient.forEach(r => {
+    if(!molsByHerb.has(r.herb_id)) molsByHerb.set(r.herb_id, []);
+    molsByHerb.get(r.herb_id).push(r.mol_id);
+  });
+
+  targetsByMol = new Map();
+  DATA.ingredient_target.forEach(r => {
+    if(!targetsByMol.has(r.mol_id)) targetsByMol.set(r.mol_id, []);
+    targetsByMol.get(r.mol_id).push(r);
+  });
+
+  diseasesByTar = new Map();
+  DATA.target_disease.forEach(r => {
+    if(!diseasesByTar.has(r.tar_id)) diseasesByTar.set(r.tar_id, []);
+    diseasesByTar.get(r.tar_id).push(r.dis_id);
+  });
+
+  herbsWithData = new Set(molsByHerb.keys());
+
+  renderHerbStats();
+  renderHerbList();
+}
+
+
+const STATIC_TOKEN = '0d9b10a019eca16ab989f1d7776aa6e5';
+// ---------- Network layer visibility (Herb -> Ingredients -> Related Targets -> Related Diseases) ----------
+// Enforced rule: each layer can only be shown if every layer above it (closer to the herb) is
+// also shown. Turning off a higher layer forces-and-locks all lower layers off too.
+let layerVisibility = { ingredients: true, targets: true, diseases: true };
+// Two sets of checkboxes control the same state: the main view's (showIngredients/showTargets/
+// showDiseases) and the fullscreen modal's (...Fs). Both are kept in sync via syncLayerCheckboxes().
+function getLayerCheckboxes(){
+  return {
+    ing: [document.getElementById('showIngredients'), document.getElementById('showIngredientsFs')].filter(Boolean),
+    tgt: [document.getElementById('showTargets'), document.getElementById('showTargetsFs')].filter(Boolean),
+    dis: [document.getElementById('showDiseases'), document.getElementById('showDiseasesFs')].filter(Boolean)
+  };
+}
+function syncLayerCheckboxes(){
+  const cbs = getLayerCheckboxes();
+  cbs.ing.forEach(cb => { cb.checked = layerVisibility.ingredients; cb.disabled = false; });
+  cbs.tgt.forEach(cb => { cb.checked = layerVisibility.targets; cb.disabled = !layerVisibility.ingredients; });
+  cbs.dis.forEach(cb => { cb.checked = layerVisibility.diseases; cb.disabled = !layerVisibility.targets; });
+}
+function applyLayerRule(changedKey, changedValue){
+  if(changedKey === 'ing') layerVisibility.ingredients = changedValue;
+  if(changedKey === 'tgt') layerVisibility.targets = changedValue;
+  if(changedKey === 'dis') layerVisibility.diseases = changedValue;
+  if(!layerVisibility.ingredients){
+    layerVisibility.targets = false; layerVisibility.diseases = false;
+  } else if(!layerVisibility.targets){
+    layerVisibility.diseases = false;
+  }
+  syncLayerCheckboxes();
+  if(selectedMols.size > 0) renderNetwork();
+  if(document.getElementById('networkModal').style.display === 'flex') refreshFullscreenNetwork();
+}
+function bindLayerCheckboxes(){
+  const map = [['showIngredients','ing'], ['showIngredientsFs','ing'], ['showTargets','tgt'], ['showTargetsFs','tgt'], ['showDiseases','dis'], ['showDiseasesFs','dis']];
+  map.forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if(el) el.onchange = () => applyLayerRule(key, el.checked);
+  });
+}
+
+function tcmspHerbUrl(latinName){
+  return `https://www.tcmsp-e.com/tcmspsearch.php?qr=${encodeURIComponent(latinName)}&qsr=herb_en_name&token=${STATIC_TOKEN}`;
+}
+
+// ---------- Herb list ----------
+let currentHerbId = null;
+let selectedMols = new Set();
+let activeTab = 'ingredients';
+let network = null;
+let lastNodes = null, lastEdges = null, lastOptions = null;
+let fsNetwork = null;
+
+// ---------- Term explanation modal ----------
+const TERM_INFO = {
+  ob: {
+    title: 'OB — Oral Bioavailability（口服生物利用率）',
+    body: 'OB 表示這個成分口服吸收後，實際能進入血液循環被人體利用的比例（%）。TCMSP 資料庫常用 OB ≥ 30% 作為篩選「藥理上有意義」成分的門檻之一，通常會搭配 DL（類藥性，Drug-Likeness）一起評估。工具列裡「只選 OB 前 10」會依照 OB 值由高到低排序，自動勾選該藥材裡 OB 最高的前 10 個成分。'
+  },
+  molecule_name: { title: 'Molecule name（成分名稱）', body: '這個成分在 TCMSP 資料庫裡的英文（拉丁化學）名稱，通常是化合物的學名。' },
+  mol_id: { title: 'Mol ID（成分編號）', body: 'TCMSP 資料庫給每個成分的唯一編號，格式為 MOL + 6 碼數字，可用來跟 TCMSP 網站或其他資料表對照查詢。' },
+  mw: { title: 'MW — Molecular Weight（分子量）', body: '這個成分的分子量（g/mol）。分子量太大的化合物通常較難被腸道吸收，常搭配 OB（口服生物利用率）一起評估。' },
+  dl: {
+    title: 'DL — Drug-Likeness（類藥性）',
+    body: 'DL 是用來評估一個成分的化學結構「像不像藥」的指標（0~1 之間，越高越像已知藥物的結構特徵）。TCMSP 常用 DL ≥ 0.18 作為篩選門檻，通常會搭配 OB（口服生物利用率）一起評估。'
+  },
+  alogp: { title: 'ALogP（親脂性 / 脂水分配係數）', body: '衡量成分親油（脂溶性）與親水程度的指標，數值越高代表越親脂。會影響成分能否穿過細胞膜、被腸道吸收，也常用來評估是否符合藥物的一般化學特性。' },
+  hdon: { title: 'Hdon — Hydrogen Bond Donors（氫鍵供體數）', body: '這個成分分子結構中能提供氫鍵的原子數目（例如 -OH、-NH）。氫鍵供體／受體數目太多的化合物，通常較不利於穿透細胞膜、口服吸收較差。' },
+  hacc: { title: 'Hacc — Hydrogen Bond Acceptors（氫鍵受體數）', body: '這個成分分子結構中能接受氫鍵的原子數目（例如 O、N）。與 Hdon 一樣，數目太多通常不利於口服吸收。' },
+  tar_id: { title: 'Tar ID（靶點編號）', body: 'TCMSP 資料庫給每個蛋白質靶點的唯一編號，格式為 TAR + 5 碼數字。' },
+  target_source: {
+    title: '來源（資料來源標記）',
+    body: '「彙總」代表這個靶點原本就存在於 TCMSP 官方的「All targets」彙總清單裡；「補充」代表這個靶點只出現在藥材詳情頁的成分—靶點關聯資料中，原本的彙總清單裡沒有收錄，是額外用詳情頁提供的名稱補上去的（同樣的作法也套用在少數缺漏的成分上）。'
+  },
+  validated: { title: 'Validated（是否已驗證）', body: '標示這一筆「成分—靶點」關聯，是否有實驗證據支持（相對於單純由模型預測而來）。' },
+  svm: { title: 'SVM（支持向量機預測信心分數）', body: 'TCMSP 用 SVM（Support Vector Machine）模型預測這個成分是否會作用在這個靶點上的信心分數，數值越高代表模型越有把握。' },
+  rf: { title: 'RF（隨機森林預測信心分數）', body: 'TCMSP 用 Random Forest（隨機森林）模型預測這個成分是否會作用在這個靶點上的信心分數，數值越高代表模型越有把握。與 SVM 是兩種不同演算法的預測結果，可互相參考。' },
+  dis_id: { title: 'Dis ID（疾病編號）', body: 'TCMSP 資料庫給每個疾病的唯一編號，格式為 DIS + 5 碼數字，可用 https://www.tcmsp-e.com/browse.php?qc=diseases 依編號查詢。' },
+  icd9: { title: 'ICD9', body: '國際疾病分類第九版（ICD-9）代碼，是一套國際通用的疾病編碼標準，可用來對照其他醫療資料庫。' },
+  icd10: { title: 'ICD10', body: '國際疾病分類第十版（ICD-10）代碼，是 ICD-9 的後續版本，目前較廣泛使用的國際疾病編碼標準。' },
+  via_target: { title: 'Via target（透過哪個靶點連結）', body: '這個疾病是透過哪一個蛋白質靶點跟目前勾選的成分產生關聯（成分 → 靶點 → 疾病 的中間靶點）。' },
+  disease_name: { title: 'Disease name（疾病名稱）', body: 'TCMSP 資料庫裡這個疾病的英文名稱（原始資料沒有中文欄位，網絡圖裡的中文名稱是額外整理的常見疾病翻譯，涵蓋常見／高頻出現的疾病，較罕見或高度專業的疾病名稱仍維持英文原名）。' },
+  disease_zh: {
+    title: '中文名稱（疾病）',
+    body: 'TCMSP 原始資料沒有中文欄位，這裡顯示的是額外整理、涵蓋常見／高頻出現疾病的翻譯（依上方「圖上文字」下拉選單切換繁體中文／简体中文；選 English 時不顯示中文）。沒有收錄到翻譯的疾病會顯示「-」，不會用猜測的譯名硬填。'
+  },
+  disease_info_modal: {
+    title: '疾病資訊',
+    body: '點擊會在本頁彈出視窗顯示這個疾病的資料（英文名稱、中文名稱、Dis ID、ICD9、ICD10），內容為本機資料庫已整理的欄位；視窗下方另附「查看 TCMSP 原始資料來源」連結，會另開新視窗前往 TCMSP 官網對應的疾病說明頁。'
+  }
+};
+// ---------- Chinese name dictionary for network diagram (disease / target nodes) ----------
+// Coverage note: TCMSP's own disease/target names are English-only (no Chinese field in the
+// source data). These translations were hand-authored for the diseases and targets that
+// actually appear most frequently across the imported herb data (i.e. the ones most likely to
+// show up in a network view). Anything not in this dictionary falls back to the original
+// English name rather than guessing -- this covers roughly the top 120 diseases and top 60
+// targets by frequency; the long tail (rarer, highly technical entries) stays in English.
+const ZH_DICT = {
+  disease: {
+    DIS00130:{hant:'癌症（未指定）',hans:'癌症（未指定）'}, DIS00055:{hant:'止痛藥／鎮痛劑',hans:'止痛药／镇痛剂'},
+    DIS00077:{hant:'氣喘',hans:'哮喘'}, DIS00659:{hant:'攝護腺癌',hans:'前列腺癌'},
+    DIS00051:{hant:'阿茲海默症',hans:'阿尔茨海默病'}, DIS00489:{hant:'瘧疾',hans:'疟疾'},
+    DIS00416:{hant:'發炎',hans:'炎症'}, DIS00612:{hant:'胰臟癌',hans:'胰腺癌'},
+    DIS00397:{hant:'高血壓',hans:'高血压'}, DIS00117:{hant:'乳癌',hans:'乳腺癌'},
+    DIS00711:{hant:'思覺失調症',hans:'精神分裂症'}, DIS00621:{hant:'帕金森氏症',hans:'帕金森病'},
+    DIS00144:{hant:'心血管疾病（未指定）',hans:'心血管疾病（未指定）'}, DIS00567:{hant:'第二型糖尿病（非胰島素依賴型）',hans:'2型糖尿病（非胰岛素依赖型）'},
+    DIS00072:{hant:'焦慮症（未指定）',hans:'焦虑症（未指定）'}, DIS00744:{hant:'實體腫瘤',hans:'实体肿瘤'},
+    DIS00572:{hant:'肥胖症',hans:'肥胖症'}, DIS00093:{hant:'細菌感染',hans:'细菌感染'},
+    DIS00079:{hant:'動脈粥狀硬化',hans:'动脉粥样硬化'}, DIS00703:{hant:'類風濕性關節炎（未指定）',hans:'类风湿性关节炎（未指定）'},
+    DIS00550:{hant:'神經退化性疾病',hans:'神经退行性疾病'}, DIS00353:{hant:'心臟衰竭',hans:'心力衰竭'},
+    DIS00228:{hant:'憂鬱症',hans:'抑郁症'}, DIS00797:{hant:'腫瘤',hans:'肿瘤'},
+    DIS00607:{hant:'疼痛',hans:'疼痛'}, DIS00471:{hant:'肺癌',hans:'肺癌'},
+    DIS00618:{hant:'寄生蟲病',hans:'寄生虫病'}, DIS00586:{hant:'骨關節炎',hans:'骨关节炎'},
+    DIS00569:{hant:'非小細胞肺癌',hans:'非小细胞肺癌'}, DIS00702:{hant:'類風濕性關節炎',hans:'类风湿性关节炎'},
+    DIS00611:{hant:'疼痛（未指定）',hans:'疼痛（未指定）'}, DIS00597:{hant:'卵巢癌',hans:'卵巢癌'},
+    DIS00533:{hant:'心肌梗塞',hans:'心肌梗死'}, DIS00529:{hant:'多發性硬化症',hans:'多发性硬化症'},
+    DIS00527:{hant:'多發性骨髓瘤',hans:'多发性骨髓瘤'}, DIS00517:{hant:'偏頭痛',hans:'偏头痛'},
+    DIS00772:{hant:'血栓症',hans:'血栓症'}, DIS00754:{hant:'中風',hans:'中风'},
+    DIS00558:{hant:'神經系統疾病',hans:'神经系统疾病'}, DIS00542:{hant:'腫瘤（贅生物）',hans:'肿瘤（赘生物）'},
+    DIS00330:{hant:'青光眼',hans:'青光眼'}, DIS00213:{hant:'克隆氏症（未指定）',hans:'克罗恩病（未指定）'},
+    DIS00204:{hant:'抽搐',hans:'抽搐'}, DIS00200:{hant:'大腸直腸癌',hans:'结直肠癌'},
+    DIS00041:{hant:'酒精成癮',hans:'酒精依赖'}, DIS00810:{hant:'血管疾病',hans:'血管疾病'},
+    DIS00689:{hant:'腎細胞癌',hans:'肾细胞癌'}, DIS00505:{hant:'黑色素瘤',hans:'黑色素瘤'},
+    DIS00446:{hant:'卡波西氏肉瘤',hans:'卡波西肉瘤'}, DIS00418:{hant:'發炎性疾病',hans:'炎性疾病'},
+    DIS00258:{hant:'藥物成癮',hans:'药物依赖'}, DIS00234:{hant:'糖尿病',hans:'糖尿病'},
+    DIS00201:{hant:'大腸直腸腫瘤',hans:'结直肠肿瘤'}, DIS00193:{hant:'古柯鹼成癮',hans:'可卡因依赖'},
+    DIS00088:{hant:'自體免疫疾病',hans:'自身免疫性疾病'}, DIS00082:{hant:'異位性皮膚炎',hans:'特应性皮炎'},
+    DIS00075:{hant:'關節炎',hans:'关节炎'}, DIS00823:{hant:'病毒感染（未指定）',hans:'病毒感染（未指定）'},
+    DIS00773:{hant:'血栓性疾病',hans:'血栓性疾病'}, DIS00698:{hant:'呼吸系統疾病',hans:'呼吸系统疾病'},
+    DIS00668:{hant:'乾癬',hans:'银屑病'}, DIS00632:{hant:'周邊血管疾病',hans:'周围血管疾病'},
+    DIS00595:{hant:'骨質疏鬆症（未指定）',hans:'骨质疏松症（未指定）'}, DIS00592:{hant:'骨質疏鬆症',hans:'骨质疏松症'},
+    DIS00562:{hant:'神經精神疾病',hans:'神经精神疾病'}, DIS00534:{hant:'心肌梗塞',hans:'心肌梗死'},
+    DIS00516:{hant:'微生物感染',hans:'微生物感染'}, DIS00509:{hant:'間皮瘤',hans:'间皮瘤'},
+    DIS00445:{hant:'缺血性中風',hans:'缺血性中风'}, DIS00443:{hant:'缺血性心臟病',hans:'缺血性心脏病'},
+    DIS00441:{hant:'缺血',hans:'缺血'}, DIS00417:{hant:'發炎性腸道疾病',hans:'炎症性肠病'},
+    DIS00383:{hant:'人類免疫缺陷病毒感染',hans:'人类免疫缺陷病毒感染'}, DIS00380:{hant:'荷爾蒙抗性攝護腺癌',hans:'激素抵抗性前列腺癌'},
+    DIS00226:{hant:'失智症',hans:'痴呆症'}, DIS00196:{hant:'認知功能缺損',hans:'认知功能缺损'},
+    DIS00192:{hant:'凝血功能障礙',hans:'凝血功能障碍'}, DIS00183:{hant:'慢性阻塞性肺病（未指定）',hans:'慢性阻塞性肺疾病（未指定）'},
+    DIS00176:{hant:'慢性淋巴性白血病',hans:'慢性淋巴细胞白血病'}, DIS00174:{hant:'慢性發炎性疾病',hans:'慢性炎性疾病'},
+    DIS00137:{hant:'心律不整',hans:'心律失常'}, DIS00121:{hant:'乳房腫瘤',hans:'乳腺肿瘤'},
+    DIS00113:{hant:'腦損傷',hans:'脑损伤'}, DIS00111:{hant:'腦癌',hans:'脑癌'},
+    DIS00801:{hant:'潰瘍',hans:'溃疡'}, DIS00800:{hant:'潰瘍性結腸炎',hans:'溃疡性结肠炎'},
+    DIS00793:{hant:'錐蟲病',hans:'锥虫病'}, DIS00790:{hant:'滴蟲病',hans:'滴虫病'},
+    DIS00770:{hant:'血栓栓塞性疾病',hans:'血栓栓塞性疾病'}, DIS00749:{hant:'鱗狀細胞癌',hans:'鳞状细胞癌'},
+    DIS00743:{hant:'實體腫瘤',hans:'实体肿瘤'}, DIS00737:{hant:'皮膚疾病',hans:'皮肤疾病'},
+    DIS00724:{hant:'嚴重冠狀動脈心臟病',hans:'严重冠状动脉心脏病'}, DIS00692:{hant:'腎衰竭',hans:'肾衰竭'},
+    DIS00670:{hant:'精神疾病',hans:'精神疾病'}, DIS00669:{hant:'乾癬及乾癬相關疾病',hans:'银屑病及银屑病相关疾病'},
+    DIS00657:{hant:'增生性疾病',hans:'增生性疾病'}, DIS00651:{hant:'前驅細胞淋巴母細胞性白血病／淋巴瘤',hans:'前体细胞淋巴母细胞性白血病／淋巴瘤'},
+    DIS00615:{hant:'胰臟腫瘤',hans:'胰腺肿瘤'}, DIS00598:{hant:'卵巢腫瘤',hans:'卵巢肿瘤'},
+    DIS00565:{hant:'非何杰金氏淋巴瘤',hans:'非霍奇金淋巴瘤'}, DIS00561:{hant:'神經病變性疼痛',hans:'神经病理性疼痛'},
+    DIS00538:{hant:'噁心與嘔吐',hans:'恶心与呕吐'}, DIS00522:{hant:'情緒（情感性）障礙',hans:'情绪（情感性）障碍'},
+    DIS00430:{hant:'胰島素阻抗',hans:'胰岛素抵抗'}, DIS00372:{hant:'疱疹病毒感染',hans:'疱疹病毒感染'},
+    DIS00364:{hant:'肝細胞癌',hans:'肝细胞癌'}, DIS00283:{hant:'勃起功能障礙',hans:'勃起功能障碍'},
+    DIS00269:{hant:'肺氣腫',hans:'肺气肿'}, DIS00265:{hant:'呼吸困難',hans:'呼吸困难'},
+    DIS00246:{hant:'腹瀉',hans:'腹泻'}, DIS00203:{hant:'充血性心臟衰竭',hans:'充血性心力衰竭'},
+    DIS00179:{hant:'慢性骨髓性白血病',hans:'慢性髓系白血病'}, DIS00103:{hant:'膀胱癌',hans:'膀胱癌'},
+    DIS00097:{hant:'白塞氏症',hans:'白塞病'}, DIS00076:{hant:'類風濕性關節炎',hans:'类风湿性关节炎'}
+  },
+  target: {
+    TAR00094:{hant:'前列腺素G/H合成酶2（COX-2）',hans:'前列腺素G/H合成酶2（COX-2）'}, TAR00006:{hant:'前列腺素G/H合成酶1（COX-1）',hans:'前列腺素G/H合成酶1（COX-1）'},
+    TAR00309:{hant:'γ-胺基丁酸受體α1亞基',hans:'γ-氨基丁酸受体α1亚基'}, TAR00444:{hant:'熱休克蛋白90（HSP90）',hans:'热休克蛋白90（HSP90）'},
+    TAR03276:{hant:'核受體共活化因子2',hans:'核受体共激活因子2'}, TAR00038:{hant:'毒蕈鹼型乙醯膽鹼受體M1',hans:'毒蕈碱型乙酰胆碱受体M1'},
+    TAR00261:{hant:'β2腎上腺素受體',hans:'β2肾上腺素受体'}, TAR00070:{hant:'第五型鈉離子通道蛋白α亞基',hans:'5型钠离子通道蛋白α亚基'},
+    TAR00016:{hant:'毒蕈鹼型乙醯膽鹼受體M3',hans:'毒蕈碱型乙酰胆碱受体M3'}, TAR00216:{hant:'α1B腎上腺素受體',hans:'α1B肾上腺素受体'},
+    TAR00048:{hant:'雄性素受體',hans:'雄激素受体'}, TAR00079:{hant:'凝血因子Xa',hans:'凝血因子Xa'},
+    TAR03907:{hant:'鈣調蛋白',hans:'钙调蛋白'}, TAR00287:{hant:'DNA拓撲異構酶II',hans:'DNA拓扑异构酶II'},
+    TAR00017:{hant:'凝血酶',hans:'凝血酶'}, TAR00046:{hant:'雌激素受體',hans:'雌激素受体'},
+    TAR00210:{hant:'毒蕈鹼型乙醯膽鹼受體M2',hans:'毒蕈碱型乙酰胆碱受体M2'}, TAR02928:{hant:'胰蛋白酶1',hans:'胰蛋白酶1'},
+    TAR00332:{hant:'二肽基肽酶IV（DPP-4）',hans:'二肽基肽酶IV（DPP-4）'}, TAR00158:{hant:'視黃酸受體RXR-α',hans:'视黄酸受体RXR-α'},
+    TAR00727:{hant:'醇脫氫酶1C',hans:'醇脱氢酶1C'}, TAR00186:{hant:'鈉依賴型正腎上腺素轉運體',hans:'钠依赖型去甲肾上腺素转运体'},
+    TAR00565:{hant:'單胺氧化酶B（MAO-B）',hans:'单胺氧化酶B（MAO-B）'}, TAR00699:{hant:'PKA催化次單元C-α mRNA',hans:'PKA催化亚基C-α mRNA'},
+    TAR00239:{hant:'鈉依賴型多巴胺轉運體',hans:'钠依赖型多巴胺转运体'}, TAR00141:{hant:'γ-胺基丁酸受體α2亞基',hans:'γ-氨基丁酸受体α2亚基'},
+    TAR00117:{hant:'碳酸酐酶II',hans:'碳酸酐酶II'}, TAR00003:{hant:'誘導型一氧化氮合成酶（iNOS）',hans:'诱导型一氧化氮合酶（iNOS）'},
+    TAR01143:{hant:'細胞色素P450-cam',hans:'细胞色素P450-cam'}, TAR00191:{hant:'α1A腎上腺素受體',hans:'α1A肾上腺素受体'},
+    TAR00165:{hant:'乙醯膽鹼酯酶',hans:'乙酰胆碱酯酶'}, TAR03284:{hant:'γ-胺基丁酸受體α6亞基',hans:'γ-氨基丁酸受体α6亚基'},
+    TAR00172:{hant:"cGMP抑制型3',5'-環磷酸二酯酶A",hans:"cGMP抑制型3',5'-环磷酸二酯酶A"}, TAR00290:{hant:'鈉依賴型血清素轉運體',hans:'钠依赖型血清素转运体'},
+    TAR00037:{hant:'電壓門控鉀離子通道H亞家族成員2（hERG）',hans:'电压门控钾离子通道H亚家族成员2（hERG）'}, TAR02966:{hant:'原致癌基因絲胺酸／蘇胺酸激酶Pim-1',hans:'原癌基因丝氨酸／苏氨酸激酶Pim-1'},
+    TAR00482:{hant:'細胞分裂蛋白激酶2（CDK2）',hans:'细胞分裂蛋白激酶2（CDK2）'}, TAR00726:{hant:'醇脫氫酶1B',hans:'醇脱氢酶1B'},
+    TAR03279:{hant:'核受體共活化因子1',hans:'核受体共激活因子1'}, TAR00095:{hant:'內皮型一氧化氮合成酶（eNOS）',hans:'内皮型一氧化氮合酶（eNOS）'},
+    TAR00209:{hant:'黃體素受體',hans:'孕激素受体'}, TAR00078:{hant:'過氧化體增殖物活化受體γ（PPAR-γ）',hans:'过氧化物酶体增殖物激活受体γ（PPAR-γ）'},
+    TAR00063:{hant:'β1腎上腺素受體',hans:'β1肾上腺素受体'}, TAR01172:{hant:'溶菌酶',hans:'溶菌酶'},
+    TAR00422:{hant:'糖原合成酶激酶3β（GSK-3β）',hans:'糖原合成酶激酶3β（GSK-3β）'}, TAR00581:{hant:'神經元乙醯膽鹼受體α7鏈',hans:'神经元乙酰胆碱受体α7链'},
+    TAR00272:{hant:'α1D腎上腺素受體',hans:'α1D肾上腺素受体'}, TAR00307:{hant:'雌激素受體β',hans:'雌激素受体β'},
+    TAR00123:{hant:'凝血因子VII',hans:'凝血因子VII'}, TAR00252:{hant:'礦皮質素受體',hans:'盐皮质激素受体'},
+    TAR00200:{hant:'γ-胺基丁酸受體α3亞基',hans:'γ-氨基丁酸受体α3亚基'}, TAR00299:{hant:'μ型類鴉片受體',hans:'μ型阿片受体'},
+    TAR00126:{hant:'α2C腎上腺素受體',hans:'α2C肾上腺素受体'}, TAR03025:{hant:'細胞週期蛋白A2',hans:'细胞周期蛋白A2'},
+    TAR00308:{hant:'糖皮質素受體',hans:'糖皮质激素受体'}, TAR04633:{hant:'11β-羥基類固醇去氫酶2',hans:'11β-羟基类固醇脱氢酶2'},
+    TAR00229:{hant:'非受體型蛋白酪胺酸磷酸酶1 mRNA',hans:'非受体型蛋白酪氨酸磷酸酶1 mRNA'}, TAR03952:{hant:'胰蛋白酶3',hans:'胰蛋白酶3'},
+    TAR00402:{hant:'絲裂原活化蛋白激酶14（p38）',hans:'丝裂原活化蛋白激酶14（p38）'}, TAR03216:{hant:'麩胺酸受體2',hans:'谷氨酸受体2'}
+  }
+};
+// ---------- Herb photo gallery (植物照片) ----------
+// Real, sourced images from Wikimedia Commons (CC-licensed). Coverage is currently limited to
+// the 5 true Panax-genus (人参屬) herbs requested; other herbs show a "not yet available" note
+// rather than a fabricated placeholder. herb_id keys match the herbs table.
+const HERB_PHOTOS = {
+  336: { // 人参 Panax Ginseng C. A. Mey.
+    label: '人參（Panax ginseng）',
+    photos: [
+      {url:'https://commons.wikimedia.org/wiki/Special:FilePath/Panax%20Ginseng.jpg', caption:'人參植株', source:'https://commons.wikimedia.org/wiki/File:Panax_Ginseng.jpg'},
+      {url:'https://commons.wikimedia.org/wiki/Special:FilePath/Ginsengpflanze.jpg', caption:'人參植株（葉片）', source:'https://commons.wikimedia.org/wiki/File:Ginsengpflanze.jpg'},
+      {url:'https://commons.wikimedia.org/wiki/Special:FilePath/Ginseng%20root.jpg', caption:'人參根部', source:'https://commons.wikimedia.org/wiki/File:Ginseng_root.jpg'}
+    ],
+    moreUrl: 'https://commons.wikimedia.org/wiki/Category:Panax_ginseng'
+  },
+  167: { // 紅參 Ginsen Radix Et Rhizoma Rubra（人參之炮製品，同一物種）
+    label: '紅參（同為 Panax ginseng，經蒸製加工）',
+    photos: [
+      {url:'https://commons.wikimedia.org/wiki/Special:FilePath/Red%20ginseng.JPG', caption:'紅參（加工後根部）', source:'https://commons.wikimedia.org/wiki/File:Red_ginseng.JPG'},
+      {url:'https://commons.wikimedia.org/wiki/Special:FilePath/Korean%20red%20ginseng.jpg', caption:'韓國紅參', source:'https://commons.wikimedia.org/wiki/File:Korean_red_ginseng.jpg'}
+    ],
+    moreUrl: 'https://commons.wikimedia.org/wiki/Category:Panax_ginseng'
+  },
+  346: { // 三七 Panax Notoginseng
+    label: '三七 / 田七（Panax notoginseng）',
+    photos: [
+      {url:'https://commons.wikimedia.org/wiki/Special:FilePath/Yunnan%20ginseng%20fruit.jpg', caption:'三七（雲南人參）果實', source:'https://commons.wikimedia.org/wiki/File:Yunnan_ginseng_fruit.jpg'}
+    ],
+    moreUrl: 'https://commons.wikimedia.org/wiki/Category:Panax_notoginseng'
+  },
+  423: { // 西洋参 Panacis Quinquefolii Radix
+    label: '西洋參（Panax quinquefolius）',
+    photos: [
+      {url:'https://commons.wikimedia.org/wiki/Special:FilePath/American%20Ginseng.jpg', caption:'西洋參植株', source:'https://commons.wikimedia.org/wiki/File:American_Ginseng.jpg'},
+      {url:'https://commons.wikimedia.org/wiki/Special:FilePath/Panax%20quinquefolium%2C%20ginseng%20(3543549600).jpg', caption:'西洋參', source:'https://commons.wikimedia.org/wiki/File:Panax_quinquefolium,_ginseng_(3543549600).jpg'}
+    ],
+    moreUrl: 'https://commons.wikimedia.org/wiki/Category:Panax'
+  },
+  490: { // 竹节参 Panacis Japonici Rhizoma
+    label: '竹節參（Panax japonicus）',
+    photos: [
+      {url:'https://commons.wikimedia.org/wiki/Special:FilePath/Panax%20japonicus%202.JPG', caption:'竹節參植株', source:'https://commons.wikimedia.org/wiki/File:Panax_japonicus_2.JPG'}
+    ],
+    moreUrl: 'https://commons.wikimedia.org/wiki/Category:Panax'
+  }
+};
+function openPhotoModal(herbId){
+  const entry = HERB_PHOTOS[herbId];
+  const herb = herbsById.get(herbId);
+  const body = document.getElementById('photoModalBody');
+  document.getElementById('photoModalTitle').textContent = '植物照片 — ' + (herb ? herb.herb_cn_name : '');
+  if(!entry){
+    body.innerHTML = `<p class="small">這個藥材目前還沒有收錄照片。目前僅提供人參屬（Panax）5 種藥材的照片：人參、紅參、三七、西洋參、竹節參，其餘藥材之後會陸續補充。</p>`;
+  } else {
+    body.innerHTML = `<p class="small">${escapeHtml(entry.label)} — 圖片來源：Wikimedia Commons（CC 授權）</p>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;">
+        ${entry.photos.map(p => `
+          <div style="width:220px;">
+            <img src="${p.url}" alt="${escapeHtml(p.caption)}" style="width:100%;height:170px;object-fit:cover;border-radius:8px;border:1px solid #333;">
+            <div class="small" style="margin-top:4px;">${escapeHtml(p.caption)}</div>
+            <a class="term-link" href="${p.source}" target="_blank" rel="noopener">查看原始來源 ↗</a>
+          </div>`).join('')}
+      </div>
+      ${entry.moreUrl ? `<p class="small" style="margin-top:12px;"><a class="term-link" href="${entry.moreUrl}" target="_blank" rel="noopener">在 Wikimedia Commons 瀏覽更多照片 ↗</a></p>` : ''}`;
+  }
+  document.getElementById('photoModal').style.display = 'flex';
+}
+function closePhotoModal(){ document.getElementById('photoModal').style.display = 'none'; }
+
+let netLang = 'hant'; // 'hant' | 'hans' | 'en'
+function zhLabel(type, id, fallbackName){
+  if(netLang === 'en') return fallbackName;
+  const entry = ZH_DICT[type] && ZH_DICT[type][id];
+  if(entry && entry[netLang]) return entry[netLang] + '\n(' + fallbackName + ')';
+  return fallbackName;
+}
+// Chinese-only lookup (no English fallback appended) -- used for the Related Diseases table's
+// dedicated Chinese-name column, which already has the English name in its own column.
+function zhOnly(type, id){
+  if(netLang === 'en') return '';
+  const entry = ZH_DICT[type] && ZH_DICT[type][id];
+  return (entry && entry[netLang]) ? entry[netLang] : '';
+}
+// Note: deliberately no outbound link-builder to tcmsp-e.com here -- disease details are shown
+// via an in-app modal (openDiseaseInfoModal) using only locally-held fields, per the decision to
+// avoid directly opening a third-party site's URL from this tool.
+function openDiseaseInfoModal(disId){
+  const d = diseasesById.get(disId);
+  const body = document.getElementById('diseaseInfoModalBody');
+  document.getElementById('diseaseInfoModalTitle').textContent = '疾病資訊';
+  if(!d){
+    body.innerHTML = '<p class="small">找不到這個疾病的資料。</p>';
+  } else {
+    const zh = zhOnly('disease', d.dis_id);
+    body.innerHTML = `
+      <p><b>${escapeHtml(d.disease_name||'')}</b></p>
+      <table style="width:100%;font-size:13px;border-collapse:collapse;">
+        <tr><td class="small" style="padding:4px 8px 4px 0;">中文名稱</td><td>${zh ? escapeHtml(zh) : '<span class="na">-（尚無收錄翻譯）</span>'}</td></tr>
+        <tr><td class="small" style="padding:4px 8px 4px 0;">Dis ID</td><td>${escapeHtml(d.dis_id||'')}</td></tr>
+        <tr><td class="small" style="padding:4px 8px 4px 0;">ICD9</td><td>${escapeHtml(d.icd9||'-')}</td></tr>
+        <tr><td class="small" style="padding:4px 8px 4px 0;">ICD10</td><td>${escapeHtml(d.icd10||'-')}</td></tr>
+      </table>
+      ${d.disease_id!=null ? `<p class="small" style="margin-top:10px;"><a class="term-link" href="https://www.tcmsp-e.com/disease.php?qd=${encodeURIComponent(d.disease_id)}" target="_blank" rel="noopener">查看 TCMSP 原始資料來源 ↗</a></p>` : ''}`;
+  }
+  document.getElementById('diseaseInfoModal').style.display = 'flex';
+}
+function closeDiseaseInfoModal(){ document.getElementById('diseaseInfoModal').style.display = 'none'; }
+
+function showTermInfo(key){
+  const info = TERM_INFO[key];
+  if(!info) return;
+  document.getElementById('termInfoTitle').textContent = info.title;
+  document.getElementById('termInfoBody').textContent = info.body;
+  document.getElementById('termInfoModal').style.display = 'flex';
+}
+function closeTermInfo(){
+  document.getElementById('termInfoModal').style.display = 'none';
+}
+
+function renderHerbStats(){
+  document.getElementById('herbStats').textContent =
+    `共 ${DATA.herbs.length} 個藥材，其中 ${herbsWithData.size} 個已有完整關聯資料（綠色標記）`;
+}
+
+function renderHerbList(filter=''){
+  const q = filter.trim().toLowerCase();
+  const list = document.getElementById('herbList');
+  list.innerHTML = '';
+  DATA.herbs
+    .filter(h => !q || [h.herb_cn_name, h.herb_pinyin, h.herb_en_name].some(v => (v||'').toLowerCase().includes(q)))
+    .forEach(h => {
+      const row = document.createElement('div');
+      row.className = 'herbRow' + (h.herb_id === currentHerbId ? ' active' : '');
+      const hasData = herbsWithData.has(h.herb_id);
+      row.innerHTML = `<div class="cn">${escapeHtml(h.herb_cn_name)} ${hasData ? `<span class="badge">${molsByHerb.get(h.herb_id).length} 成分</span>` : ''}</div>
+        <div class="en">${escapeHtml(h.herb_pinyin||'')} · ${escapeHtml(h.herb_en_name||'')}</div>`;
+      row.onclick = () => selectHerb(h.herb_id);
+      list.appendChild(row);
+    });
+}
+function escapeHtml(s){ return String(s??'').replace(/[&<>'"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+
+document.getElementById('herbSearch').addEventListener('input', e => renderHerbList(e.target.value));
+
+// ---------- Herb detail view ----------
+function selectHerb(herbId){
+  currentHerbId = herbId;
+  renderHerbList(document.getElementById('herbSearch').value);
+  const herb = herbsById.get(herbId);
+  const main = document.getElementById('main');
+
+  if(!herbsWithData.has(herbId)){
+    main.innerHTML = `
+      <div id="herbHeader">
+        <h2>${escapeHtml(herb.herb_cn_name)}（${escapeHtml(herb.herb_pinyin||'')}） <a class="term-link herbNameLink" onclick="openPhotoModal(${herb.herb_id})">📷 植物照片</a></h2>
+        <div class="meta">${escapeHtml(herb.herb_en_name||'')} · ${escapeHtml(herb.child_cn_name||'')} ${herb.child_en_name?('/ '+escapeHtml(herb.child_en_name)):''}</div>
+      </div>
+      <div id="noData">
+        這個藥材目前還沒有抓取關聯資料（Ingredients / Related Targets / Related Diseases）。<br><br>
+        可以用 <code>tcmsp_herb_detail_extractor.html</code> 工具，開啟下面這個網址後在 Console 執行抓取程式，再把 JSON 拿給 Claude 匯入：<br>
+        <a class="link" href="${tcmspHerbUrl(herb.herb_en_name)}" target="_blank">${escapeHtml(herb.herb_en_name||'')} 詳情頁 ↗</a>
+      </div>`;
+    return;
+  }
+
+  selectedMols = new Set(molsByHerb.get(herbId));
+  activeTab = 'ingredients';
+  ingSort = {col:null, dir:1};
+  ingFilters = {};
+  colWidths = {};
+  layerVisibility = { ingredients: true, targets: true, diseases: true };
+
+  main.innerHTML = `
+    <div id="herbHeader">
+      <h2>${escapeHtml(herb.herb_cn_name)}（${escapeHtml(herb.herb_pinyin||'')}） <a class="term-link herbNameLink" onclick="openPhotoModal(${herb.herb_id})">📷 植物照片</a></h2>
+      <div class="meta">${escapeHtml(herb.herb_en_name||'')} · ${escapeHtml(herb.child_cn_name||'')} ${herb.child_en_name?('/ '+escapeHtml(herb.child_en_name)):''}
+        · <a class="link" href="${tcmspHerbUrl(herb.herb_en_name)}" target="_blank">在 TCMSP 開啟 ↗</a></div>
+    </div>
+    <div class="kpi" id="kpiRow"></div>
+    <div id="toolbar2">
+      <button id="selAll">全選成分</button>
+      <button id="selNone">全不選</button>
+      <button id="selTop">只選 OB 前 10</button>
+      <a class="term-link" onclick="showTermInfo('ob')">ⓘ 什麼是 OB？</a>
+      <button id="selHasTarget">只選有靶點資料</button>
+      <button id="selHasDisease">只選有疾病資料</button>
+      <button class="primary" id="showBtn">▶ 顯示 Selected</button>
+      <span style="flex:1"></span>
+      <span class="small">網絡圖每個成分最多顯示</span>
+      <select id="capTgt"><option value="3">3 個靶點</option><option value="5" selected>5 個靶點</option><option value="10">10 個靶點</option><option value="999">全部</option></select>
+      <span class="small">每個靶點最多</span>
+      <select id="capDis"><option value="3">3 個疾病</option><option value="5" selected>5 個疾病</option><option value="10">10 個疾病</option><option value="999">全部</option></select>
+      <span class="small">圖上文字</span>
+      <select id="netLangSelect">
+        <option value="hant" selected>繁體中文</option>
+        <option value="hans">简体中文</option>
+        <option value="en">English（原文）</option>
+      </select>
+      <button id="fsNet">⛶ 放大檢視關聯圖</button>
+    </div>
+    <div id="toolbar3" style="display:flex;gap:10px;padding:6px 20px 10px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line);">
+      <span class="small">顯示層級：</span>
+      <label class="small" style="display:inline-flex;align-items:center;gap:4px;"><input type="checkbox" id="showIngredients" checked> Ingredients</label>
+      <label class="small" style="display:inline-flex;align-items:center;gap:4px;"><input type="checkbox" id="showTargets" checked> Related Targets</label>
+      <label class="small" style="display:inline-flex;align-items:center;gap:4px;"><input type="checkbox" id="showDiseases" checked> Related Diseases</label>
+      <span class="small" style="color:#f0c98a;">規則：Herb → Ingredients → Related Targets → Related Diseases 是逐層關係，上層不顯示時，下層會一併自動隱藏（並鎖定勾選框）</span>
+      <button id="dlJson">⭳ 下載此藥材 JSON</button>
+      <button id="dlCsv">⭳ 下載此藥材 CSV</button>
+    </div>
+    <div id="body">
+      <div id="pickerCol"></div>
+      <div id="contentCol">
+        <div id="network"><div class="placeholder">請按上方「▶ 顯示 Selected」查看網絡圖</div></div>
+        <div id="netResizeHandle" title="拖曳調整關聯圖／表格的高度比例">⋯</div>
+        <div class="tabs">
+          <button data-tab="ingredients" class="active">Ingredients</button>
+          <button data-tab="targets">Related Targets</button>
+          <button data-tab="diseases">Related Diseases</button>
+          <span style="flex:1"></span>
+          <span class="small">版面：</span>
+          <select id="layoutPresetSelect" style="font-size:11px;"></select>
+          <button id="applyLayoutBtn">套用</button>
+          <input id="layoutNameInput" placeholder="版面名稱" style="width:100px;font-size:11px;background:#1c1f26;color:#eee;border:1px solid #3a3d44;border-radius:6px;padding:4px 6px;">
+          <button id="saveLayoutBtn">儲存目前版面</button>
+          <button id="deleteLayoutBtn">刪除</button>
+        </div>
+        <div id="tableWrap"></div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('selAll').onclick = () => { selectedMols = new Set(molsByHerb.get(herbId)); renderPicker(); markPending(); };
+  document.getElementById('selNone').onclick = () => { selectedMols = new Set(); renderPicker(); markPending(); };
+  document.getElementById('selTop').onclick = () => {
+    const mols = molsByHerb.get(herbId).map(id => ingredientsById.get(id)).filter(Boolean);
+    mols.sort((a,b) => (b.ob||0) - (a.ob||0));
+    selectedMols = new Set(mols.slice(0,10).map(m => m.mol_id));
+    renderPicker(); markPending();
+  };
+  document.getElementById('selHasTarget').onclick = () => {
+    const mols = molsByHerb.get(herbId).filter(mid => (targetsByMol.get(mid)||[]).length > 0);
+    selectedMols = new Set(mols);
+    renderPicker(); markPending();
+  };
+  document.getElementById('selHasDisease').onclick = () => {
+    const mols = molsByHerb.get(herbId).filter(mid =>
+      (targetsByMol.get(mid)||[]).some(r => (diseasesByTar.get(r.tar_id)||[]).length > 0)
+    );
+    selectedMols = new Set(mols);
+    renderPicker(); markPending();
+  };
+  document.getElementById('fsNet').onclick = openNetworkFullscreen;
+  document.getElementById('netLangSelect').value = netLang;
+  document.getElementById('netLangSelect').onchange = (e) => {
+    netLang = e.target.value;
+    if(selectedMols.size > 0) renderNetwork();
+    if(document.getElementById('networkModal').style.display === 'flex') openNetworkFullscreen();
+    if(activeTab === 'diseases') renderTable();
+  };
+  bindLayerCheckboxes();
+  syncLayerCheckboxes();
+  document.getElementById('showBtn').onclick = () => renderAll();
+  document.querySelectorAll('.tabs button').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeTab = btn.dataset.tab;
+      renderTable();
+    };
+  });
+  document.getElementById('dlJson').onclick = downloadHerbJson;
+  document.getElementById('dlCsv').onclick = downloadHerbCsv;
+  document.getElementById('capTgt').onchange = renderNetwork;
+  document.getElementById('capDis').onchange = renderNetwork;
+
+  document.getElementById('saveLayoutBtn').onclick = () => saveCurrentLayout(document.getElementById('layoutNameInput').value.trim());
+  document.getElementById('applyLayoutBtn').onclick = () => applyLayoutPreset(document.getElementById('layoutPresetSelect').value);
+  document.getElementById('deleteLayoutBtn').onclick = () => deleteLayoutPreset(document.getElementById('layoutPresetSelect').value);
+  refreshLayoutPresetOptions();
+  initNetworkResize();
+
+  renderPicker();
+  renderKpi();
+  renderAll();
+}
+
+function renderKpi(){
+  const mols = molsByHerb.get(currentHerbId);
+  const tarSet = new Set();
+  mols.forEach(m => (targetsByMol.get(m)||[]).forEach(r => tarSet.add(r.tar_id)));
+  const disSet = new Set();
+  tarSet.forEach(t => (diseasesByTar.get(t)||[]).forEach(d => disSet.add(d)));
+  document.getElementById('kpiRow').innerHTML = `
+    <div><b>${mols.length}</b><span>Ingredients</span></div>
+    <div><b>${tarSet.size}</b><span>Related Targets</span></div>
+    <div><b>${disSet.size}</b><span>Related Diseases</span></div>
+  `;
+}
+
+function renderPicker(){
+  const mols = molsByHerb.get(currentHerbId).map(id => ingredientsById.get(id)).filter(Boolean);
+  const col = document.getElementById('pickerCol');
+  col.innerHTML = mols.map(m => `
+    <label class="pick-row">
+      <input type="checkbox" data-mol="${m.mol_id}" ${selectedMols.has(m.mol_id)?'checked':''}>
+      ${escapeHtml(m.molecule_name)} <span class="small">(OB ${m.ob!=null?m.ob.toFixed(1):'-'})</span>
+    </label>`).join('');
+  col.querySelectorAll('input').forEach(inp => {
+    inp.onchange = () => {
+      if(inp.checked) selectedMols.add(inp.dataset.mol); else selectedMols.delete(inp.dataset.mol);
+      markPending();
+    };
+  });
+}
+function markPending(){
+  const btn = document.getElementById('showBtn');
+  if(btn) btn.textContent = `▶ 顯示 Selected（${selectedMols.size} 個已勾選，尚未套用）`;
+}
+function clearPending(){
+  const btn = document.getElementById('showBtn');
+  if(btn) btn.textContent = `▶ 顯示 Selected（已套用 ${selectedMols.size} 個）`;
+}
+
+function renderAll(){ renderTable(); renderNetwork(); clearPending(); }
+
+// ---------- Table: sort / filter state (ingredients tab only) ----------
+const ING_COLS = [
+  {key:'molecule_name', label:'Molecule name', type:'text', info:'molecule_name'},
+  {key:'mol_id',        label:'Mol ID',        type:'text', info:'mol_id'},
+  {key:'mw',            label:'MW',            type:'num',  info:'mw'},
+  {key:'ob',            label:'OB%',           type:'num',  info:'ob'},
+  {key:'dl',            label:'DL',            type:'num',  info:'dl'},
+  {key:'alogp',         label:'ALogP',         type:'num',  info:'alogp'},
+  {key:'hdon',          label:'Hdon',          type:'num',  info:'hdon'},
+  {key:'hacc',          label:'Hacc',          type:'num',  info:'hacc'}
+];
+let ingSort = {col:null, dir:1};
+let ingFilters = {};
+function toggleIngSort(col){
+  if(ingSort.col === col) ingSort.dir *= -1; else { ingSort.col = col; ingSort.dir = 1; }
+  renderTable();
+}
+function applyIngFilters(rows){
+  const active = Object.entries(ingFilters).filter(([,f]) => f && f.op && f.val !== '' && f.val != null);
+  if(!active.length) return rows;
+  return rows.filter(r => active.every(([col,f]) => {
+    const v = r[col]; if(v == null) return false;
+    const num = parseFloat(f.val); if(isNaN(num)) return true;
+    if(f.op === '>=') return v >= num;
+    if(f.op === '<=') return v <= num;
+    if(f.op === '=')  return Math.abs(v - num) < 1e-9;
+    if(f.op === '<')  return v < num;
+    return true;
+  }));
+}
+function applyIngSort(rows){
+  if(!ingSort.col) return rows;
+  const col = ingSort.col, dir = ingSort.dir;
+  return rows.slice().sort((a,b) => {
+    let av = a[col], bv = b[col];
+    if(typeof av === 'string' || typeof bv === 'string'){
+      return dir * String(av||'').localeCompare(String(bv||''));
+    }
+    av = (av==null) ? -Infinity : av; bv = (bv==null) ? -Infinity : bv;
+    return dir * (av - bv);
+  });
+}
+function sortArrow(col){ return ingSort.col === col ? (ingSort.dir === 1 ? ' ▲' : ' ▼') : ''; }
+
+// ---------- Table ----------
+function renderTable(){
+  const wrap = document.getElementById('tableWrap');
+  const mols = [...selectedMols];
+  if(activeTab === 'ingredients'){
+    let rows = mols.map(id => ingredientsById.get(id)).filter(Boolean);
+    rows = applyIngFilters(rows);
+    rows = applyIngSort(rows);
+    const filterBar = `<div class="ingFilterBar" style="display:flex;flex-wrap:wrap;gap:10px;padding:4px 0 10px;font-size:11.5px;color:var(--muted);align-items:center;">
+      <span>篩選（設定門檻，Enter 或點別處套用）：</span>
+      ${ING_COLS.filter(c=>c.type==='num').map(c => `
+        <span style="display:inline-flex;gap:3px;align-items:center;">
+          ${c.label}
+          <select data-fcol="${c.key}" style="font-size:11px;">
+            <option value="">--</option>
+            <option value=">=">≥</option>
+            <option value="<=">≤</option>
+            <option value="=">=</option>
+            <option value="<">&lt;</option>
+          </select>
+          <input type="number" data-fval="${c.key}" style="width:55px;font-size:11px;" value="${(ingFilters[c.key]&&ingFilters[c.key].val!=null)?ingFilters[c.key].val:''}">
+        </span>`).join('')}
+      <button id="ingFilterClear">清除篩選</button>
+      <span style="flex:1"></span>
+      <span class="small">顯示 ${rows.length} / ${mols.length} 筆</span>
+    </div>`;
+    wrap.innerHTML = filterBar + `<table><thead><tr>
+      ${ING_COLS.map(c => `<th class="sortable" data-col="${c.key}">${c.label} <a class="term-link" onclick="event.stopPropagation(); showTermInfo('${c.info}')">ⓘ</a>${sortArrow(c.key)}</th>`).join('')}
+      </tr></thead><tbody>${rows.map(r => `<tr>
+        <td>${escapeHtml(r.molecule_name)}</td><td>${r.mol_id}</td><td>${fmt(r.mw)}</td><td>${fmt(r.ob)}</td><td>${fmt(r.dl)}</td><td>${fmt(r.alogp)}</td><td>${r.hdon??''}</td><td>${r.hacc??''}</td>
+      </tr>`).join('')}</tbody></table>`;
+    wrap.querySelectorAll('th.sortable').forEach(th => {
+      th.style.cursor = 'pointer';
+      th.onclick = (e) => { if(e.target.closest('a.term-link') || e.target.closest('.col-resizer')) return; toggleIngSort(th.dataset.col); };
+    });
+    wrap.querySelectorAll('[data-fcol]').forEach(sel => {
+      sel.value = (ingFilters[sel.dataset.fcol] || {}).op || '';
+      sel.onchange = () => {
+        ingFilters[sel.dataset.fcol] = ingFilters[sel.dataset.fcol] || {};
+        ingFilters[sel.dataset.fcol].op = sel.value;
+        renderTable();
+      };
+    });
+    wrap.querySelectorAll('[data-fval]').forEach(inp => {
+      inp.onchange = () => {
+        ingFilters[inp.dataset.fval] = ingFilters[inp.dataset.fval] || {};
+        ingFilters[inp.dataset.fval].val = inp.value;
+        renderTable();
+      };
+    });
+    const clearBtn = document.getElementById('ingFilterClear');
+    if(clearBtn) clearBtn.onclick = () => { ingFilters = {}; renderTable(); };
+  } else if(activeTab === 'targets'){
+    const rows = [];
+    mols.forEach(mid => (targetsByMol.get(mid)||[]).forEach(r => {
+      const t = targetsById.get(r.tar_id);
+      if(t) rows.push({mol: ingredientsById.get(mid), t, r});
+    }));
+    wrap.innerHTML = `<table><thead><tr>
+      <th>Target name</th><th><a class="term-link" onclick="showTermInfo('tar_id')">Tar ID</a></th><th><a class="term-link" onclick="showTermInfo('target_source')">來源</a></th><th>Molecule</th><th><a class="term-link" onclick="showTermInfo('validated')">Validated</a></th><th><a class="term-link" onclick="showTermInfo('svm')">SVM</a></th><th><a class="term-link" onclick="showTermInfo('rf')">RF</a></th>
+      </tr></thead><tbody>${rows.map(x => `<tr>
+        <td>${escapeHtml(x.t.target_name||'')}</td><td>${x.t.tar_id}</td>
+        <td>${x.t.source==='herb_detail_supplement'?'<span class="tag supp">補充</span>':'<span class="tag">彙總</span>'}</td>
+        <td>${escapeHtml(x.mol ? x.mol.molecule_name : '')}</td>
+        <td>${x.r.validated || '<span class="na">-</span>'}</td>
+        <td>${fmt(x.r.svm_score)}</td><td>${fmt(x.r.rf_score)}</td>
+      </tr>`).join('')}</tbody></table>`;
+  } else {
+    const tarSet = new Set();
+    mols.forEach(mid => (targetsByMol.get(mid)||[]).forEach(r => tarSet.add(r.tar_id)));
+    const rows = [];
+    tarSet.forEach(tid => (diseasesByTar.get(tid)||[]).forEach(did => {
+      const d = diseasesById.get(did); const t = targetsById.get(tid);
+      if(d) rows.push({d, t});
+    }));
+    const seen = new Set();
+    const uniqRows = rows.filter(x => { const k = x.d.dis_id+'|'+x.t.tar_id; if(seen.has(k)) return false; seen.add(k); return true; });
+    wrap.innerHTML = `<table><thead><tr>
+      <th><a class="term-link" onclick="showTermInfo('disease_name')">Disease name</a></th>
+      <th><a class="term-link" onclick="showTermInfo('disease_zh')">中文名稱</a></th>
+      <th><a class="term-link" onclick="showTermInfo('dis_id')">Dis ID</a></th><th><a class="term-link" onclick="showTermInfo('icd9')">ICD9</a></th><th><a class="term-link" onclick="showTermInfo('icd10')">ICD10</a></th><th><a class="term-link" onclick="showTermInfo('via_target')">Via target</a></th>
+      <th><a class="term-link" onclick="showTermInfo('disease_info_modal')">疾病資訊</a></th>
+      </tr></thead><tbody>${uniqRows.map(x => { const zh = zhOnly('disease', x.d.dis_id); return `<tr>
+        <td>${escapeHtml(x.d.disease_name)}</td>
+        <td>${zh ? escapeHtml(zh) : '<span class="na">-</span>'}</td>
+        <td>${x.d.dis_id}</td><td>${x.d.icd9||''}</td><td>${x.d.icd10||''}</td><td>${escapeHtml(x.t.target_name||'')}</td>
+        <td><a class="term-link" onclick="openDiseaseInfoModal('${x.d.dis_id}')">查看疾病資訊</a></td>
+      </tr>`; }).join('')}</tbody></table>`;
+  }
+  makeColumnsResizable();
+}
+function fmt(v){ return (v===null || v===undefined) ? '' : (typeof v==='number' ? v.toFixed(4).replace(/0+$/,'').replace(/\.$/,'') : v); }
+
+// ---------- Network ----------
+function renderNetwork(){
+  const container = document.getElementById('network');
+  if(selectedMols.size === 0){
+    if(network){ network.destroy(); network = null; }
+    lastNodes = null; lastEdges = null; lastOptions = null;
+    container.innerHTML = '<div class="placeholder">尚未勾選任何成分</div>';
+    return;
+  }
+  try{
+    if(typeof vis === 'undefined') throw new Error('vis-network 未能從 CDN 載入');
+    const capTgt = parseInt(document.getElementById('capTgt').value, 10);
+    const capDis = parseInt(document.getElementById('capDis').value, 10);
+    const herb = herbsById.get(currentHerbId);
+    const nodes = new vis.DataSet();
+    const edges = new vis.DataSet();
+    nodes.add({id:'herb', label: herb.herb_cn_name + '\n' + (herb.herb_en_name||''), shape:'dot', size:30, color:'#c99a3d', font:{color:'#111',size:14,bold:true}});
+
+    const usedTargets = new Map(); // tar_id -> count
+    if(layerVisibility.ingredients){
+      [...selectedMols].forEach(mid => {
+        const m = ingredientsById.get(mid); if(!m) return;
+        nodes.add({id:'m_'+mid, label:m.molecule_name, shape:'dot', size:13, color:'#3b82c4', font:{color:'#fff',size:9}, title:`OB ${fmt(m.ob)}% DL ${fmt(m.dl)}`});
+        edges.add({from:'herb', to:'m_'+mid, color:{color:'#3a3d44',opacity:.5}, width:1});
+        if(!layerVisibility.targets) return;
+        let tgs = (targetsByMol.get(mid)||[]).slice().sort((a,b)=>(b.svm_score||0)-(a.svm_score||0)).slice(0, capTgt);
+        tgs.forEach(r => {
+          const t = targetsById.get(r.tar_id); if(!t) return;
+          usedTargets.set(r.tar_id, (usedTargets.get(r.tar_id)||0) + 1);
+          if(!nodes.get('t_'+r.tar_id)) nodes.add({id:'t_'+r.tar_id, label:zhLabel('target', t.tar_id, t.target_name), shape:'dot', size:12, color:'#3a9d63', font:{color:'#fff',size:9}});
+          edges.add({from:'m_'+mid, to:'t_'+r.tar_id, color:{color:'#e0b64a',opacity:.7}, width:1});
+        });
+      });
+    }
+    const usedDiseases = new Set();
+    if(layerVisibility.diseases){
+      usedTargets.forEach((count, tid) => {
+        let dids = (diseasesByTar.get(tid)||[]).slice(0, capDis);
+        dids.forEach(did => {
+          const d = diseasesById.get(did); if(!d) return;
+          usedDiseases.add(did);
+          if(!nodes.get('d_'+did)) nodes.add({id:'d_'+did, label:zhLabel('disease', d.dis_id, d.disease_name), shape:'dot', size:11, color:'#c0533e', font:{color:'#fff',size:8}});
+          edges.add({from:'t_'+tid, to:'d_'+did, color:{color:'#c0533e',opacity:.35}, width:1});
+        });
+      });
+    }
+
+    const data = {nodes, edges};
+    const options = { autoResize:true, physics:{ stabilization:true, barnesHut:{gravitationalConstant:-3000,centralGravity:0.2,springLength:100,springConstant:0.03,damping:0.4} }, interaction:{hover:true,tooltipDelay:80}, edges:{smooth:{type:'continuous'}} };
+    if(network) network.setData(data); else network = new vis.Network(container, data, options);
+    network.once('stabilizationIterationsDone', ()=> network.fit({animation:false}));
+    setTimeout(()=>{ if(network){ network.redraw(); network.fit({animation:false}); } }, 150);
+    lastNodes = nodes; lastEdges = edges; lastOptions = options;
+  }catch(err){
+    container.innerHTML = `<div class="placeholder">⚠️ 網絡圖繪製失敗：${err.message}</div>`;
+    network = null;
+    lastNodes = null; lastEdges = null; lastOptions = null;
+  }
+}
+
+// ---------- Network fullscreen (print / download / close) ----------
+function openNetworkFullscreen(){
+  if(!lastNodes || !lastEdges){
+    alert('請先按「▶ 顯示 Selected」產生網絡圖，再放大檢視。');
+    return;
+  }
+  const herb = herbsById.get(currentHerbId);
+  document.getElementById('networkModalTitle').textContent =
+    '關聯圖 — ' + (herb ? herb.herb_cn_name + '（' + (herb.herb_en_name||'') + '）' : '');
+  document.getElementById('networkModal').style.display = 'flex';
+  bindLayerCheckboxes();
+  syncLayerCheckboxes();
+  hideNodeDetail();
+  renderFullscreenNetwork();
+}
+function refreshFullscreenNetwork(){
+  hideNodeDetail();
+  renderFullscreenNetwork();
+}
+function renderFullscreenNetwork(){
+  const container = document.getElementById('networkModalCanvas');
+  if(fsNetwork){ fsNetwork.destroy(); fsNetwork = null; }
+  if(!lastNodes || !lastEdges) return;
+  fsNetwork = new vis.Network(container, {nodes:lastNodes, edges:lastEdges}, lastOptions);
+  fsNetwork.once('stabilizationIterationsDone', ()=> fsNetwork.fit({animation:false}));
+  setTimeout(()=>{ if(fsNetwork){ fsNetwork.redraw(); fsNetwork.fit({animation:false}); } }, 150);
+  fsNetwork.on('click', (params) => {
+    if(params.nodes && params.nodes.length) showNodeDetail(params.nodes[0]);
+    else hideNodeDetail();
+  });
+}
+function closeNetworkFullscreen(){
+  document.getElementById('networkModal').style.display = 'none';
+  if(fsNetwork){ fsNetwork.destroy(); fsNetwork = null; }
+  hideNodeDetail();
+}
+
+// ---------- Fullscreen node detail panel ----------
+function nodeDetailTable(title, rows){
+  return `<button onclick="hideNodeDetail()" style="float:right;">✕</button>
+    <h4 style="margin:0 0 12px;color:#fff;font-size:14px;">${escapeHtml(title)}</h4>
+    <table style="width:100%;font-size:12.5px;border-collapse:collapse;">
+      ${rows.map(([k,v]) => `<tr><td class="small" style="padding:5px 8px 5px 0;white-space:nowrap;vertical-align:top;">${escapeHtml(k)}</td><td style="padding:5px 0;word-break:break-word;">${escapeHtml(v==null?'-':String(v))}</td></tr>`).join('')}
+    </table>`;
+}
+function showNodeDetail(nodeId){
+  const panel = document.getElementById('networkNodeDetail');
+  let html = '';
+  if(nodeId === 'herb'){
+    const h = herbsById.get(currentHerbId);
+    if(h) html = nodeDetailTable('藥材 Herb', [
+      ['中文名稱', h.herb_cn_name], ['拼音', h.herb_pinyin], ['英文學名', h.herb_en_name],
+      ['分類（中）', h.child_cn_name], ['分類（英）', h.child_en_name], ['Herb ID', h.herb_id]
+    ]);
+  } else if(nodeId.indexOf('m_') === 0){
+    const m = ingredientsById.get(nodeId.slice(2));
+    if(m) html = nodeDetailTable('成分 Ingredient', [
+      ['Molecule name', m.molecule_name], ['Mol ID', m.mol_id], ['MW', fmt(m.mw)],
+      ['OB%', fmt(m.ob)], ['DL', fmt(m.dl)], ['ALogP', fmt(m.alogp)], ['Hdon', m.hdon], ['Hacc', m.hacc]
+    ]);
+  } else if(nodeId.indexOf('t_') === 0){
+    const t = targetsById.get(nodeId.slice(2));
+    if(t) html = nodeDetailTable('靶點 Target', [
+      ['Target name', t.target_name], ['中文名稱', zhOnly('target', t.tar_id) || null], ['Tar ID', t.tar_id],
+      ['來源', t.source==='herb_detail_supplement' ? '補充（藥材詳情頁）' : '彙總（Browse 匯出）']
+    ]);
+  } else if(nodeId.indexOf('d_') === 0){
+    const d = diseasesById.get(nodeId.slice(2));
+    if(d) html = nodeDetailTable('疾病 Disease', [
+      ['Disease name', d.disease_name], ['中文名稱', zhOnly('disease', d.dis_id) || null], ['Dis ID', d.dis_id],
+      ['ICD9', d.icd9], ['ICD10', d.icd10]
+    ]);
+  }
+  const panelEl = document.getElementById('networkNodeDetail');
+  if(html){ panelEl.innerHTML = html; panelEl.style.display = 'block'; }
+  else hideNodeDetail();
+}
+function hideNodeDetail(){
+  const panel = document.getElementById('networkNodeDetail');
+  if(panel){ panel.style.display = 'none'; panel.innerHTML = ''; }
+}
+function getFsCanvas(){
+  return document.getElementById('networkModalCanvas').querySelector('canvas');
+}
+function downloadNetworkImage(){
+  const canvas = getFsCanvas();
+  if(!canvas){ alert('目前沒有可下載的圖形。'); return; }
+  const herb = herbsById.get(currentHerbId);
+  const name = herb ? (herb.herb_en_name||herb.herb_id) : 'network';
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `tcmsp_network_${String(name).replace(/[^a-zA-Z0-9]+/g,'_')}.png`;
+  a.click();
+}
+function printNetwork(){
+  const canvas = getFsCanvas();
+  if(!canvas){ alert('目前沒有可列印的圖形。'); return; }
+  const dataUrl = canvas.toDataURL('image/png');
+  const title = document.getElementById('networkModalTitle').textContent;
+  const w = window.open('', '_blank');
+  w.document.write(`<!doctype html><html><head><title>${escapeHtml(title)}</title></head>
+    <body style="margin:0;display:flex;align-items:center;justify-content:center;background:#fff;">
+    <img src="${dataUrl}" style="max-width:100%;" onload="window.print()">
+    </body></html>`);
+  w.document.close();
+}
+document.getElementById('netCloseBtn').onclick = closeNetworkFullscreen;
+document.getElementById('netDownloadBtn').onclick = downloadNetworkImage;
+document.getElementById('netPrintBtn').onclick = printNetwork;
+
+// ---------- Resizable network/table split ----------
+let networkHeight = 380; // px
+function initNetworkResize(){
+  const handle = document.getElementById('netResizeHandle');
+  const netEl = document.getElementById('network');
+  if(!handle || !netEl) return;
+  netEl.style.height = networkHeight + 'px';
+  let dragging = false, startY = 0, startH = 0;
+  handle.onmousedown = (e) => {
+    dragging = true; startY = e.clientY; startH = netEl.getBoundingClientRect().height;
+    document.body.style.userSelect = 'none';
+  };
+  window.addEventListener('mousemove', (e) => {
+    if(!dragging) return;
+    let h = startH + (e.clientY - startY);
+    h = Math.max(120, Math.min(h, window.innerHeight - 220));
+    netEl.style.height = h + 'px';
+    networkHeight = h;
+    if(network){ network.redraw(); }
+  });
+  window.addEventListener('mouseup', () => { if(dragging){ dragging = false; document.body.style.userSelect = ''; } });
+}
+
+// ---------- Resizable table columns ----------
+let colWidths = {}; // { tabName: [w0, w1, ...] }
+function makeColumnsResizable(){
+  const table = document.querySelector('#tableWrap table');
+  if(!table) return;
+  const ths = table.querySelectorAll('thead th');
+  const saved = colWidths[activeTab];
+  ths.forEach((th, idx) => {
+    th.style.position = 'relative';
+    if(saved && saved[idx]) th.style.width = saved[idx] + 'px';
+    const grip = document.createElement('span');
+    grip.className = 'col-resizer';
+    th.appendChild(grip);
+    grip.onmousedown = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const startX = e.clientX, startW = th.getBoundingClientRect().width;
+      function onMove(ev){
+        const w = Math.max(40, Math.round(startW + (ev.clientX - startX)));
+        th.style.width = w + 'px';
+        colWidths[activeTab] = colWidths[activeTab] || [];
+        colWidths[activeTab][idx] = w;
+      }
+      function onUp(){ window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); }
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    };
+  });
+}
+
+// ---------- Named layout presets (network height + column widths), saved in localStorage ----------
+const LAYOUT_STORAGE_KEY = 'tcmsp_layout_presets_v1';
+function loadLayoutPresets(){ try{ return JSON.parse(localStorage.getItem(LAYOUT_STORAGE_KEY) || '{}'); }catch(e){ return {}; } }
+function saveLayoutPresets(p){ localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(p)); }
+function refreshLayoutPresetOptions(){
+  const sel = document.getElementById('layoutPresetSelect');
+  if(!sel) return;
+  const presets = loadLayoutPresets();
+  const names = Object.keys(presets);
+  sel.innerHTML = '<option value="">-- 選擇已儲存版面 --</option>' + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+}
+function saveCurrentLayout(name){
+  if(!name){ alert('請先輸入版面名稱'); return; }
+  const presets = loadLayoutPresets();
+  presets[name] = presets[name] || {};
+  presets[name].networkHeight = networkHeight;
+  presets[name].cols = colWidths;
+  saveLayoutPresets(presets);
+  refreshLayoutPresetOptions();
+  document.getElementById('layoutPresetSelect').value = name;
+}
+function applyLayoutPreset(name){
+  if(!name) return;
+  const presets = loadLayoutPresets();
+  const p = presets[name];
+  if(!p) return;
+  if(p.networkHeight){
+    networkHeight = p.networkHeight;
+    const netEl = document.getElementById('network');
+    if(netEl){ netEl.style.height = networkHeight + 'px'; if(network) network.redraw(); }
+  }
+  if(p.cols){
+    colWidths = JSON.parse(JSON.stringify(p.cols));
+    makeColumnsResizable();
+  }
+}
+function deleteLayoutPreset(name){
+  if(!name) return;
+  const presets = loadLayoutPresets();
+  delete presets[name];
+  saveLayoutPresets(presets);
+  refreshLayoutPresetOptions();
+}
+
+// ---------- Version history modal ----------
+const CHANGELOG = [
+  {
+    version: '00.01.05',
+    date: '2026-07-29',
+    changes: [
+      '疾病資訊彈出視窗移除「資料來源：TCMSP 資料庫（本機端整理，未連結至第三方網站）」這段文字',
+      '疾病資訊彈出視窗新增「查看 TCMSP 原始資料來源」連結，點擊會另開新視窗前往 TCMSP 官網對應的疾病說明頁'
+    ]
+  },
+  {
+    version: '00.01.04',
+    date: '2026-07-29',
+    changes: [
+      '放大檢視關聯圖新增「顯示層級」勾選（Ingredients／Related Targets／Related Diseases），跟主畫面共用同一套規則與狀態，切換其中一邊會同步另一邊',
+      '放大檢視關聯圖新增點擊節點查看詳細資訊：點任何一個節點（藥材／成分／靶點／疾病）會在同一個視窗右側以表格顯示該節點的詳細欄位'
+    ]
+  },
+  {
+    version: '00.01.03',
+    date: '2026-07-29',
+    changes: [
+      '關聯圖新增「顯示層級」勾選（Ingredients／Related Targets／Related Diseases），可逐層開關',
+      '強制規則：Herb → Ingredients → Related Targets → Related Diseases 是逐層關係，關掉上層會自動一併關閉並鎖定下層的勾選框，畫面上會顯示這條規則說明',
+      'Related Diseases 表格的「疾病資訊」改為彈出視窗顯示本機資料庫欄位，不再直接連結開啟 tcmsp-e.com 網站，避免直接連結第三方網站的疑慮'
+    ]
+  },
+  {
+    version: '00.01.02',
+    date: '2026-07-29',
+    changes: [
+      'Related Diseases 表格新增「中文名稱」欄位，隨「圖上文字」下拉選單（繁體中文／简体中文／English）切換，沒有收錄翻譯的疾病顯示「-」',
+      'Related Diseases 表格新增「TCMSP 詳情」欄位，可直接連到 TCMSP 官網該疾病的完整說明頁（https://www.tcmsp-e.com/disease.php?qd=疾病編號）',
+      '版本快照機制改為外部 version_snapshots.json 檔案管理，避免每次新版都把舊快照一起重複打包進檔案裡'
+    ]
+  },
+  {
+    version: '00.01.01',
+    date: '2026-07-29',
+    changes: [
+      '新增成分／靶點／疾病表格欄位說明視窗（點欄名旁的 ⓘ 可查看定義，例如 OB%、DL、ICD9...）',
+      'Ingredients 表格新增排序（點欄名切換升冪/降冪▲▼）與數值篩選（≥ / ≤ / = / <，可自訂門檻）',
+      '關聯圖新增「圖上文字」語言切換（繁體中文／简体中文／English），涵蓋常見疾病與靶點的中文翻譯',
+      '關聯圖新增「⛶ 放大檢視」全螢幕檢視，並可列印／下載圖片／關閉回主頁',
+      '新增版面調整功能：關聯圖／表格區可上下拖曳調整高度比例，表格欄寬可拖曳調整，並可將調整結果儲存為自訂命名的版面配置，下次點選套用',
+      '藥材名稱旁新增「📷 植物照片」連結，目前提供人參屬 5 種藥材（人參／紅參／三七／西洋參／竹節參）的植物照片與 Wikimedia Commons 來源連結',
+      '新增本版本歷史查詢視窗（左下角版本號）'
+    ],
+    downloadable: true
+  },
+  {
+    version: '00.01.00',
+    date: '2026-07-29（較早）',
+    changes: [
+      '建立藥材關聯查詢站：左側藥材清單搜尋、右側 Ingredients／Related Targets／Related Diseases 分頁與關聯網絡圖',
+      '成分挑選器（全選／全不選／只選 OB 前 10／只選有靶點資料／只選有疾病資料）與「▶ 顯示 Selected」套用機制',
+      '支援下載單一藥材的 JSON／CSV'
+    ],
+    downloadable: false
+  }
+];
+// Frozen source snapshots for every past version, keyed by version string, base64(UTF-8) of
+// that version's herb_query_site_template.html source at the time it shipped. Substituted at
+// build time from version_snapshots.json (a small standalone file kept alongside the template
+// so old snapshots never need recomputing -- new versions just append a new key).
+const VERSION_SNAPSHOTS = __VERSION_SNAPSHOTS_JSON__;
+function openVersionModal(){
+  const body = document.getElementById('versionModalBody');
+  body.innerHTML = CHANGELOG.map(v => `
+    <div class="versionEntry">
+      <h4>v${v.version} <span class="small">（${escapeHtml(v.date)}）</span></h4>
+      <ul>${v.changes.map(c => `<li>${escapeHtml(c)}</li>`).join('')}</ul>
+      ${VERSION_SNAPSHOTS[v.version]
+        ? `<button onclick="downloadVersion('${v.version}')">⭳ 下載此版本（.zip）</button>`
+        : `<button disabled title="版本管理機制自 v00.01.01 才開始保存快照，此版本沒有保留可下載的檔案">⭳ 無可下載檔案</button>`}
+    </div>
+  `).join('');
+  document.getElementById('versionModal').style.display = 'flex';
+}
+function closeVersionModal(){ document.getElementById('versionModal').style.display = 'none'; }
+async function downloadVersion(version){
+  const b64 = VERSION_SNAPSHOTS[version];
+  if(!b64 || b64.indexOf('__VERSION_SNAPSHOTS') === 0){
+    alert('此版本沒有保留可下載的快照。');
+    return;
+  }
+  if(typeof JSZip === 'undefined'){ alert('打包工具（JSZip）載入失敗，請檢查網路連線後重試。'); return; }
+  try{
+    const binStr = atob(b64);
+    const bytes = new Uint8Array(binStr.length);
+    for(let i=0;i<binStr.length;i++) bytes[i] = binStr.charCodeAt(i);
+    const decoded = new TextDecoder('utf-8').decode(bytes);
+    const zip = new JSZip();
+    zip.file(`tcmsp_herb_query_site_template_v${version}.html`, decoded);
+    zip.file('CHANGELOG.txt', CHANGELOG.map(v => `v${v.version}（${v.date}）\n` + v.changes.map(c=>'- '+c).join('\n')).join('\n\n'));
+    zip.file('README.txt', `這個檔案是 v${version} 版的「程式樣板」（不含資料庫匯出內容，本身無法直接開啟顯示資料）。\n若要還原成當時可運作的完整頁面，請搭配當時的 tcmsp.sqlite，依專案 README_tcmsp_db.md 裡「重新產生查詢站」的步驟，將這個樣板與資料庫匯出的 JSON 合併即可。`);
+    const blob = await zip.generateAsync({type:'blob'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `tcmsp_herb_query_site_v${version}.zip`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 3000);
+  }catch(e){
+    alert('打包下載失敗：' + e.message);
+  }
+}
+
+// ---------- Download ----------
+function herbFullPayload(){
+  const herb = herbsById.get(currentHerbId);
+  const mols = molsByHerb.get(currentHerbId);
+  const ingredients = mols.map(id => ingredientsById.get(id)).filter(Boolean);
+  const targetRows = [];
+  mols.forEach(mid => (targetsByMol.get(mid)||[]).forEach(r => {
+    const t = targetsById.get(r.tar_id);
+    targetRows.push({ mol_id: mid, molecule_name: (ingredientsById.get(mid)||{}).molecule_name, tar_id: r.tar_id, target_name: t?t.target_name:'', source: t?t.source:'', validated: r.validated, svm_score: r.svm_score, rf_score: r.rf_score });
+  }));
+  const tarSet = new Set(targetRows.map(r => r.tar_id));
+  const diseaseRows = [];
+  tarSet.forEach(tid => (diseasesByTar.get(tid)||[]).forEach(did => {
+    const d = diseasesById.get(did);
+    diseaseRows.push({ tar_id: tid, target_name: (targetsById.get(tid)||{}).target_name, dis_id: did, disease_name: d?d.disease_name:'' });
+  }));
+  return { herb, ingredients, ingredient_target: targetRows, target_disease: diseaseRows };
+}
+function downloadBlob(content, filename, mime){
+  const blob = new Blob([content], {type:mime});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  URL.revokeObjectURL(a.href);
+}
+function downloadHerbJson(){
+  const herb = herbsById.get(currentHerbId);
+  downloadBlob(JSON.stringify(herbFullPayload(), null, 2), `tcmsp_herb_${(herb.herb_en_name||herb.herb_id).replace(/[^a-zA-Z0-9]+/g,'_')}_full.json`, 'application/json');
+}
+function downloadHerbCsv(){
+  const p = herbFullPayload();
+  const rows = p.ingredient_target;
+  if(!rows.length){ downloadBlob('no data','empty.csv','text/csv'); return; }
+  const headers = Object.keys(rows[0]);
+  const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
+  const csv = [headers.map(esc).join(',')].concat(rows.map(r=>headers.map(h=>esc(r[h])).join(','))).join('\r\n');
+  const herb = herbsById.get(currentHerbId);
+  downloadBlob('﻿'+csv, `tcmsp_herb_${(herb.herb_en_name||herb.herb_id).replace(/[^a-zA-Z0-9]+/g,'_')}_ingredient_target.csv`, 'text/csv;charset=utf-8');
+}
+
+// ---------- Platform nav: logout ----------
+document.getElementById('platformLogout').addEventListener('click', async (e) => {
+  e.preventDefault();
+  try { await api(`/auth/logout?login_log_id=${getLoginLogId()}`, { method: 'POST' }); } catch (err) {}
+  clearSession();
+  window.location.href = 'index.html';
+});
+
+// ---------- Init ----------
+bootstrapData();
+
+</script>
+</body>
+</html>
