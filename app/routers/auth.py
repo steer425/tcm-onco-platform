@@ -1,5 +1,6 @@
 import secrets
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -19,6 +20,34 @@ from app.oauth_google import (
 from app.security import create_access_token, create_oauth_state_token, hash_password, verify_oauth_state_token, verify_password
 
 router = APIRouter(prefix="/auth", tags=["登入與帳號申請"])
+
+# 部分瀏覽器/Facebook 登入完成頁會觸發兩次跳轉到 callback 網址（同一組授權碼送兩次），
+# 第一次成功交換後，第二次會被 Facebook/Google 判定「授權碼已使用過」而失敗。
+# 這裡快取「最近成功處理過的授權碼 -> 對應的導轉結果」，同一組授權碼重複進來時直接回放結果，
+# 不需要重新跟第三方交換 token（也就不會撞到「已使用過」的錯誤）。
+# 純粹是「同一次登入流程內的重放保護」，快取內容很快就會用不到，
+# 就算部署交接導致快取遺失，最差情況也只是退回目前的行為（第二次請求失敗、使用者需要重新登入一次）。
+_recent_oauth_redirects: dict = {}
+_OAUTH_REPLAY_CACHE_SECONDS = 60
+
+
+def _cache_oauth_result(code: str, response: RedirectResponse):
+    now = datetime.utcnow().timestamp()
+    # 順手清掉過期的快取項目，避免無限增長
+    for k in list(_recent_oauth_redirects.keys()):
+        if now - _recent_oauth_redirects[k][1] > _OAUTH_REPLAY_CACHE_SECONDS:
+            del _recent_oauth_redirects[k]
+    _recent_oauth_redirects[code] = (response, now)
+
+
+def _get_cached_oauth_result(code: str) -> Optional[RedirectResponse]:
+    entry = _recent_oauth_redirects.get(code)
+    if not entry:
+        return None
+    response, ts = entry
+    if datetime.utcnow().timestamp() - ts > _OAUTH_REPLAY_CACHE_SECONDS:
+        return None
+    return response
 
 
 def _redirect_oauth_error(code_str: str) -> RedirectResponse:
@@ -164,6 +193,10 @@ async def google_callback(code: str = None, state: str = None, error: str = None
     if not code:
         return _redirect_oauth_error("missing_code")
 
+    cached = _get_cached_oauth_result(code)
+    if cached:
+        return cached
+
     try:
         userinfo = await google_exchange_code_for_userinfo(code)
     except HTTPException as e:
@@ -175,7 +208,9 @@ async def google_callback(code: str = None, state: str = None, error: str = None
     if not google_sub or not email:
         return _redirect_oauth_error("missing_profile")
 
-    return _handle_oauth_login(db, models.OAuthProvider.google, google_sub, email, "Google")
+    result = _handle_oauth_login(db, models.OAuthProvider.google, google_sub, email, "Google")
+    _cache_oauth_result(code, result)
+    return result
 
 
 @router.get("/facebook/enabled", summary="查詢 Facebook 登入是否已啟用（供前台判斷是否顯示按鈕）")
@@ -198,6 +233,10 @@ async def facebook_callback(code: str = None, state: str = None, error: str = No
     if not code:
         return _redirect_oauth_error("missing_code")
 
+    cached = _get_cached_oauth_result(code)
+    if cached:
+        return cached
+
     try:
         userinfo = await facebook_exchange_code_for_userinfo(code)
     except HTTPException as e:
@@ -213,7 +252,9 @@ async def facebook_callback(code: str = None, state: str = None, error: str = No
         # 因為本系統的帳號體系以 email 作為帳號識別，無法用純數字 ID 建立有意義的帳號名稱。
         return _redirect_oauth_error("facebook_no_email")
 
-    return _handle_oauth_login(db, models.OAuthProvider.facebook, facebook_id, email, "Facebook")
+    result = _handle_oauth_login(db, models.OAuthProvider.facebook, facebook_id, email, "Facebook")
+    _cache_oauth_result(code, result)
+    return result
 
 
 @router.get("/me", response_model=schemas.UserOut, summary="取得目前登入者資訊")
