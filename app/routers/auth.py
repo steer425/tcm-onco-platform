@@ -166,7 +166,8 @@ async def google_callback(code: str = None, state: str = None, error: str = None
 
     try:
         userinfo = await google_exchange_code_for_userinfo(code)
-    except HTTPException:
+    except HTTPException as e:
+        print(f"[Google OAuth] token exchange failed: {e.detail}")
         return _redirect_oauth_error("token_exchange_failed")
 
     google_sub = userinfo.get("sub")
@@ -199,7 +200,8 @@ async def facebook_callback(code: str = None, state: str = None, error: str = No
 
     try:
         userinfo = await facebook_exchange_code_for_userinfo(code)
-    except HTTPException:
+    except HTTPException as e:
+        print(f"[Facebook OAuth] token exchange failed: {e.detail}")
         return _redirect_oauth_error("token_exchange_failed")
 
     facebook_id = userinfo.get("id")

@@ -1,5 +1,16 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.13.2 — 2026-07-31（第三方登入失敗時記錄實際錯誤訊息）
+
+### 問題
+
+Google／Facebook 登入若在「交換 token」這步失敗，畫面只會顯示通用的「與第三方服務交換登入憑證失敗」，實際上 Google/Facebook 回傳的詳細錯誤原因完全沒有被記錄下來，導致除錯時完全看不到問題出在哪。
+
+### 修正
+
+- `google_callback`、`facebook_callback` 在 token 交換失敗時，改為把 Google/Facebook 回應的實際錯誤內容印到伺服器日誌（`print`，會顯示在 Render 的 Logs 分頁），格式為 `[Google OAuth] token exchange failed: ...` / `[Facebook OAuth] token exchange failed: ...`
+- 使用者看到的畫面訊息不變（仍是友善的通用訊息），但管理者現在可以到 Render 後台的 Logs 分頁查到具體原因（例如 redirect_uri 不匹配、client_secret 錯誤等）
+
 ## v1.13.1 — 2026-07-31（修正第三方登入「驗證逾時或失效」的真正原因）
 
 ### 問題
