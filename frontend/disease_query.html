@@ -166,6 +166,7 @@ let currentRelated = { targets: [], ingredients: [], herbs: [] };
 let activeTab = "targets";
 let layerVisibility = { targets: true, ingredients: true, herbs: true };
 let mainNetwork = null, modalNetwork = null;
+let modalOpen = false; // 全螢幕檢視是否開啟中，開啟時切換顯示層級/挑選器要同步重繪全螢幕那個畫布，不能只更新背景的小圖
 
 async function bootstrapData() {
   const listEl = document.getElementById("disList");
@@ -366,6 +367,7 @@ function recomputeAndRender() {
 
   renderTable();
   renderNetwork("network", false);
+  if (modalOpen) renderNetwork("networkModalCanvas", true);
 }
 
 // ---------- Tabs / Table ----------
@@ -489,7 +491,10 @@ function showNodeDetail(nodeId, nodesDataSet) {
 }
 
 [document.getElementById("maxTargetsSel"), document.getElementById("maxIngSel"), document.getElementById("maxHerbSel")].forEach(sel => {
-  sel.addEventListener("change", () => renderNetwork("network", false));
+  sel.addEventListener("change", () => {
+    renderNetwork("network", false);
+    if (modalOpen) renderNetwork("networkModalCanvas", true);
+  });
 });
 
 // ---------- Fullscreen modal ----------
@@ -498,10 +503,12 @@ document.getElementById("fullscreenBtn").addEventListener("click", () => {
   document.getElementById("networkModalTitle").textContent = "疾病關聯網絡圖：" + (currentDisease.disease_cn_name || currentDisease.disease_name);
   document.getElementById("networkNodeDetail").style.display = "none";
   document.getElementById("networkModal").style.display = "flex";
+  modalOpen = true;
   setTimeout(() => renderNetwork("networkModalCanvas", true), 50);
 });
 document.getElementById("networkModalClose").addEventListener("click", () => {
   document.getElementById("networkModal").style.display = "none";
+  modalOpen = false;
 });
 
 // ---------- Download ----------
