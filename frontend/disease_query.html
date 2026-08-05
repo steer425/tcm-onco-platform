@@ -16,7 +16,7 @@ html,body{margin:0;padding:0;background:var(--bg);color:#eee;font-family:"Noto S
 #header h1{margin:0 0 4px;font-size:18px;font-weight:600;}
 #header p{margin:0;font-size:12px;color:var(--muted);line-height:1.6;}
 #layout{display:flex;height:calc(100vh - 116px);min-height:600px;}
-#disPanel{width:340px;flex-shrink:0;border-right:1px solid var(--line);display:flex;flex-direction:column;}
+#disPanel{width:320px;flex-shrink:0;border-right:1px solid var(--line);display:flex;flex-direction:column;}
 #disSearch{margin:10px;padding:8px 10px;background:#1c1f26;border:1px solid #3a3d44;color:#eee;border-radius:6px;font-size:13px;}
 #disStats{padding:0 12px 6px;font-size:11.5px;color:var(--muted);}
 #disList{flex:1;overflow-y:auto;border-top:1px solid var(--line);}
@@ -40,8 +40,14 @@ button{background:#26292f;border:1px solid #3a3d44;color:#eee;padding:6px 11px;b
 button:hover{background:#31353c;}
 button.primary{background:#2f5c8a;border-color:#3d70a3;}
 button.primary:hover{background:#396d9e;}
-#body{display:flex;flex:1;min-height:0;flex-direction:column;}
-#network{height:360px;border-bottom:1px solid var(--line);position:relative;flex-shrink:0;}
+select{background:#1c1f26;color:#eee;border:1px solid #3a3d44;border-radius:6px;padding:5px 8px;font-size:12px;}
+#body2{display:flex;flex:1;min-height:0;}
+#pickerCol{width:250px;flex-shrink:0;border-right:1px solid var(--line);overflow-y:auto;}
+#pickerCol .pick-row{display:flex;gap:6px;padding:5px 12px;font-size:12px;cursor:pointer;align-items:center;}
+#pickerCol .pick-row:hover{background:#1a1d23;}
+#contentCol{flex:1;display:flex;flex-direction:column;min-width:0;}
+#layerBar{display:flex;gap:10px;align-items:center;padding:6px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap;background:#12151b;}
+#network{height:340px;border-bottom:1px solid var(--line);position:relative;flex-shrink:0;}
 #network .placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:20px;}
 .tabs{display:flex;gap:6px;padding:8px 16px 0;}
 .tabs button{background:#1c1f26;}
@@ -53,10 +59,14 @@ td{padding:6px 8px;border-bottom:1px solid #23262c;vertical-align:top;}
 tr:hover td{background:#171a20;}
 .na{color:#666;font-style:italic;}
 .small{font-size:11px;color:var(--muted);}
-#networkModal,.modal-overlay{display:none;position:fixed;inset:0;z-index:9999;flex-direction:column;background:#0b0d11;}
+#networkModal{display:none;position:fixed;inset:0;z-index:9999;flex-direction:column;background:#0b0d11;}
 #networkModalBar{display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);flex-shrink:0;flex-wrap:wrap;}
 #networkModalBar b{color:#eee;font-size:14px;flex:1;}
+#networkModalLayerBar{display:flex;gap:10px;align-items:center;padding:6px 16px;border-bottom:1px solid var(--line);flex-shrink:0;flex-wrap:wrap;background:#10131a;}
+#networkModalMain{flex:1;display:flex;min-height:0;}
 #networkModalCanvas{flex:1;min-height:0;}
+#networkNodeDetail{display:none;width:300px;flex-shrink:0;border-left:1px solid var(--line);overflow:auto;padding:14px;background:#12151b;color:#eee;}
+#networkNodeDetail table td{border-bottom:1px solid #23262c;}
 </style>
 </head>
 <body>
@@ -79,24 +89,46 @@ tr:hover td{background:#171a20;}
   </div>
   <div id="main">
     <div id="disHeader"><div id="emptyState">← 請從左側選擇一個疾病</div></div>
-    <div id="body" style="display:none;">
+    <div id="bodyWrap" style="display:none; flex:1; min-height:0; display:flex; flex-direction:column;">
       <div class="kpi">
         <div><b id="kpiTargets">0</b><span>Related Targets</span></div>
         <div><b id="kpiIngredients">0</b><span>Related Ingredients</span></div>
         <div><b id="kpiHerbs">0</b><span>Related Herbs</span></div>
       </div>
       <div id="toolbar2">
-        <button id="fullscreenBtn">⛶ 放大檢視網絡圖</button>
-        <button id="downloadJsonBtn">⬇ 下載此疾病 JSON</button>
-        <button id="downloadCsvBtn">⬇ 下載此疾病 CSV</button>
+        <button id="selAllBtn">全選靶點</button>
+        <button id="selNoneBtn">全不選</button>
+        <button id="selHasIngBtn">只選有成分資料</button>
+        <button id="selHasHerbBtn">只選有藥材資料</button>
+        <button class="primary" id="applyBtn">▶ 顯示 Selected（已套用 <span id="selCount">0</span> 個）</button>
+        <span style="flex:1"></span>
+        <span class="small">網絡圖每層最多顯示：</span>
+        <select id="maxTargetsSel"><option value="5">5個靶點</option><option value="8" selected>8個靶點</option><option value="15">15個靶點</option><option value="9999">全部</option></select>
+        <select id="maxIngSel"><option value="3">3個成分</option><option value="4" selected>4個成分</option><option value="8">8個成分</option><option value="9999">全部</option></select>
+        <select id="maxHerbSel"><option value="2">2個藥材</option><option value="3" selected>3個藥材</option><option value="6">6個藥材</option><option value="9999">全部</option></select>
+        <button id="fullscreenBtn">⛶ 放大檢視關聯圖</button>
+        <button id="downloadJsonBtn">⬇ JSON</button>
+        <button id="downloadCsvBtn">⬇ CSV</button>
       </div>
-      <div id="network"><div class="placeholder">選擇疾病後顯示關聯網絡圖（僅顯示部分節點以避免過於密集，完整清單見下方表格）</div></div>
-      <div class="tabs">
-        <button class="active" data-tab="targets">Related Targets</button>
-        <button data-tab="ingredients">Related Ingredients</button>
-        <button data-tab="herbs">Related Herbs</button>
+      <div id="layerBar">
+        <span class="small">顯示層級：</span>
+        <label class="small"><input type="checkbox" id="layerTargets" checked> Related Targets</label>
+        <label class="small"><input type="checkbox" id="layerIngredients" checked> Related Ingredients</label>
+        <label class="small"><input type="checkbox" id="layerHerbs" checked> Related Herbs</label>
+        <span class="small">規則：Disease → Targets → Ingredients → Herbs 是逐層關係，關掉上層會自動一併關閉並鎖定下層</span>
       </div>
-      <div id="tableWrap"></div>
+      <div id="body2">
+        <div id="pickerCol"></div>
+        <div id="contentCol">
+          <div id="network"><div class="placeholder">選擇疾病後顯示關聯網絡圖</div></div>
+          <div class="tabs">
+            <button class="active" data-tab="targets">Related Targets</button>
+            <button data-tab="ingredients">Related Ingredients</button>
+            <button data-tab="herbs">Related Herbs</button>
+          </div>
+          <div id="tableWrap"></div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -106,7 +138,16 @@ tr:hover td{background:#171a20;}
     <b id="networkModalTitle"></b>
     <button id="networkModalClose">✕ 關閉</button>
   </div>
-  <div id="networkModalCanvas"></div>
+  <div id="networkModalLayerBar">
+    <span class="small">顯示層級：</span>
+    <label class="small"><input type="checkbox" id="modalLayerTargets" checked> Related Targets</label>
+    <label class="small"><input type="checkbox" id="modalLayerIngredients" checked> Related Ingredients</label>
+    <label class="small"><input type="checkbox" id="modalLayerHerbs" checked> Related Herbs</label>
+  </div>
+  <div id="networkModalMain">
+    <div id="networkModalCanvas"></div>
+    <div id="networkNodeDetail"></div>
+  </div>
 </div>
 
 <script>
@@ -118,8 +159,12 @@ let DATA = null;
 let diseasesById, targetsById, ingredientsById, herbsById;
 let targetsByDisease, ingredientsByTarget, herbsByIngredient;
 let currentDisease = null;
+let allRelatedTargetIds = [];       // 這個疾病全部相關的靶點 ID（挑選器的來源清單）
+let selectedTargetIds = new Set();  // 挑選器目前勾選的靶點 ID
+let appliedTargetIds = new Set();   // 按下「顯示 Selected」後實際套用到圖表/表格的靶點 ID
 let currentRelated = { targets: [], ingredients: [], herbs: [] };
 let activeTab = "targets";
+let layerVisibility = { targets: true, ingredients: true, herbs: true };
 let mainNetwork = null, modalNetwork = null;
 
 async function bootstrapData() {
@@ -200,26 +245,120 @@ function selectDisease(disId) {
 
   document.querySelectorAll(".disRow").forEach(r => r.classList.toggle("active", r.dataset.id === disId));
 
-  const targetIds = Array.from(targetsByDisease.get(disId) || []);
-  const ingredientIdSet = new Set();
-  targetIds.forEach(tid => (ingredientsByTarget.get(tid) || new Set()).forEach(mid => ingredientIdSet.add(mid)));
-  const ingredientIds = Array.from(ingredientIdSet);
-  const herbIdSet = new Set();
-  ingredientIds.forEach(mid => (herbsByIngredient.get(mid) || new Set()).forEach(hid => herbIdSet.add(hid)));
-  const herbIds = Array.from(herbIdSet);
+  allRelatedTargetIds = Array.from(targetsByDisease.get(disId) || []);
+  selectedTargetIds = new Set(allRelatedTargetIds); // 預設全選
+  appliedTargetIds = new Set(allRelatedTargetIds);
+
+  document.getElementById("emptyState").style.display = "none";
+  document.getElementById("bodyWrap").style.display = "flex";
+  document.getElementById("disHeader").innerHTML = `
+    <h2>${currentDisease.disease_cn_name ? escapeHtml(currentDisease.disease_cn_name) + '　' : ''}${escapeHtml(currentDisease.disease_name || "(未命名)")}</h2>
+    <div class="meta">${currentDisease.icd9 ? "ICD9: " + currentDisease.icd9 : ""} ${currentDisease.icd10 ? "　ICD10: " + currentDisease.icd10 : ""} ${!currentDisease.icd9 && !currentDisease.icd10 ? "（無 ICD 編碼資料）" : ""}</div>
+  `;
+
+  renderPicker();
+  recomputeAndRender();
+}
+
+// ---------- 靶點挑選器（picker）----------
+function renderPicker() {
+  const col = document.getElementById("pickerCol");
+  col.innerHTML = allRelatedTargetIds.map(tid => {
+    const t = targetsById.get(tid);
+    if (!t) return "";
+    const ingCount = (ingredientsByTarget.get(tid) || new Set()).size;
+    return `<label class="pick-row">
+      <input type="checkbox" data-tid="${tid}" ${selectedTargetIds.has(tid) ? "checked" : ""}>
+      <span style="flex:1;">${escapeHtml(t.target_name)}</span>
+      <span class="small">${ingCount} 個成分</span>
+    </label>`;
+  }).join("");
+  col.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener("change", () => {
+      if (cb.checked) selectedTargetIds.add(cb.dataset.tid);
+      else selectedTargetIds.delete(cb.dataset.tid);
+      document.getElementById("selCount").textContent = appliedTargetIds.size;
+    });
+  });
+}
+
+document.getElementById("selAllBtn").addEventListener("click", () => {
+  selectedTargetIds = new Set(allRelatedTargetIds);
+  renderPicker();
+});
+document.getElementById("selNoneBtn").addEventListener("click", () => {
+  selectedTargetIds = new Set();
+  renderPicker();
+});
+document.getElementById("selHasIngBtn").addEventListener("click", () => {
+  selectedTargetIds = new Set(allRelatedTargetIds.filter(tid => (ingredientsByTarget.get(tid) || new Set()).size > 0));
+  renderPicker();
+});
+document.getElementById("selHasHerbBtn").addEventListener("click", () => {
+  selectedTargetIds = new Set(allRelatedTargetIds.filter(tid => {
+    const ings = Array.from(ingredientsByTarget.get(tid) || []);
+    return ings.some(mid => (herbsByIngredient.get(mid) || new Set()).size > 0);
+  }));
+  renderPicker();
+});
+document.getElementById("applyBtn").addEventListener("click", () => {
+  appliedTargetIds = new Set(selectedTargetIds);
+  recomputeAndRender();
+});
+
+// ---------- 顯示層級（cascading）----------
+function syncLayerCheckboxes(targetsCb, ingCb, herbCb) {
+  targetsCb.checked = layerVisibility.targets;
+  ingCb.checked = layerVisibility.ingredients;
+  ingCb.disabled = !layerVisibility.targets;
+  herbCb.checked = layerVisibility.herbs;
+  herbCb.disabled = !layerVisibility.ingredients || !layerVisibility.targets;
+}
+
+function onLayerChange(key, value) {
+  if (key === "targets") layerVisibility.targets = value;
+  if (key === "ingredients") layerVisibility.ingredients = value;
+  if (key === "herbs") layerVisibility.herbs = value;
+  if (!layerVisibility.targets) { layerVisibility.ingredients = false; layerVisibility.herbs = false; }
+  else if (!layerVisibility.ingredients) { layerVisibility.herbs = false; }
+  syncLayerCheckboxes(document.getElementById("layerTargets"), document.getElementById("layerIngredients"), document.getElementById("layerHerbs"));
+  syncLayerCheckboxes(document.getElementById("modalLayerTargets"), document.getElementById("modalLayerIngredients"), document.getElementById("modalLayerHerbs"));
+  recomputeAndRender();
+}
+
+["layerTargets", "layerIngredients", "layerHerbs"].forEach((id, idx) => {
+  const key = ["targets", "ingredients", "herbs"][idx];
+  document.getElementById(id).addEventListener("change", (e) => onLayerChange(key, e.target.checked));
+});
+["modalLayerTargets", "modalLayerIngredients", "modalLayerHerbs"].forEach((id, idx) => {
+  const key = ["targets", "ingredients", "herbs"][idx];
+  document.getElementById(id).addEventListener("change", (e) => onLayerChange(key, e.target.checked));
+});
+
+// ---------- 依目前套用的靶點選擇 + 顯示層級，重新計算關聯資料 ----------
+function recomputeAndRender() {
+  document.getElementById("selCount").textContent = appliedTargetIds.size;
+
+  const targetIds = layerVisibility.targets ? Array.from(appliedTargetIds) : [];
+  let ingredientIds = [];
+  let herbIds = [];
+
+  if (layerVisibility.ingredients) {
+    const ingSet = new Set();
+    targetIds.forEach(tid => (ingredientsByTarget.get(tid) || new Set()).forEach(mid => ingSet.add(mid)));
+    ingredientIds = Array.from(ingSet);
+  }
+  if (layerVisibility.herbs) {
+    const herbSet = new Set();
+    ingredientIds.forEach(mid => (herbsByIngredient.get(mid) || new Set()).forEach(hid => herbSet.add(hid)));
+    herbIds = Array.from(herbSet);
+  }
 
   currentRelated = {
     targets: targetIds.map(id => targetsById.get(id)).filter(Boolean),
     ingredients: ingredientIds.map(id => ingredientsById.get(id)).filter(Boolean),
     herbs: herbIds.map(id => herbsById.get(id)).filter(Boolean),
   };
-
-  document.getElementById("emptyState").style.display = "none";
-  document.getElementById("body").style.display = "flex";
-  document.getElementById("disHeader").innerHTML = `
-    <h2>${currentDisease.disease_cn_name ? escapeHtml(currentDisease.disease_cn_name) + '　' : ''}${escapeHtml(currentDisease.disease_name || "(未命名)")}</h2>
-    <div class="meta">${currentDisease.icd9 ? "ICD9: " + currentDisease.icd9 : ""} ${currentDisease.icd10 ? "　ICD10: " + currentDisease.icd10 : ""} ${!currentDisease.icd9 && !currentDisease.icd10 ? "（無 ICD 編碼資料）" : ""}</div>
-  `;
 
   document.getElementById("kpiTargets").textContent = currentRelated.targets.length;
   document.getElementById("kpiIngredients").textContent = currentRelated.ingredients.length;
@@ -243,15 +382,15 @@ function renderTable() {
   const wrap = document.getElementById("tableWrap");
   if (activeTab === "targets") {
     wrap.innerHTML = `<table><thead><tr><th>Tar ID</th><th>Target Name</th><th>DrugBank ID</th><th>KEGG</th></tr></thead><tbody>
-      ${currentRelated.targets.map(t => `<tr><td>${t.tar_id}</td><td>${escapeHtml(t.target_name)}</td><td>${t.drugbank_id || '<span class="na">-</span>'}</td><td>${t.kegg || '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="4" class="small">無資料</td></tr>'}
+      ${currentRelated.targets.map(t => `<tr><td>${t.tar_id}</td><td>${escapeHtml(t.target_name)}</td><td>${t.drugbank_id || '<span class="na">-</span>'}</td><td>${t.kegg || '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="4" class="small">無資料（可能已被顯示層級或挑選器篩掉）</td></tr>'}
     </tbody></table>`;
   } else if (activeTab === "ingredients") {
     wrap.innerHTML = `<table><thead><tr><th>Mol ID</th><th>Molecule Name</th><th>MW</th><th>OB%</th><th>DL</th><th>ALogP</th></tr></thead><tbody>
-      ${currentRelated.ingredients.map(i => `<tr><td>${i.mol_id}</td><td>${escapeHtml(i.molecule_name)}</td><td>${i.mw ?? '<span class="na">-</span>'}</td><td>${i.ob ?? '<span class="na">-</span>'}</td><td>${i.dl ?? '<span class="na">-</span>'}</td><td>${i.alogp ?? '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="6" class="small">無資料</td></tr>'}
+      ${currentRelated.ingredients.map(i => `<tr><td>${i.mol_id}</td><td>${escapeHtml(i.molecule_name)}</td><td>${i.mw ?? '<span class="na">-</span>'}</td><td>${i.ob ?? '<span class="na">-</span>'}</td><td>${i.dl ?? '<span class="na">-</span>'}</td><td>${i.alogp ?? '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="6" class="small">無資料（可能已被顯示層級或挑選器篩掉）</td></tr>'}
     </tbody></table>`;
   } else {
     wrap.innerHTML = `<table><thead><tr><th>Herb ID</th><th>中文名稱</th><th>拼音</th><th>English Name</th><th>分類</th></tr></thead><tbody>
-      ${currentRelated.herbs.map(h => `<tr><td>${h.herb_id}</td><td>${escapeHtml(h.herb_cn_name)}</td><td>${escapeHtml(h.herb_pinyin)}</td><td>${escapeHtml(h.herb_en_name)}</td><td>${escapeHtml(h.child_cn_name) || '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="5" class="small">無資料</td></tr>'}
+      ${currentRelated.herbs.map(h => `<tr><td>${h.herb_id}</td><td>${escapeHtml(h.herb_cn_name)}</td><td>${escapeHtml(h.herb_pinyin)}</td><td>${escapeHtml(h.herb_en_name)}</td><td>${escapeHtml(h.child_cn_name) || '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="5" class="small">無資料（可能已被顯示層級或挑選器篩掉）</td></tr>'}
     </tbody></table>`;
   }
 }
@@ -260,38 +399,44 @@ function renderTable() {
 function buildGraphData() {
   const nodes = [];
   const edges = [];
-  const MAX_TARGETS = 8, MAX_ING_PER_TARGET = 4, MAX_HERB_PER_ING = 3;
+  const MAX_TARGETS = parseInt(document.getElementById("maxTargetsSel").value, 10);
+  const MAX_ING_PER_TARGET = parseInt(document.getElementById("maxIngSel").value, 10);
+  const MAX_HERB_PER_ING = parseInt(document.getElementById("maxHerbSel").value, 10);
 
   const disNodeId = "dis-" + currentDisease.dis_id;
-  nodes.push({ id: disNodeId, label: currentDisease.disease_cn_name || currentDisease.disease_name, color: "#c0533e", shape: "dot", size: 22, font: { color: "#fff" } });
+  nodes.push({ id: disNodeId, label: currentDisease.disease_cn_name || currentDisease.disease_name, color: "#c0533e", shape: "dot", size: 22, font: { color: "#fff" }, group: "disease" });
 
-  const shownTargets = currentRelated.targets.slice(0, MAX_TARGETS);
+  if (!layerVisibility.targets) return { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+
+  const shownTargets = Array.from(appliedTargetIds).map(id => targetsById.get(id)).filter(Boolean).slice(0, MAX_TARGETS);
   const shownIngredientIds = new Set();
   const shownHerbIds = new Set();
 
   shownTargets.forEach(t => {
     const tid = "tgt-" + t.tar_id;
-    nodes.push({ id: tid, label: t.target_name, color: "#3a9d63", shape: "dot", size: 14 });
+    nodes.push({ id: tid, label: t.target_name, color: "#3a9d63", shape: "dot", size: 14, group: "target" });
     edges.push({ from: disNodeId, to: tid });
 
+    if (!layerVisibility.ingredients) return;
     const ingIds = Array.from(ingredientsByTarget.get(t.tar_id) || []).slice(0, MAX_ING_PER_TARGET);
     ingIds.forEach(mid => {
       const ing = ingredientsById.get(mid);
       if (!ing) return;
       const iid = "mol-" + mid;
       if (!shownIngredientIds.has(mid)) {
-        nodes.push({ id: iid, label: ing.molecule_name, color: "#3b82c4", shape: "dot", size: 10 });
+        nodes.push({ id: iid, label: ing.molecule_name, color: "#3b82c4", shape: "dot", size: 10, group: "ingredient" });
         shownIngredientIds.add(mid);
       }
       edges.push({ from: tid, to: iid });
 
+      if (!layerVisibility.herbs) return;
       const herbIds = Array.from(herbsByIngredient.get(mid) || []).slice(0, MAX_HERB_PER_ING);
       herbIds.forEach(hid => {
         const herb = herbsById.get(hid);
         if (!herb) return;
         const hnid = "herb-" + hid;
         if (!shownHerbIds.has(hid)) {
-          nodes.push({ id: hnid, label: herb.herb_cn_name || herb.herb_en_name, color: "#c99a3d", shape: "dot", size: 8 });
+          nodes.push({ id: hnid, label: herb.herb_cn_name || herb.herb_en_name, color: "#c99a3d", shape: "dot", size: 8, group: "herb" });
           shownHerbIds.add(hid);
         }
         edges.push({ from: iid, to: hnid });
@@ -304,8 +449,8 @@ function buildGraphData() {
 
 function renderNetwork(containerId, isModal) {
   const container = document.getElementById(containerId);
-  if (!currentDisease || currentRelated.targets.length === 0) {
-    container.innerHTML = '<div class="placeholder">此疾病目前沒有已知的靶點關聯資料</div>';
+  if (!currentDisease || appliedTargetIds.size === 0 || !layerVisibility.targets) {
+    container.innerHTML = '<div class="placeholder">目前沒有可顯示的靶點關聯資料（請檢查挑選器與顯示層級設定）</div>';
     return;
   }
   const data = buildGraphData();
@@ -316,13 +461,42 @@ function renderNetwork(containerId, isModal) {
     nodes: { borderWidth: 0, font: { color: "#ccc", size: 10 } },
   };
   const network = new vis.Network(container, data, options);
+  network.on("click", (params) => {
+    if (params.nodes.length && isModal) showNodeDetail(params.nodes[0], data.nodes);
+  });
   if (isModal) { modalNetwork = network; } else { mainNetwork = network; }
 }
+
+function showNodeDetail(nodeId, nodesDataSet) {
+  const panel = document.getElementById("networkNodeDetail");
+  const node = nodesDataSet.get(nodeId);
+  if (!node) { panel.style.display = "none"; return; }
+  let rows = [];
+  if (nodeId.startsWith("dis-")) {
+    rows = [["中文名稱", currentDisease.disease_cn_name || "-"], ["英文名稱", currentDisease.disease_name], ["Dis ID", currentDisease.dis_id], ["ICD9", currentDisease.icd9 || "-"], ["ICD10", currentDisease.icd10 || "-"]];
+  } else if (nodeId.startsWith("tgt-")) {
+    const t = targetsById.get(nodeId.slice(4));
+    rows = [["Target name", t.target_name], ["Tar ID", t.tar_id], ["DrugBank ID", t.drugbank_id || "-"], ["KEGG", t.kegg || "-"]];
+  } else if (nodeId.startsWith("mol-")) {
+    const i = ingredientsById.get(nodeId.slice(4));
+    rows = [["Molecule name", i.molecule_name], ["Mol ID", i.mol_id], ["MW", i.mw ?? "-"], ["OB%", i.ob ?? "-"], ["DL", i.dl ?? "-"], ["ALogP", i.alogp ?? "-"]];
+  } else if (nodeId.startsWith("herb-")) {
+    const h = herbsById.get(nodeId.slice(5));
+    rows = [["中文名稱", h.herb_cn_name || "-"], ["拼音", h.herb_pinyin || "-"], ["英文學名", h.herb_en_name], ["Herb ID", h.herb_id]];
+  }
+  panel.innerHTML = `<h3 style="margin-top:0;">節點詳情</h3><table>${rows.map(([k, v]) => `<tr><td class="small" style="padding:4px 8px 4px 0;">${k}</td><td>${escapeHtml(v)}</td></tr>`).join("")}</table>`;
+  panel.style.display = "block";
+}
+
+[document.getElementById("maxTargetsSel"), document.getElementById("maxIngSel"), document.getElementById("maxHerbSel")].forEach(sel => {
+  sel.addEventListener("change", () => renderNetwork("network", false));
+});
 
 // ---------- Fullscreen modal ----------
 document.getElementById("fullscreenBtn").addEventListener("click", () => {
   if (!currentDisease) return;
-  document.getElementById("networkModalTitle").textContent = "疾病關聯網絡圖：" + currentDisease.disease_name;
+  document.getElementById("networkModalTitle").textContent = "疾病關聯網絡圖：" + (currentDisease.disease_cn_name || currentDisease.disease_name);
+  document.getElementById("networkNodeDetail").style.display = "none";
   document.getElementById("networkModal").style.display = "flex";
   setTimeout(() => renderNetwork("networkModalCanvas", true), 50);
 });
