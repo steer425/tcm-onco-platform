@@ -335,7 +335,9 @@ function setProgress(pct, text){
   const wrap = document.getElementById('loadProgressWrap');
   if(pct === null){ wrap.style.display = 'none'; return; }
   wrap.style.display = 'block';
-  document.getElementById('loadProgressBar').style.width = Math.min(100, Math.max(0, pct)) + '%';
+  const bar = document.getElementById('loadProgressBar');
+  bar.style.background = '#2f5c8a';
+  bar.style.width = Math.min(100, Math.max(0, pct)) + '%';
   document.getElementById('loadProgressText').textContent = text || '';
 }
 
@@ -351,22 +353,33 @@ async function bootstrapData(){
     return;
   }
   rebuildIndexes();
+
+  // 決定預設顯示的藥材：優先用後台設定的「預設藥材」，沒設定時才退回搜尋人參
+  setProgress(40, '判斷預設藥材...');
+  let defaultHerb = null;
+  try {
+    const cfg = await api('/system-settings/default-herb');
+    if (cfg.herb_id) defaultHerb = herbsById.get(cfg.herb_id);
+  } catch (e) { /* 拿不到設定就退回人參 */ }
+  if (!defaultHerb) {
+    defaultHerb = DATA.herbs.find(h => (h.herb_en_name || '').toLowerCase().startsWith('panax ginseng'))
+      || DATA.herbs.find(h => (h.herb_en_name || '').toLowerCase().includes('ginseng'));
+  }
+  defaultHerbId = defaultHerb ? defaultHerb.herb_id : null;
+
   renderHerbStats();
   renderHerbList();
 
-  // 找出人參（Panax Ginseng），預設載入並顯示它的完整關聯資料
-  setProgress(60, '載入人參關聯資料...');
-  const ginseng = DATA.herbs.find(h => (h.herb_en_name || '').toLowerCase().startsWith('panax ginseng'))
-    || DATA.herbs.find(h => (h.herb_en_name || '').toLowerCase().includes('ginseng'));
-  if (ginseng) {
+  if (defaultHerb) {
+    setProgress(60, `載入${defaultHerb.herb_cn_name || defaultHerb.herb_en_name}關聯資料...`);
     try {
-      const detail = await api(`/tcmsp/herbs/public/${ginseng.herb_id}/detail`);
+      const detail = await api(`/tcmsp/herbs/public/${defaultHerb.herb_id}/detail`);
       mergeHerbDetail(detail);
-      loadedHerbIds.add(ginseng.herb_id);
+      loadedHerbIds.add(defaultHerb.herb_id);
       renderHerbStats();
       renderHerbList();
       setProgress(null);
-      selectHerb(ginseng.herb_id);
+      selectHerb(defaultHerb.herb_id);
     } catch (e) {
       setProgress(null);
     }
@@ -400,7 +413,12 @@ document.getElementById('loadAllBtn').addEventListener('click', async () => {
         setProgress(pct, `正在下載完整資料集... ${(received/1024/1024).toFixed(1)}MB / ${(total/1024/1024).toFixed(1)}MB`);
         btn.textContent = `載入中...${pct}%`;
       } else {
-        setProgress(50, `正在下載完整資料集... ${(received/1024/1024).toFixed(1)}MB`);
+        // 拿不到 Content-Length（例如跨網域回應標頭沒有公開）時，改顯示已下載的 MB 數，
+        // 至少讓使用者看得出畫面「有在動」，不會誤以為當機。
+        setProgress(100, `下載中... ${(received/1024/1024).toFixed(1)}MB（無法取得總大小，僅顯示已下載量）`);
+        document.getElementById('loadProgressBar').style.width = '100%';
+        document.getElementById('loadProgressBar').style.background = '#3a9d63';
+        btn.textContent = `載入中...${(received/1024/1024).toFixed(1)}MB`;
       }
     }
     const blob = new Blob(chunks);
@@ -470,6 +488,7 @@ function tcmspHerbUrl(latinName){
 
 // ---------- Herb list ----------
 let currentHerbId = null;
+let defaultHerbId = null; // 後台設定的預設藥材，未搜尋時只顯示這一個
 let selectedMols = new Set();
 let activeTab = 'ingredients';
 let network = null;
@@ -773,9 +792,24 @@ function renderHerbList(filter=''){
   const q = filter.trim().toLowerCase();
   const list = document.getElementById('herbList');
   list.innerHTML = '';
+
+  // 沒有輸入搜尋字串時，只顯示後台設定的「預設藥材」，避免一次列出全部 502 筆造成選擇困難；
+  // 想找其他藥材時，直接在搜尋欄輸入即可（清單資料本來就已經全部載入，搜尋不會變慢）。
+  if (!q && defaultHerbId && !allDataLoaded) {
+    list.innerHTML = '<div style="padding:8px 12px; color:var(--muted); font-size:11px;">僅顯示預設藥材，輸入上方搜尋框可找其他藥材，或按「載入全部」看完整清單</div>';
+    const defaultHerb = herbsById.get(defaultHerbId);
+    if (defaultHerb) {
+      appendHerbRow(list, defaultHerb);
+    }
+    return;
+  }
+
   DATA.herbs
     .filter(h => !q || [h.herb_cn_name, h.herb_pinyin, h.herb_en_name].some(v => (v||'').toLowerCase().includes(q)))
-    .forEach(h => {
+    .forEach(h => appendHerbRow(list, h));
+}
+
+function appendHerbRow(list, h){
       const row = document.createElement('div');
       row.className = 'herbRow' + (h.herb_id === currentHerbId ? ' active' : '');
       const hasData = herbsWithData.has(h.herb_id);
@@ -783,7 +817,6 @@ function renderHerbList(filter=''){
         <div class="en">${escapeHtml(h.herb_pinyin||'')} · ${escapeHtml(h.herb_en_name||'')}</div>`;
       row.onclick = () => selectHerb(h.herb_id);
       list.appendChild(row);
-    });
 }
 function escapeHtml(s){ return String(s??'').replace(/[&<>'"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 

@@ -11,6 +11,9 @@
   .theme-option.active { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(0,0,0,0.03); }
   .theme-swatch { height: 40px; border-radius: 6px; margin-bottom: 8px; display: flex; overflow: hidden; }
   .theme-swatch div { flex: 1; }
+  .pick-result-row { padding: 7px 10px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--border); }
+  .pick-result-row:last-child { border-bottom: none; }
+  .pick-result-row:hover { background: #f0f3f1; }
 </style>
 </head>
 <body data-current-page="system-settings.html">
@@ -41,6 +44,22 @@
         <thead><tr><th>卡片</th><th>啟用</th><th>前台顯示</th><th>後台顯示</th><th></th></tr></thead>
         <tbody id="dashWidgetsBody">載入中...</tbody>
       </table>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">查詢站預設項目</h3>
+      <p class="hint-msg" style="margin-top:0;">
+        TCMSP 藥材／疾病關聯查詢站首次載入時，只會顯示這裡設定的項目（其餘項目使用者可以自行搜尋，或按「載入全部」看全部資料），藉此加快首次載入速度。
+      </p>
+      <label>預設藥材（TCMSP 藥材關聯查詢站）</label>
+      <input id="defaultHerbSearch" placeholder="輸入中文/拼音/英文名稱搜尋..." autocomplete="off" />
+      <div id="defaultHerbResults" style="max-height:160px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; margin-top:4px; display:none;"></div>
+      <p class="hint-msg" id="currentDefaultHerb">目前預設：載入中...</p>
+
+      <label style="margin-top:18px;">預設疾病（TCMSP 疾病關聯查詢站）</label>
+      <input id="defaultDiseaseSearch" placeholder="輸入中文/英文名稱搜尋..." autocomplete="off" />
+      <div id="defaultDiseaseResults" style="max-height:160px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; margin-top:4px; display:none;"></div>
+      <p class="hint-msg" id="currentDefaultDisease">目前預設：載入中...</p>
     </div>
   </main>
 </div>

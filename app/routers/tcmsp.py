@@ -239,6 +239,72 @@ def admin_delete_herb(herb_id: int, db: Session = Depends(get_db), admin: models
 # 供管理者逐步補齊、修正翻譯。
 # ---------------------------------------------------------------------------
 
+@router.get("/diseases/public/list", summary="（前台）取得疾病清單（輕量，不含關聯資料，供左側清單快速載入）")
+def public_list_diseases(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    diseases = db.query(models.TcmspDisease).all()
+    return [
+        {
+            "dis_id": d.dis_id, "disease_id": d.disease_id, "disease_name": d.disease_name,
+            "disease_cn_name": d.disease_cn_name, "icd9": d.icd9, "icd10": d.icd10,
+        }
+        for d in diseases
+    ]
+
+
+@router.get("/diseases/public/{dis_id}/detail", summary="（前台）取得單一疾病的完整關聯資料（靶點/成分/藥材，範圍限定在這個疾病）")
+def public_get_disease_detail(dis_id: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    disease = db.query(models.TcmspDisease).filter(models.TcmspDisease.dis_id == dis_id).first()
+    if not disease:
+        raise HTTPException(status_code=404, detail="找不到疾病資料")
+
+    target_disease_rows = db.query(models.TcmspTargetDisease).filter(models.TcmspTargetDisease.dis_id == dis_id).all()
+    tar_ids = [r.tar_id for r in target_disease_rows]
+
+    ingredient_target_rows = db.query(models.TcmspIngredientTarget).filter(models.TcmspIngredientTarget.tar_id.in_(tar_ids)).all() if tar_ids else []
+    mol_ids = list({r.mol_id for r in ingredient_target_rows})
+
+    herb_ingredient_rows = db.query(models.TcmspHerbIngredient).filter(models.TcmspHerbIngredient.mol_id.in_(mol_ids)).all() if mol_ids else []
+    herb_ids = list({r.herb_id for r in herb_ingredient_rows})
+
+    targets = db.query(models.TcmspTarget).filter(models.TcmspTarget.tar_id.in_(tar_ids)).all() if tar_ids else []
+    ingredients = db.query(models.TcmspIngredient).filter(models.TcmspIngredient.mol_id.in_(mol_ids)).all() if mol_ids else []
+    herbs = db.query(models.TcmspHerb).filter(models.TcmspHerb.id.in_(herb_ids), models.TcmspHerb.status == "active").all() if herb_ids else []
+
+    return {
+        "diseases": [{
+            "dis_id": disease.dis_id, "disease_id": disease.disease_id, "disease_name": disease.disease_name,
+            "disease_cn_name": disease.disease_cn_name, "icd9": disease.icd9, "icd10": disease.icd10,
+        }],
+        "targets": [
+            {"tar_id": t.tar_id, "target_id": t.target_id, "drugbank_id": t.drugbank_id, "target_name": t.target_name, "kegg": t.kegg, "source": t.source}
+            for t in targets
+        ],
+        "ingredients": [
+            {
+                "mol_id": i.mol_id, "molecule_name": i.molecule_name, "mw": _val(i.mw),
+                "hdon": _val(i.hdon), "hacc": _val(i.hacc), "alogp": _val(i.alogp),
+                "halflife": _val(i.halflife), "ob": _val(i.ob), "caco2": _val(i.caco2),
+                "bbb": _val(i.bbb), "dl": _val(i.dl), "fasa": _val(i.fasa),
+                "tpsa": _val(i.tpsa), "rbn": _val(i.rbn), "source": i.source,
+            }
+            for i in ingredients
+        ],
+        "herbs": [
+            {
+                "herb_id": h.id, "herb_cn_name": h.herb_cn_name, "herb_pinyin": h.herb_pinyin,
+                "herb_en_name": h.herb_en_name, "child_cn_name": h.child_cn_name, "child_en_name": h.child_en_name,
+            }
+            for h in herbs
+        ],
+        "target_disease": [{"tar_id": r.tar_id, "dis_id": r.dis_id} for r in target_disease_rows],
+        "ingredient_target": [
+            {"mol_id": r.mol_id, "tar_id": r.tar_id, "validated": r.validated, "svm_score": _val(r.svm_score), "rf_score": _val(r.rf_score)}
+            for r in ingredient_target_rows
+        ],
+        "herb_ingredient": [{"herb_id": r.herb_id, "mol_id": r.mol_id} for r in herb_ingredient_rows],
+    }
+
+
 @router.get("/diseases", summary="（後台）查詢疾病列表（可搜尋、可篩選尚無中文名稱的項目）")
 def admin_list_diseases(keyword: Optional[str] = None, missing_cn_only: Optional[bool] = None,
                          db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):

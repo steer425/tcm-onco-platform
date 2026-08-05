@@ -97,3 +97,99 @@ window.saveDashWidget = async (btn) => {
     btn.textContent = original; btn.disabled = false;
   }
 };
+
+// ---------- 查詢站預設項目（預設藥材／預設疾病）----------
+let allHerbsCache = null;
+let allDiseasesCache = null;
+
+async function loadDefaultHerbState() {
+  try {
+    const [current, herbs] = await Promise.all([
+      api("/system-settings/default-herb"),
+      api("/tcmsp/herbs/public/list"),
+    ]);
+    allHerbsCache = herbs;
+    const hint = document.getElementById("currentDefaultHerb");
+    if (current.herb_id) {
+      const h = herbs.find(x => x.herb_id === current.herb_id);
+      hint.textContent = "目前預設：" + (h ? `${h.herb_cn_name || h.herb_en_name}（${h.herb_en_name || ""}）` : `herb_id=${current.herb_id}（找不到對應名稱）`);
+    } else {
+      hint.textContent = "目前預設：尚未設定（會自動退回搜尋「Panax Ginseng／人參」）";
+    }
+  } catch (err) {
+    document.getElementById("currentDefaultHerb").textContent = "載入失敗：" + err.message;
+  }
+}
+
+document.getElementById("defaultHerbSearch").addEventListener("input", (e) => {
+  const kw = e.target.value.trim().toLowerCase();
+  const resultsEl = document.getElementById("defaultHerbResults");
+  if (!kw || !allHerbsCache) { resultsEl.style.display = "none"; return; }
+  const matches = allHerbsCache.filter(h =>
+    (h.herb_cn_name || "").toLowerCase().includes(kw) ||
+    (h.herb_pinyin || "").toLowerCase().includes(kw) ||
+    (h.herb_en_name || "").toLowerCase().includes(kw)
+  ).slice(0, 30);
+  resultsEl.innerHTML = matches.map(h =>
+    `<div class="pick-result-row" onclick="chooseDefaultHerb(${h.herb_id})">${h.herb_cn_name || ""}（${h.herb_pinyin || ""}）· ${h.herb_en_name || ""}</div>`
+  ).join("") || '<div class="pick-result-row" style="color:#999;">沒有符合的藥材</div>';
+  resultsEl.style.display = "block";
+});
+
+window.chooseDefaultHerb = async (herbId) => {
+  try {
+    await api("/system-settings/default-herb", { method: "PUT", body: JSON.stringify({ herb_id: herbId }) });
+    document.getElementById("defaultHerbSearch").value = "";
+    document.getElementById("defaultHerbResults").style.display = "none";
+    await loadDefaultHerbState();
+  } catch (err) {
+    alert("設定失敗：" + err.message);
+  }
+};
+
+async function loadDefaultDiseaseState() {
+  try {
+    const [current, diseases] = await Promise.all([
+      api("/system-settings/default-disease"),
+      api("/tcmsp/diseases"),
+    ]);
+    allDiseasesCache = diseases;
+    const hint = document.getElementById("currentDefaultDisease");
+    if (current.dis_id) {
+      const d = diseases.find(x => x.dis_id === current.dis_id);
+      hint.textContent = "目前預設：" + (d ? `${d.disease_cn_name || d.disease_name}（${d.disease_name || ""}）` : `dis_id=${current.dis_id}（找不到對應名稱）`);
+    } else {
+      hint.textContent = "目前預設：尚未設定（會自動退回清單第一筆）";
+    }
+  } catch (err) {
+    document.getElementById("currentDefaultDisease").textContent = "載入失敗：" + err.message;
+  }
+}
+
+document.getElementById("defaultDiseaseSearch").addEventListener("input", (e) => {
+  const kw = e.target.value.trim().toLowerCase();
+  const resultsEl = document.getElementById("defaultDiseaseResults");
+  if (!kw || !allDiseasesCache) { resultsEl.style.display = "none"; return; }
+  const matches = allDiseasesCache.filter(d =>
+    (d.disease_cn_name || "").toLowerCase().includes(kw) ||
+    (d.disease_name || "").toLowerCase().includes(kw)
+  ).slice(0, 30);
+  resultsEl.innerHTML = matches.map(d =>
+    `<div class="pick-result-row" onclick="chooseDefaultDisease('${d.dis_id}')">${d.disease_cn_name || ""}（${d.disease_name || ""}）</div>`
+  ).join("") || '<div class="pick-result-row" style="color:#999;">沒有符合的疾病</div>';
+  resultsEl.style.display = "block";
+});
+
+window.chooseDefaultDisease = async (disId) => {
+  try {
+    await api("/system-settings/default-disease", { method: "PUT", body: JSON.stringify({ dis_id: disId }) });
+    document.getElementById("defaultDiseaseSearch").value = "";
+    document.getElementById("defaultDiseaseResults").style.display = "none";
+    await loadDefaultDiseaseState();
+  } catch (err) {
+    alert("設定失敗：" + err.message);
+  }
+};
+
+loadDefaultHerbState();
+loadDefaultDiseaseState();

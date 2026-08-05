@@ -18,7 +18,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="TCM 中藥腫瘤篩選平台 - 後台系統 API（目標零）",
     description="帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄",
-    version="1.17.0",
+    version="1.17.1",
 )
 
 ALLOWED_ORIGINS = [
@@ -36,6 +36,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Length"],  # 跨網域請求預設不會公開回應標頭給 JS 讀取，進度條需要這個才能算出下載百分比
 )
 
 app.include_router(auth.router)

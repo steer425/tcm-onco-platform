@@ -137,11 +137,24 @@ tr:hover td{background:#171a20;}
         <option value="cn">简体中文</option>
       </select>
     </div>
+    <div style="padding:6px 12px 0;">
+      <button id="loadAllBtn" class="primary" style="width:100%;">⬇ 載入全部 564 種疾病資料（目前僅載入預設疾病）</button>
+    </div>
     <div id="disStats" class="small"></div>
     <div id="disList"></div>
   </div>
   <div id="main">
-    <div id="disHeader"><div id="emptyState">← 請從左側選擇一個疾病</div></div>
+    <div id="disHeader">
+      <div id="emptyState">
+        <span id="emptyStateText">← 請從左側選擇一個疾病</span>
+        <div id="loadProgressWrap" style="display:none; max-width:360px; margin:16px auto 0;">
+          <div style="height:6px; background:#1c1f26; border-radius:4px; overflow:hidden; border:1px solid #2a2d34;">
+            <div id="loadProgressBar" style="height:100%; width:0%; background:#2f5c8a; transition:width .15s ease;"></div>
+          </div>
+          <div id="loadProgressText" class="small" style="margin-top:6px;"></div>
+        </div>
+      </div>
+    </div>
     <div id="bodyWrap" style="display:none; flex:1; min-height:0; display:flex; flex-direction:column;">
       <div class="kpi">
         <div><b id="kpiTargets">0</b><span>Related Targets</span></div>
@@ -208,10 +221,13 @@ if (!localStorage.getItem("tcm_token")) { window.location.href = "index.html"; }
 </script>
 <script src="js/api.js"></script>
 <script>
-let DATA = null;
+let DATA = { herbs: [], ingredients: [], targets: [], diseases: [], herb_ingredient: [], ingredient_target: [], target_disease: [] };
 let diseasesById, targetsById, ingredientsById, herbsById;
 let targetsByDisease, ingredientsByTarget, herbsByIngredient;
 let currentDisease = null;
+let defaultDisId = null; // 後台設定的預設疾病，未搜尋時只顯示這一個
+let loadedDisIds = new Set();
+let allDataLoaded = false;
 let allRelatedTargetIds = [];       // 這個疾病全部相關的靶點 ID（挑選器的來源清單）
 let selectedTargetIds = new Set();  // 挑選器目前勾選的靶點 ID
 let appliedTargetIds = new Set();   // 按下「顯示 Selected」後實際套用到圖表/表格的靶點 ID
@@ -236,16 +252,7 @@ function zhConv(text){
   catch(e) { return text; }
 }
 
-async function bootstrapData() {
-  const listEl = document.getElementById("disList");
-  listEl.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:12.5px;">資料載入中，請稍候...</div>';
-  try {
-    DATA = await api("/tcmsp/data/full");
-  } catch (e) {
-    listEl.innerHTML = '<div style="padding:20px;color:#e08080;font-size:12.5px;">資料載入失敗：' + e.message + '</div>';
-    return;
-  }
-
+function rebuildIndexes(){
   diseasesById = new Map(DATA.diseases.map(d => [d.dis_id, d]));
   targetsById = new Map(DATA.targets.map(t => [t.tar_id, t]));
   ingredientsById = new Map(DATA.ingredients.map(i => [i.mol_id, i]));
@@ -268,19 +275,94 @@ async function bootstrapData() {
     if (!herbsByIngredient.has(r.mol_id)) herbsByIngredient.set(r.mol_id, new Set());
     herbsByIngredient.get(r.mol_id).add(r.herb_id);
   });
+}
+
+// 把單一疾病的詳情資料合併進全域 DATA，避免重複資料
+function mergeDiseaseDetail(detail){
+  const existingTarIds = new Set(DATA.targets.map(t => t.tar_id));
+  detail.targets.forEach(t => { if(!existingTarIds.has(t.tar_id)){ DATA.targets.push(t); existingTarIds.add(t.tar_id); } });
+
+  const existingMolIds = new Set(DATA.ingredients.map(i => i.mol_id));
+  detail.ingredients.forEach(i => { if(!existingMolIds.has(i.mol_id)){ DATA.ingredients.push(i); existingMolIds.add(i.mol_id); } });
+
+  const existingHerbIds = new Set(DATA.herbs.map(h => h.herb_id));
+  detail.herbs.forEach(h => { if(!existingHerbIds.has(h.herb_id)){ DATA.herbs.push(h); existingHerbIds.add(h.herb_id); } });
+
+  const existingTD = new Set(DATA.target_disease.map(r => r.tar_id+'|'+r.dis_id));
+  detail.target_disease.forEach(r => { const k=r.tar_id+'|'+r.dis_id; if(!existingTD.has(k)){ DATA.target_disease.push(r); existingTD.add(k); } });
+
+  const existingIT = new Set(DATA.ingredient_target.map(r => r.mol_id+'|'+r.tar_id));
+  detail.ingredient_target.forEach(r => { const k=r.mol_id+'|'+r.tar_id; if(!existingIT.has(k)){ DATA.ingredient_target.push(r); existingIT.add(k); } });
+
+  const existingHI = new Set(DATA.herb_ingredient.map(r => r.herb_id+'|'+r.mol_id));
+  detail.herb_ingredient.forEach(r => { const k=r.herb_id+'|'+r.mol_id; if(!existingHI.has(k)){ DATA.herb_ingredient.push(r); existingHI.add(k); } });
+
+  rebuildIndexes();
+}
+
+function setProgress(pct, text){
+  const wrap = document.getElementById('loadProgressWrap');
+  if(pct === null){ if(wrap) wrap.style.display = 'none'; return; }
+  if(!wrap) return;
+  wrap.style.display = 'block';
+  document.getElementById('loadProgressBar').style.width = Math.min(100, Math.max(0, pct)) + '%';
+  document.getElementById('loadProgressText').textContent = text || '';
+}
+
+async function bootstrapData() {
+  const listEl = document.getElementById("disList");
+  listEl.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:12.5px;">資料載入中，請稍候...</div>';
+  try {
+    DATA.diseases = await api("/tcmsp/diseases/public/list");
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:20px;color:#e08080;font-size:12.5px;">資料載入失敗：' + e.message + '</div>';
+    return;
+  }
+  rebuildIndexes();
+
+  // 決定預設顯示的疾病：優先用後台設定的「預設疾病」，沒設定時退回清單第一筆（依 dis_id 排序）
+  let defaultDisease = null;
+  try {
+    const cfg = await api('/system-settings/default-disease');
+    if (cfg.dis_id) defaultDisease = diseasesById.get(cfg.dis_id);
+  } catch (e) { /* 拿不到設定就退回第一筆 */ }
+  if (!defaultDisease) {
+    const sorted = DATA.diseases.slice().sort((a, b) => (a.dis_id || "").localeCompare(b.dis_id || ""));
+    defaultDisease = sorted[0];
+  }
+  defaultDisId = defaultDisease ? defaultDisease.dis_id : null;
 
   renderDiseaseStats();
   renderDiseaseList();
+
+  if (defaultDisease) {
+    try {
+      const detail = await api(`/tcmsp/diseases/public/${defaultDisease.dis_id}/detail`);
+      mergeDiseaseDetail(detail);
+      loadedDisIds.add(defaultDisease.dis_id);
+      renderDiseaseList();
+      selectDisease(defaultDisease.dis_id);
+    } catch (e) { /* 載入失敗就留在空白狀態 */ }
+  }
 }
 
 function renderDiseaseStats() {
-  const withData = DATA.diseases.filter(d => (targetsByDisease.get(d.dis_id) || new Set()).size > 0).length;
-  document.getElementById("disStats").textContent = `共 ${DATA.diseases.length} 種疾病，其中 ${withData} 個已有完整關聯資料`;
+  const loadedNote = allDataLoaded ? '（已載入全部）' : `（已載入 ${loadedDisIds.size} 個疾病的完整資料，其餘點擊時自動載入）`;
+  document.getElementById("disStats").textContent = `共 ${DATA.diseases.length} 種疾病 ${loadedNote}`;
 }
 
 function renderDiseaseList(filter) {
   const listEl = document.getElementById("disList");
   const kw = (filter || "").trim().toLowerCase();
+
+  if (!kw && defaultDisId && !allDataLoaded) {
+    listEl.innerHTML = '<div style="padding:8px 12px; color:var(--muted); font-size:11px;">僅顯示預設疾病，輸入上方搜尋框可找其他疾病，或按「載入全部」看完整清單</div>';
+    const d = diseasesById.get(defaultDisId);
+    if (d) listEl.innerHTML += buildDiseaseRowHtml(d);
+    bindDiseaseRowClicks(listEl);
+    return;
+  }
+
   let list = DATA.diseases.slice().sort((a, b) => (a.disease_name || "").localeCompare(b.disease_name || ""));
   if (kw) {
     list = list.filter(d =>
@@ -289,14 +371,20 @@ function renderDiseaseList(filter) {
       String(d.dis_id).includes(kw)
     );
   }
-  listEl.innerHTML = list.map(d => {
-    const cnt = (targetsByDisease.get(d.dis_id) || new Set()).size;
-    const cnName = d.disease_cn_name ? escapeHtml(zhConv(d.disease_cn_name)) : '';
-    return `<div class="disRow" data-id="${d.dis_id}">
-      <div class="name">${cnName ? cnName + ' ' : ''}${escapeHtml(d.disease_name || "(未命名)")} ${cnt ? `<span class="badge">${cnt} 個靶點</span>` : ""}</div>
-      <div class="meta">${d.icd9 ? "ICD9: " + d.icd9 : ""} ${d.icd10 ? " ICD10: " + d.icd10 : ""}</div>
-    </div>`;
-  }).join("");
+  listEl.innerHTML = list.map(d => buildDiseaseRowHtml(d)).join("");
+  bindDiseaseRowClicks(listEl);
+}
+
+function buildDiseaseRowHtml(d) {
+  const cnt = (targetsByDisease.get(d.dis_id) || new Set()).size;
+  const cnName = d.disease_cn_name ? escapeHtml(zhConv(d.disease_cn_name)) : '';
+  return `<div class="disRow" data-id="${d.dis_id}">
+    <div class="name">${cnName ? cnName + ' ' : ''}${escapeHtml(d.disease_name || "(未命名)")} ${cnt ? `<span class="badge">${cnt} 個靶點</span>` : ""}</div>
+    <div class="meta">${d.icd9 ? "ICD9: " + d.icd9 : ""} ${d.icd10 ? " ICD10: " + d.icd10 : ""}</div>
+  </div>`;
+}
+
+function bindDiseaseRowClicks(listEl) {
   listEl.querySelectorAll(".disRow").forEach(row => {
     row.addEventListener("click", () => selectDisease(row.dataset.id));
   });
@@ -308,11 +396,27 @@ function escapeHtml(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-function selectDisease(disId) {
+async function selectDisease(disId) {
   currentDisease = diseasesById.get(disId);
   if (!currentDisease) return;
 
   document.querySelectorAll(".disRow").forEach(r => r.classList.toggle("active", r.dataset.id === disId));
+
+  if (!loadedDisIds.has(disId) && !allDataLoaded) {
+    document.getElementById("emptyState").style.display = "block";
+    document.getElementById("emptyStateText").textContent = `載入 ${currentDisease.disease_cn_name || currentDisease.disease_name} 的關聯資料中...`;
+    document.getElementById("bodyWrap").style.display = "none";
+    try {
+      const detail = await api(`/tcmsp/diseases/public/${disId}/detail`);
+      mergeDiseaseDetail(detail);
+      loadedDisIds.add(disId);
+      renderDiseaseStats();
+    } catch (e) {
+      document.getElementById("emptyStateText").textContent = "載入失敗：" + e.message;
+      return;
+    }
+    if (!currentDisease || currentDisease.dis_id !== disId) return; // 載入途中使用者又點了別的疾病
+  }
 
   allRelatedTargetIds = Array.from(targetsByDisease.get(disId) || []);
   selectedTargetIds = new Set(allRelatedTargetIds); // 預設全選
@@ -638,6 +742,55 @@ document.getElementById('themeToggleLink').addEventListener('click', async (e) =
   } catch(err) { /* 儲存失敗不影響當下畫面已經切換的結果 */ }
 });
 loadQueryStationTheme();
+
+// 「載入全部」按鈕：一次拉取完整資料集，用真實的位元組進度顯示下載進度
+document.getElementById('loadAllBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('loadAllBtn');
+  if (allDataLoaded) return;
+  btn.disabled = true;
+  btn.textContent = '載入中...0%';
+  setProgress(0, '正在下載完整資料集...');
+  try {
+    const token = getToken();
+    const res = await fetch((API_BASE || '') + '/tcmsp/data/full', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const total = parseInt(res.headers.get('content-length') || '0', 10);
+    const reader = res.body.getReader();
+    let received = 0;
+    const chunks = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      if (total) {
+        const pct = Math.round((received / total) * 100);
+        setProgress(pct, `正在下載完整資料集... ${(received/1024/1024).toFixed(1)}MB / ${(total/1024/1024).toFixed(1)}MB`);
+        btn.textContent = `載入中...${pct}%`;
+      } else {
+        setProgress(100, `下載中... ${(received/1024/1024).toFixed(1)}MB（無法取得總大小，僅顯示已下載量）`);
+        document.getElementById('loadProgressBar').style.background = '#3a9d63';
+        btn.textContent = `載入中...${(received/1024/1024).toFixed(1)}MB`;
+      }
+    }
+    const blob = new Blob(chunks);
+    const text = await blob.text();
+    DATA = JSON.parse(text);
+    rebuildIndexes();
+    allDataLoaded = true;
+    btn.textContent = '✓ 已載入全部 ' + DATA.diseases.length + ' 種疾病資料';
+    btn.disabled = true;
+    renderDiseaseStats();
+    renderDiseaseList(document.getElementById('disSearch').value);
+    setProgress(null);
+    if (currentDisease) selectDisease(currentDisease.dis_id);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '⬇ 載入全部 564 種疾病資料（重試）';
+    setProgress(null);
+    alert('載入全部資料失敗：' + e.message);
+  }
+});
 
 bootstrapData();
 </script>
