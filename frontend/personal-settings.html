@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>個人化設定 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<style>
+  .theme-grid { display: flex; gap: 16px; flex-wrap: wrap; }
+  .theme-option { border: 2px solid var(--border); border-radius: 10px; padding: 14px; width: 180px; cursor: pointer; text-align: center; }
+  .theme-option.active { border-color: var(--primary); }
+  .theme-preview { height: 60px; border-radius: 6px; margin-bottom: 8px; border: 1px solid var(--border); }
+  .theme-preview.dark { background: #0f1115; }
+  .theme-preview.light { background: #f5f7f5; }
+  .theme-preview span { display: block; padding-top: 22px; font-size: 11px; }
+  .theme-preview.dark span { color: #8a8f98; }
+  .theme-preview.light span { color: #6b7a70; }
+</style>
+</head>
+<body data-current-page="personal-settings.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">個人化設定</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">關聯查詢站 CSS 設定</h3>
+      <p class="hint-msg" style="margin-top:0;">
+        套用於「TCMSP 藥材關聯查詢站」與「TCMSP 疾病關聯查詢站」兩個頁面。這是<b>你個人的偏好設定</b>，只影響你自己看到的畫面，不會影響其他使用者；設定後會記住，下次登入直接套用。
+      </p>
+      <div class="theme-grid" id="themeGrid">載入中...</div>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/personal-settings.js"></script>
+</body>
+</html>

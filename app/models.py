@@ -314,6 +314,18 @@ class TcmspTargetDisease(Base):
     dis_id = Column(String, ForeignKey("tcmsp_diseases.dis_id"), nullable=False, index=True)
 
 
+class UserPreference(Base):
+    """使用者個人化設定（key-value，依 user_id 分開儲存），例如查詢站配色偏好"""
+    __tablename__ = "user_preferences"
+    __table_args__ = (UniqueConstraint("user_id", "key", name="uq_user_pref_key"),)
+
+    id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    key = Column(String, nullable=False)
+    value = Column(String, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class SystemSetting(Base):
     """通用系統設定（key-value），目前用於主題配色，未來其他全站設定也可共用這張表"""
     __tablename__ = "system_settings"

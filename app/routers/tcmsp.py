@@ -41,6 +41,75 @@ def _val(v):
 # 前台／一般登入使用者：查詢用（供 tcmsp_query.html 使用）
 # ---------------------------------------------------------------------------
 
+@router.get("/herbs/public/list", summary="（前台）取得藥材清單（輕量，不含關聯資料，供左側清單快速載入）")
+def public_list_herbs(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    herbs = db.query(models.TcmspHerb).filter(models.TcmspHerb.status == "active").all()
+    return [
+        {
+            "herb_id": h.id, "herb_cn_name": h.herb_cn_name, "herb_pinyin": h.herb_pinyin,
+            "herb_en_name": h.herb_en_name, "child_cn_name": h.child_cn_name, "child_en_name": h.child_en_name,
+        }
+        for h in herbs
+    ]
+
+
+@router.get("/herbs/public/{herb_id}/detail", summary="（前台）取得單一藥材的完整關聯資料（成分/靶點/疾病，範圍限定在這個藥材）")
+def public_get_herb_detail(herb_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    herb = db.query(models.TcmspHerb).filter(models.TcmspHerb.id == herb_id, models.TcmspHerb.status == "active").first()
+    if not herb:
+        raise HTTPException(status_code=404, detail="找不到藥材資料")
+
+    herb_ingredient_rows = db.query(models.TcmspHerbIngredient).filter(models.TcmspHerbIngredient.herb_id == herb_id).all()
+    mol_ids = [r.mol_id for r in herb_ingredient_rows]
+
+    ingredient_target_rows = db.query(models.TcmspIngredientTarget).filter(models.TcmspIngredientTarget.mol_id.in_(mol_ids)).all() if mol_ids else []
+    tar_ids = list({r.tar_id for r in ingredient_target_rows})
+
+    target_disease_rows = db.query(models.TcmspTargetDisease).filter(models.TcmspTargetDisease.tar_id.in_(tar_ids)).all() if tar_ids else []
+    dis_ids = list({r.dis_id for r in target_disease_rows})
+
+    ingredients = db.query(models.TcmspIngredient).filter(models.TcmspIngredient.mol_id.in_(mol_ids)).all() if mol_ids else []
+    targets = db.query(models.TcmspTarget).filter(models.TcmspTarget.tar_id.in_(tar_ids)).all() if tar_ids else []
+    diseases = db.query(models.TcmspDisease).filter(models.TcmspDisease.dis_id.in_(dis_ids)).all() if dis_ids else []
+
+    return {
+        "herbs": [{
+            "herb_id": herb.id, "herb_cn_name": herb.herb_cn_name, "herb_pinyin": herb.herb_pinyin,
+            "herb_en_name": herb.herb_en_name, "child_cn_name": herb.child_cn_name, "child_en_name": herb.child_en_name,
+        }],
+        "ingredients": [
+            {
+                "mol_id": i.mol_id, "molecule_name": i.molecule_name, "mw": _val(i.mw),
+                "hdon": _val(i.hdon), "hacc": _val(i.hacc), "alogp": _val(i.alogp),
+                "halflife": _val(i.halflife), "ob": _val(i.ob), "caco2": _val(i.caco2),
+                "bbb": _val(i.bbb), "dl": _val(i.dl), "fasa": _val(i.fasa),
+                "tpsa": _val(i.tpsa), "rbn": _val(i.rbn), "source": i.source,
+            }
+            for i in ingredients
+        ],
+        "targets": [
+            {
+                "tar_id": t.tar_id, "target_id": t.target_id, "drugbank_id": t.drugbank_id,
+                "target_name": t.target_name, "kegg": t.kegg, "source": t.source,
+            }
+            for t in targets
+        ],
+        "diseases": [
+            {
+                "dis_id": d.dis_id, "disease_id": d.disease_id, "disease_name": d.disease_name,
+                "disease_cn_name": d.disease_cn_name, "icd9": d.icd9, "icd10": d.icd10,
+            }
+            for d in diseases
+        ],
+        "herb_ingredient": [{"herb_id": r.herb_id, "mol_id": r.mol_id} for r in herb_ingredient_rows],
+        "ingredient_target": [
+            {"mol_id": r.mol_id, "tar_id": r.tar_id, "validated": r.validated, "svm_score": _val(r.svm_score), "rf_score": _val(r.rf_score)}
+            for r in ingredient_target_rows
+        ],
+        "target_disease": [{"tar_id": r.tar_id, "dis_id": r.dis_id} for r in target_disease_rows],
+    }
+
+
 @router.get("/data/full", summary="取得完整 TCMSP 關聯資料（前台查詢站使用，內建快取）")
 def get_full_data(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     now = time.time()

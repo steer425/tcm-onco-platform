@@ -52,6 +52,9 @@ FEATURE_CONFIG = [
     {"code": "F0-17", "module": "目標零", "name": "公告管理",
      "nav_label": "公告管理", "page_url": "announcements.html",
      "show_frontend": False, "show_backend": True, "sort_order": 46},
+    {"code": "F0-18", "module": "目標零", "name": "個人化設定",
+     "nav_label": "個人化設定", "page_url": "personal-settings.html",
+     "show_frontend": True, "show_backend": True, "sort_order": 47},
 
     # ---- 目標五：中藥行 ----
     {"code": "F5-1", "module": "目標五", "name": "中藥行資料管理（後台）",
