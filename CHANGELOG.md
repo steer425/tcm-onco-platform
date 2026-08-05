@@ -1,5 +1,24 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.14.0 — 2026-08-05（新增 TCMSP 疾病關聯查詢站）
+
+### 新增功能
+
+- 新頁面 `disease_query.html`（F1-2）：與「TCMSP 藥材關聯查詢站」資料同源（同一個 `/tcmsp/data/full` API），但以**疾病**為查詢起點，左側改列出 564 種疾病，右側顯示反向關聯：Related Targets → Related Ingredients → Related Herbs
+- 呈現方式與藥材查詢站一致：同樣的深色主題、KPI 統計卡片、分頁籤表格、Disease→Targets→Ingredients→Herbs 網絡關聯圖（可全螢幕檢視）、單一疾病 JSON/CSV 下載
+- 後端不需要新增 API，直接複用既有的 `/tcmsp/data/full`，前端在瀏覽器端建立反向索引（`targetsByDisease`／`ingredientsByTarget`／`herbsByIngredient`）
+- 登入後即可在導覽選單看到這個功能項目（前台），管理者可到「角色管理」的權限矩陣視窗調整哪些角色可以使用、要不要停用/顯示於前台或後台
+- 網絡圖為避免節點過於密集，僅顯示部分節點（每個疾病最多 8 個靶點、每個靶點最多 4 個成分、每個成分最多 3 個藥材），完整清單仍可在下方表格查看
+
+### 部署注意事項
+
+需要重新執行遷移腳本（新增 F1-2 功能項目）：
+
+```bash
+$env:DATABASE_URL="你的 Neon 連線字串"
+python -m app.migrate_schema
+```
+
 ## v1.13.6 — 2026-08-05（無角色帳號預設也能看到 Dashboard，不再是空白畫面）
 
 ### 問題

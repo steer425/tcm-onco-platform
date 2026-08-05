@@ -70,6 +70,9 @@ FEATURE_CONFIG = [
     {"code": "F1-1", "module": "目標一/二", "name": "TCMSP 藥材關聯查詢站",
      "nav_label": "TCMSP 藥材關聯查詢站", "page_url": "tcmsp_query.html",
      "show_frontend": True, "show_backend": False, "sort_order": 70},
+    {"code": "F1-2", "module": "目標一/二", "name": "TCMSP 疾病關聯查詢站",
+     "nav_label": "TCMSP 疾病關聯查詢站", "page_url": "disease_query.html",
+     "show_frontend": True, "show_backend": False, "sort_order": 71},
 
     # ---- 其餘目標零基礎建設項目：現在都有對應頁面可查看/設定 ----
     {"code": "F0-1", "module": "目標零", "name": "前後台架構規劃",

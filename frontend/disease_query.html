@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>TCMSP 疾病關聯查詢站</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/standalone/umd/vis-network.min.js"></script>
+<style>
+:root{--bg:#0f1115;--panel:#171a20;--line:#2a2d34;--muted:#8a8f98;--herb:#c99a3d;--mol:#3b82c4;--tgt:#3a9d63;--dis:#c0533e;}
+html,body{margin:0;padding:0;background:var(--bg);color:#eee;font-family:"Noto Sans TC","Helvetica Neue",Arial,sans-serif;}
+#platformNav{display:flex;align-items:center;gap:16px;padding:8px 22px;background:#20303f;border-bottom:1px solid var(--line);font-size:12.5px;}
+#platformNav a{color:#8fc3ea;text-decoration:none;}
+#platformNav a:hover{text-decoration:underline;}
+#platformNav span{color:var(--muted);}
+#header{padding:14px 22px 10px;border-bottom:1px solid var(--line);}
+#header h1{margin:0 0 4px;font-size:18px;font-weight:600;}
+#header p{margin:0;font-size:12px;color:var(--muted);line-height:1.6;}
+#layout{display:flex;height:calc(100vh - 116px);min-height:600px;}
+#disPanel{width:340px;flex-shrink:0;border-right:1px solid var(--line);display:flex;flex-direction:column;}
+#disSearch{margin:10px;padding:8px 10px;background:#1c1f26;border:1px solid #3a3d44;color:#eee;border-radius:6px;font-size:13px;}
+#disStats{padding:0 12px 6px;font-size:11.5px;color:var(--muted);}
+#disList{flex:1;overflow-y:auto;border-top:1px solid var(--line);}
+.disRow{padding:8px 12px;border-bottom:1px solid #1e2128;cursor:pointer;font-size:12.5px;}
+.disRow:hover{background:#1a1d23;}
+.disRow.active{background:#20303f;}
+.disRow .name{font-weight:600;}
+.disRow .meta{color:var(--muted);font-size:11px;}
+.badge{display:inline-block;background:#204a33;color:#8be0af;border-radius:4px;padding:0 5px;font-size:10.5px;margin-left:6px;}
+#main{flex:1;display:flex;flex-direction:column;min-width:0;overflow-y:auto;}
+#disHeader{padding:14px 20px;border-bottom:1px solid var(--line);}
+#disHeader h2{margin:0 0 4px;font-size:17px;}
+#disHeader .meta{color:var(--muted);font-size:12.5px;}
+#emptyState{padding:60px 20px;text-align:center;color:var(--muted);font-size:14px;}
+.kpi{display:flex;gap:12px;padding:12px 20px;flex-wrap:wrap;}
+.kpi div{background:#1c1f26;border:1px solid #2a2d34;border-radius:10px;padding:10px 16px;min-width:110px;}
+.kpi b{display:block;font-size:20px;}
+.kpi span{font-size:11px;color:var(--muted);}
+#toolbar2{display:flex;gap:8px;padding:8px 20px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line);}
+button{background:#26292f;border:1px solid #3a3d44;color:#eee;padding:6px 11px;border-radius:6px;font-size:12px;cursor:pointer;}
+button:hover{background:#31353c;}
+button.primary{background:#2f5c8a;border-color:#3d70a3;}
+button.primary:hover{background:#396d9e;}
+#body{display:flex;flex:1;min-height:0;flex-direction:column;}
+#network{height:360px;border-bottom:1px solid var(--line);position:relative;flex-shrink:0;}
+#network .placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:20px;}
+.tabs{display:flex;gap:6px;padding:8px 16px 0;}
+.tabs button{background:#1c1f26;}
+.tabs button.active{background:#2f5c8a;border-color:#3d70a3;}
+#tableWrap{flex:1;overflow:auto;padding:8px 16px 16px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{position:sticky;top:0;background:#1c1f26;text-align:left;padding:7px 8px;color:#bcd;border-bottom:1px solid var(--line);white-space:nowrap;}
+td{padding:6px 8px;border-bottom:1px solid #23262c;vertical-align:top;}
+tr:hover td{background:#171a20;}
+.na{color:#666;font-style:italic;}
+.small{font-size:11px;color:var(--muted);}
+#networkModal,.modal-overlay{display:none;position:fixed;inset:0;z-index:9999;flex-direction:column;background:#0b0d11;}
+#networkModalBar{display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);flex-shrink:0;flex-wrap:wrap;}
+#networkModalBar b{color:#eee;font-size:14px;flex:1;}
+#networkModalCanvas{flex:1;min-height:0;}
+</style>
+</head>
+<body>
+<div id="platformNav">
+  <a href="dashboard.html">← 返回 Dashboard</a>
+  <span>|</span>
+  <span>TCM 中藥腫瘤篩選平台 — 目標一/二　TCMSP 疾病關聯查詢站</span>
+  <span style="flex:1"></span>
+  <a href="#" id="platformLogout">登出</a>
+</div>
+<div id="header">
+  <h1>TCMSP 疾病關聯查詢站</h1>
+  <p>與「TCMSP 藥材關聯查詢站」資料同源，但以 <b>疾病</b> 為起點反向查詢：左側選一個疾病，右側顯示與它相關的 Related Targets／Related Ingredients／Related Herbs 完整關聯與網絡圖（Disease → Targets → Ingredients → Herbs）。</p>
+</div>
+<div id="layout">
+  <div id="disPanel">
+    <input id="disSearch" placeholder="搜尋疾病（中文/英文名稱）..." />
+    <div id="disStats" class="small"></div>
+    <div id="disList"></div>
+  </div>
+  <div id="main">
+    <div id="disHeader"><div id="emptyState">← 請從左側選擇一個疾病</div></div>
+    <div id="body" style="display:none;">
+      <div class="kpi">
+        <div><b id="kpiTargets">0</b><span>Related Targets</span></div>
+        <div><b id="kpiIngredients">0</b><span>Related Ingredients</span></div>
+        <div><b id="kpiHerbs">0</b><span>Related Herbs</span></div>
+      </div>
+      <div id="toolbar2">
+        <button id="fullscreenBtn">⛶ 放大檢視網絡圖</button>
+        <button id="downloadJsonBtn">⬇ 下載此疾病 JSON</button>
+        <button id="downloadCsvBtn">⬇ 下載此疾病 CSV</button>
+      </div>
+      <div id="network"><div class="placeholder">選擇疾病後顯示關聯網絡圖（僅顯示部分節點以避免過於密集，完整清單見下方表格）</div></div>
+      <div class="tabs">
+        <button class="active" data-tab="targets">Related Targets</button>
+        <button data-tab="ingredients">Related Ingredients</button>
+        <button data-tab="herbs">Related Herbs</button>
+      </div>
+      <div id="tableWrap"></div>
+    </div>
+  </div>
+</div>
+
+<div id="networkModal">
+  <div id="networkModalBar">
+    <b id="networkModalTitle"></b>
+    <button id="networkModalClose">✕ 關閉</button>
+  </div>
+  <div id="networkModalCanvas"></div>
+</div>
+
+<script>
+if (!localStorage.getItem("tcm_token")) { window.location.href = "index.html"; }
+</script>
+<script src="js/api.js"></script>
+<script>
+let DATA = null;
+let diseasesById, targetsById, ingredientsById, herbsById;
+let targetsByDisease, ingredientsByTarget, herbsByIngredient;
+let currentDisease = null;
+let currentRelated = { targets: [], ingredients: [], herbs: [] };
+let activeTab = "targets";
+let mainNetwork = null, modalNetwork = null;
+
+async function bootstrapData() {
+  const listEl = document.getElementById("disList");
+  listEl.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:12.5px;">資料載入中，請稍候...</div>';
+  try {
+    DATA = await api("/tcmsp/data/full");
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:20px;color:#e08080;font-size:12.5px;">資料載入失敗：' + e.message + '</div>';
+    return;
+  }
+
+  diseasesById = new Map(DATA.diseases.map(d => [d.dis_id, d]));
+  targetsById = new Map(DATA.targets.map(t => [t.tar_id, t]));
+  ingredientsById = new Map(DATA.ingredients.map(i => [i.mol_id, i]));
+  herbsById = new Map(DATA.herbs.map(h => [h.herb_id, h]));
+
+  targetsByDisease = new Map();
+  DATA.target_disease.forEach(r => {
+    if (!targetsByDisease.has(r.dis_id)) targetsByDisease.set(r.dis_id, new Set());
+    targetsByDisease.get(r.dis_id).add(r.tar_id);
+  });
+
+  ingredientsByTarget = new Map();
+  DATA.ingredient_target.forEach(r => {
+    if (!ingredientsByTarget.has(r.tar_id)) ingredientsByTarget.set(r.tar_id, new Set());
+    ingredientsByTarget.get(r.tar_id).add(r.mol_id);
+  });
+
+  herbsByIngredient = new Map();
+  DATA.herb_ingredient.forEach(r => {
+    if (!herbsByIngredient.has(r.mol_id)) herbsByIngredient.set(r.mol_id, new Set());
+    herbsByIngredient.get(r.mol_id).add(r.herb_id);
+  });
+
+  renderDiseaseStats();
+  renderDiseaseList();
+}
+
+function renderDiseaseStats() {
+  const withData = DATA.diseases.filter(d => (targetsByDisease.get(d.dis_id) || new Set()).size > 0).length;
+  document.getElementById("disStats").textContent = `共 ${DATA.diseases.length} 種疾病，其中 ${withData} 個已有完整關聯資料`;
+}
+
+function renderDiseaseList(filter) {
+  const listEl = document.getElementById("disList");
+  const kw = (filter || "").trim().toLowerCase();
+  let list = DATA.diseases.slice().sort((a, b) => (a.disease_name || "").localeCompare(b.disease_name || ""));
+  if (kw) {
+    list = list.filter(d => (d.disease_name || "").toLowerCase().includes(kw) || String(d.dis_id).includes(kw));
+  }
+  listEl.innerHTML = list.map(d => {
+    const cnt = (targetsByDisease.get(d.dis_id) || new Set()).size;
+    return `<div class="disRow" data-id="${d.dis_id}">
+      <div class="name">${escapeHtml(d.disease_name || "(未命名)")} ${cnt ? `<span class="badge">${cnt} 個靶點</span>` : ""}</div>
+      <div class="meta">${d.icd9 ? "ICD9: " + d.icd9 : ""} ${d.icd10 ? " ICD10: " + d.icd10 : ""}</div>
+    </div>`;
+  }).join("");
+  listEl.querySelectorAll(".disRow").forEach(row => {
+    row.addEventListener("click", () => selectDisease(row.dataset.id));
+  });
+}
+
+document.getElementById("disSearch").addEventListener("input", (e) => renderDiseaseList(e.target.value));
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function selectDisease(disId) {
+  currentDisease = diseasesById.get(disId);
+  if (!currentDisease) return;
+
+  document.querySelectorAll(".disRow").forEach(r => r.classList.toggle("active", r.dataset.id === disId));
+
+  const targetIds = Array.from(targetsByDisease.get(disId) || []);
+  const ingredientIdSet = new Set();
+  targetIds.forEach(tid => (ingredientsByTarget.get(tid) || new Set()).forEach(mid => ingredientIdSet.add(mid)));
+  const ingredientIds = Array.from(ingredientIdSet);
+  const herbIdSet = new Set();
+  ingredientIds.forEach(mid => (herbsByIngredient.get(mid) || new Set()).forEach(hid => herbIdSet.add(hid)));
+  const herbIds = Array.from(herbIdSet);
+
+  currentRelated = {
+    targets: targetIds.map(id => targetsById.get(id)).filter(Boolean),
+    ingredients: ingredientIds.map(id => ingredientsById.get(id)).filter(Boolean),
+    herbs: herbIds.map(id => herbsById.get(id)).filter(Boolean),
+  };
+
+  document.getElementById("emptyState").style.display = "none";
+  document.getElementById("body").style.display = "flex";
+  document.getElementById("disHeader").innerHTML = `
+    <h2>${escapeHtml(currentDisease.disease_name || "(未命名)")}</h2>
+    <div class="meta">${currentDisease.icd9 ? "ICD9: " + currentDisease.icd9 : ""} ${currentDisease.icd10 ? "　ICD10: " + currentDisease.icd10 : ""} ${!currentDisease.icd9 && !currentDisease.icd10 ? "（無 ICD 編碼資料）" : ""}</div>
+  `;
+
+  document.getElementById("kpiTargets").textContent = currentRelated.targets.length;
+  document.getElementById("kpiIngredients").textContent = currentRelated.ingredients.length;
+  document.getElementById("kpiHerbs").textContent = currentRelated.herbs.length;
+
+  renderTable();
+  renderNetwork("network", false);
+}
+
+// ---------- Tabs / Table ----------
+document.querySelectorAll(".tabs button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeTab = btn.dataset.tab;
+    renderTable();
+  });
+});
+
+function renderTable() {
+  const wrap = document.getElementById("tableWrap");
+  if (activeTab === "targets") {
+    wrap.innerHTML = `<table><thead><tr><th>Tar ID</th><th>Target Name</th><th>DrugBank ID</th><th>KEGG</th></tr></thead><tbody>
+      ${currentRelated.targets.map(t => `<tr><td>${t.tar_id}</td><td>${escapeHtml(t.target_name)}</td><td>${t.drugbank_id || '<span class="na">-</span>'}</td><td>${t.kegg || '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="4" class="small">無資料</td></tr>'}
+    </tbody></table>`;
+  } else if (activeTab === "ingredients") {
+    wrap.innerHTML = `<table><thead><tr><th>Mol ID</th><th>Molecule Name</th><th>MW</th><th>OB%</th><th>DL</th><th>ALogP</th></tr></thead><tbody>
+      ${currentRelated.ingredients.map(i => `<tr><td>${i.mol_id}</td><td>${escapeHtml(i.molecule_name)}</td><td>${i.mw ?? '<span class="na">-</span>'}</td><td>${i.ob ?? '<span class="na">-</span>'}</td><td>${i.dl ?? '<span class="na">-</span>'}</td><td>${i.alogp ?? '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="6" class="small">無資料</td></tr>'}
+    </tbody></table>`;
+  } else {
+    wrap.innerHTML = `<table><thead><tr><th>Herb ID</th><th>中文名稱</th><th>拼音</th><th>English Name</th><th>分類</th></tr></thead><tbody>
+      ${currentRelated.herbs.map(h => `<tr><td>${h.herb_id}</td><td>${escapeHtml(h.herb_cn_name)}</td><td>${escapeHtml(h.herb_pinyin)}</td><td>${escapeHtml(h.herb_en_name)}</td><td>${escapeHtml(h.child_cn_name) || '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="5" class="small">無資料</td></tr>'}
+    </tbody></table>`;
+  }
+}
+
+// ---------- Network graph ----------
+function buildGraphData() {
+  const nodes = [];
+  const edges = [];
+  const MAX_TARGETS = 8, MAX_ING_PER_TARGET = 4, MAX_HERB_PER_ING = 3;
+
+  const disNodeId = "dis-" + currentDisease.dis_id;
+  nodes.push({ id: disNodeId, label: currentDisease.disease_name, color: "#c0533e", shape: "dot", size: 22, font: { color: "#fff" } });
+
+  const shownTargets = currentRelated.targets.slice(0, MAX_TARGETS);
+  const shownIngredientIds = new Set();
+  const shownHerbIds = new Set();
+
+  shownTargets.forEach(t => {
+    const tid = "tgt-" + t.tar_id;
+    nodes.push({ id: tid, label: t.target_name, color: "#3a9d63", shape: "dot", size: 14 });
+    edges.push({ from: disNodeId, to: tid });
+
+    const ingIds = Array.from(ingredientsByTarget.get(t.tar_id) || []).slice(0, MAX_ING_PER_TARGET);
+    ingIds.forEach(mid => {
+      const ing = ingredientsById.get(mid);
+      if (!ing) return;
+      const iid = "mol-" + mid;
+      if (!shownIngredientIds.has(mid)) {
+        nodes.push({ id: iid, label: ing.molecule_name, color: "#3b82c4", shape: "dot", size: 10 });
+        shownIngredientIds.add(mid);
+      }
+      edges.push({ from: tid, to: iid });
+
+      const herbIds = Array.from(herbsByIngredient.get(mid) || []).slice(0, MAX_HERB_PER_ING);
+      herbIds.forEach(hid => {
+        const herb = herbsById.get(hid);
+        if (!herb) return;
+        const hnid = "herb-" + hid;
+        if (!shownHerbIds.has(hid)) {
+          nodes.push({ id: hnid, label: herb.herb_cn_name || herb.herb_en_name, color: "#c99a3d", shape: "dot", size: 8 });
+          shownHerbIds.add(hid);
+        }
+        edges.push({ from: iid, to: hnid });
+      });
+    });
+  });
+
+  return { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+}
+
+function renderNetwork(containerId, isModal) {
+  const container = document.getElementById(containerId);
+  if (!currentDisease || currentRelated.targets.length === 0) {
+    container.innerHTML = '<div class="placeholder">此疾病目前沒有已知的靶點關聯資料</div>';
+    return;
+  }
+  const data = buildGraphData();
+  const options = {
+    physics: { stabilization: true, barnesHut: { gravitationalConstant: -3000, springLength: 90 } },
+    interaction: { hover: true },
+    edges: { color: "#3a3d44", width: 1 },
+    nodes: { borderWidth: 0, font: { color: "#ccc", size: 10 } },
+  };
+  const network = new vis.Network(container, data, options);
+  if (isModal) { modalNetwork = network; } else { mainNetwork = network; }
+}
+
+// ---------- Fullscreen modal ----------
+document.getElementById("fullscreenBtn").addEventListener("click", () => {
+  if (!currentDisease) return;
+  document.getElementById("networkModalTitle").textContent = "疾病關聯網絡圖：" + currentDisease.disease_name;
+  document.getElementById("networkModal").style.display = "flex";
+  setTimeout(() => renderNetwork("networkModalCanvas", true), 50);
+});
+document.getElementById("networkModalClose").addEventListener("click", () => {
+  document.getElementById("networkModal").style.display = "none";
+});
+
+// ---------- Download ----------
+document.getElementById("downloadJsonBtn").addEventListener("click", () => {
+  if (!currentDisease) return;
+  const payload = { disease: currentDisease, ...currentRelated };
+  downloadBlob(JSON.stringify(payload, null, 2), `disease_${currentDisease.dis_id}.json`, "application/json");
+});
+document.getElementById("downloadCsvBtn").addEventListener("click", () => {
+  if (!currentDisease) return;
+  let csv = "type,id,name\n";
+  currentRelated.targets.forEach(t => csv += `target,${t.tar_id},"${(t.target_name || "").replace(/"/g, '""')}"\n`);
+  currentRelated.ingredients.forEach(i => csv += `ingredient,${i.mol_id},"${(i.molecule_name || "").replace(/"/g, '""')}"\n`);
+  currentRelated.herbs.forEach(h => csv += `herb,${h.herb_id},"${(h.herb_cn_name || h.herb_en_name || "").replace(/"/g, '""')}"\n`);
+  downloadBlob(csv, `disease_${currentDisease.dis_id}.csv`, "text/csv");
+});
+
+function downloadBlob(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+
+// ---------- Platform nav: logout ----------
+document.getElementById("platformLogout").addEventListener("click", async (e) => {
+  e.preventDefault();
+  try { await api(`/auth/logout?login_log_id=${getLoginLogId()}`, { method: "POST" }); } catch (err) {}
+  clearSession();
+  window.location.href = "index.html";
+});
+
+// ---------- Init ----------
+bootstrapData();
+</script>
+</body>
+</html>
