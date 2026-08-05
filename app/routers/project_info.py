@@ -11,7 +11,7 @@ router = APIRouter(prefix="/project-info", tags=["Dashboard：專案資訊"])
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-APP_VERSION = "1.13.4"  # 與 app/main.py 的 FastAPI(version=...) 保持同步
+APP_VERSION = "1.13.5"  # 與 app/main.py 的 FastAPI(version=...) 保持同步
 
 SUMMARY_MAX_LEN = 60  # 版本摘要固定長度（超過用刪節號截斷）
 

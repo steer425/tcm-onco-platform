@@ -1,3 +1,4 @@
+import asyncio
 import secrets
 from datetime import datetime
 from typing import Optional
@@ -22,13 +23,23 @@ from app.security import create_access_token, create_oauth_state_token, hash_pas
 router = APIRouter(prefix="/auth", tags=["登入與帳號申請"])
 
 # 部分瀏覽器/Facebook 登入完成頁會觸發兩次跳轉到 callback 網址（同一組授權碼送兩次），
-# 第一次成功交換後，第二次會被 Facebook/Google 判定「授權碼已使用過」而失敗。
-# 這裡快取「最近成功處理過的授權碼 -> 對應的導轉結果」，同一組授權碼重複進來時直接回放結果，
-# 不需要重新跟第三方交換 token（也就不會撞到「已使用過」的錯誤）。
-# 純粹是「同一次登入流程內的重放保護」，快取內容很快就會用不到，
-# 就算部署交接導致快取遺失，最差情況也只是退回目前的行為（第二次請求失敗、使用者需要重新登入一次）。
+# 而且兩次幾乎是同時發生的——單純檢查「有沒有快取結果」擋不住這種併發情境：
+# 兩個請求都在對方還沒寫入快取之前，就各自檢查到「快取是空的」，於是雙雙跑去跟 Facebook/Google 交換，
+# 其中一個一定會撞到「授權碼已使用過」的錯誤。
+# 解法：用同一組授權碼的 asyncio.Lock 讓第二個請求「排隊等待」第一個請求做完，
+# 而不是兩個同時衝去對第三方發請求。第一個請求做完後，第二個請求拿鎖時直接讀到快取結果，
+# 不會再重新呼叫第三方 API。
 _recent_oauth_redirects: dict = {}
+_oauth_code_locks: dict = {}
+_oauth_lock_registry_guard = asyncio.Lock()  # 保護 _oauth_code_locks 這個 dict 本身的建立過程
 _OAUTH_REPLAY_CACHE_SECONDS = 60
+
+
+async def _get_oauth_code_lock(code: str) -> asyncio.Lock:
+    async with _oauth_lock_registry_guard:
+        if code not in _oauth_code_locks:
+            _oauth_code_locks[code] = asyncio.Lock()
+        return _oauth_code_locks[code]
 
 
 def _cache_oauth_result(code: str, response: RedirectResponse):
@@ -193,24 +204,26 @@ async def google_callback(code: str = None, state: str = None, error: str = None
     if not code:
         return _redirect_oauth_error("missing_code")
 
-    cached = _get_cached_oauth_result(code)
-    if cached:
-        return cached
+    lock = await _get_oauth_code_lock(code)
+    async with lock:
+        cached = _get_cached_oauth_result(code)
+        if cached:
+            return cached
 
-    try:
-        userinfo = await google_exchange_code_for_userinfo(code)
-    except HTTPException as e:
-        print(f"[Google OAuth] token exchange failed: {e.detail}")
-        return _redirect_oauth_error("token_exchange_failed")
+        try:
+            userinfo = await google_exchange_code_for_userinfo(code)
+        except HTTPException as e:
+            print(f"[Google OAuth] token exchange failed: {e.detail}")
+            return _redirect_oauth_error("token_exchange_failed")
 
-    google_sub = userinfo.get("sub")
-    email = userinfo.get("email")
-    if not google_sub or not email:
-        return _redirect_oauth_error("missing_profile")
+        google_sub = userinfo.get("sub")
+        email = userinfo.get("email")
+        if not google_sub or not email:
+            return _redirect_oauth_error("missing_profile")
 
-    result = _handle_oauth_login(db, models.OAuthProvider.google, google_sub, email, "Google")
-    _cache_oauth_result(code, result)
-    return result
+        result = _handle_oauth_login(db, models.OAuthProvider.google, google_sub, email, "Google")
+        _cache_oauth_result(code, result)
+        return result
 
 
 @router.get("/facebook/enabled", summary="查詢 Facebook 登入是否已啟用（供前台判斷是否顯示按鈕）")
@@ -233,28 +246,30 @@ async def facebook_callback(code: str = None, state: str = None, error: str = No
     if not code:
         return _redirect_oauth_error("missing_code")
 
-    cached = _get_cached_oauth_result(code)
-    if cached:
-        return cached
+    lock = await _get_oauth_code_lock(code)
+    async with lock:
+        cached = _get_cached_oauth_result(code)
+        if cached:
+            return cached
 
-    try:
-        userinfo = await facebook_exchange_code_for_userinfo(code)
-    except HTTPException as e:
-        print(f"[Facebook OAuth] token exchange failed: {e.detail}")
-        return _redirect_oauth_error("token_exchange_failed")
+        try:
+            userinfo = await facebook_exchange_code_for_userinfo(code)
+        except HTTPException as e:
+            print(f"[Facebook OAuth] token exchange failed: {e.detail}")
+            return _redirect_oauth_error("token_exchange_failed")
 
-    facebook_id = userinfo.get("id")
-    email = userinfo.get("email")
-    if not facebook_id:
-        return _redirect_oauth_error("missing_profile")
-    if not email:
-        # 部分 Facebook 帳號沒有綁定 email（例如手機號碼註冊），這裡直接擋下並提示，
-        # 因為本系統的帳號體系以 email 作為帳號識別，無法用純數字 ID 建立有意義的帳號名稱。
-        return _redirect_oauth_error("facebook_no_email")
+        facebook_id = userinfo.get("id")
+        email = userinfo.get("email")
+        if not facebook_id:
+            return _redirect_oauth_error("missing_profile")
+        if not email:
+            # 部分 Facebook 帳號沒有綁定 email（例如手機號碼註冊），這裡直接擋下並提示，
+            # 因為本系統的帳號體系以 email 作為帳號識別，無法用純數字 ID 建立有意義的帳號名稱。
+            return _redirect_oauth_error("facebook_no_email")
 
-    result = _handle_oauth_login(db, models.OAuthProvider.facebook, facebook_id, email, "Facebook")
-    _cache_oauth_result(code, result)
-    return result
+        result = _handle_oauth_login(db, models.OAuthProvider.facebook, facebook_id, email, "Facebook")
+        _cache_oauth_result(code, result)
+        return result
 
 
 @router.get("/me", response_model=schemas.UserOut, summary="取得目前登入者資訊")
