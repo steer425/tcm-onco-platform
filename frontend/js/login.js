@@ -39,25 +39,35 @@ document.getElementById("applySubmit").addEventListener("click", async () => {
   }
 });
 
-// 檢查 Google / Facebook 登入是否已啟用（後端有設定對應金鑰才會顯示按鈕）
-(async () => {
-  try {
-    const data = await api("/auth/google/enabled");
-    if (data.enabled) {
-      document.getElementById("googleLoginWrap").style.display = "block";
+// 檢查 Google / Facebook 登入是否已啟用（後端有設定對應金鑰才會顯示按鈕）。
+// Render 免費方案閒置一段時間會休眠，喚醒需要 30~60 秒，第一次查詢很可能會失敗——
+// 這裡加上重試機制，避免使用者誤以為「沒有整合第三方登入」。
+async function checkOAuthEnabled(path, wrapId, maxRetries = 6, retryDelayMs = 8000) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const data = await api(path);
+      if (data.enabled) {
+        document.getElementById(wrapId).style.display = "block";
+      }
+      return; // 查到明確結果（不管是否啟用），結束重試
+    } catch (err) {
+      if (attempt === 0) {
+        // 第一次失敗時，先給使用者一個提示，說明可能是伺服器正在喚醒中
+        const hint = document.getElementById("thirdPartyLoginHint");
+        if (hint) hint.style.display = "block";
+      }
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+      }
     }
-  } catch (err) {
-    // 查詢失敗就不顯示按鈕，不影響一般帳密登入
   }
-  try {
-    const data = await api("/auth/facebook/enabled");
-    if (data.enabled) {
-      document.getElementById("facebookLoginWrap").style.display = "block";
-    }
-  } catch (err) {
-    // 查詢失敗就不顯示按鈕，不影響一般帳密登入
-  }
-})();
+  // 重試多次仍失敗，隱藏提示（可能後端真的有問題，但不阻擋一般帳密登入）
+  const hint = document.getElementById("thirdPartyLoginHint");
+  if (hint) hint.style.display = "none";
+}
+
+checkOAuthEnabled("/auth/google/enabled", "googleLoginWrap");
+checkOAuthEnabled("/auth/facebook/enabled", "facebookLoginWrap");
 
 document.getElementById("googleLoginBtn").addEventListener("click", () => {
   window.location.href = (API_BASE || "") + "/auth/google/login";
