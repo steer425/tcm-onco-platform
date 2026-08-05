@@ -1,5 +1,31 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.15.2 — 2026-08-05（修正遷移腳本：ALTER 語句連坐失敗導致新欄位從未真正建立）
+
+### 問題
+
+使用者實測回報 `disease_cn_name` 欄位在 Neon 上仍然不存在，即使已經執行過 `migrate_schema.py` 並看到「完成」訊息。追查 Render 日誌發現真正原因：**所有 `ALTER TABLE` 語句原本共用同一個資料庫交易**，PostgreSQL 的交易機制是「一句失敗，同一交易裡後面所有語句都會被連坐拖累失敗」（錯誤代碼 `InFailedSqlTransaction`）——只要清單裡第一句（例如 `enabled` 欄位已存在）失敗，後面真正需要新增的欄位（包括這次的 `disease_cn_name`）就永遠不會真的執行到，即使腳本最後仍印出「完成」字樣，掩蓋了這個問題。
+
+### 修正
+
+- `app/migrate_schema.py`：每一句 `ALTER TABLE` 改為**各自獨立的資料庫交易**（獨立的 `engine.begin()`），一句失敗不會再拖累其他語句
+- 已在本機重複執行兩次驗證：腳本能正常跑完，不會中途崩潰
+
+### 部署注意事項
+
+這次修正的是遷移腳本本身，**請重新執行一次遷移指令**，這次應該會看到 `disease_cn_name` 欄位真正被建立：
+
+```bash
+$env:DATABASE_URL="你的 Neon 連線字串"
+python -m app.migrate_schema
+```
+
+接著重新執行匯入指令拿到完整的疾病中文翻譯：
+
+```bash
+python -m app.import_tcmsp_data data_import/tcmsp_data.json
+```
+
 ## v1.15.1 — 2026-08-05（補齊全部 564 種疾病的中文翻譯，覆蓋率 100%）
 
 ### 新增內容

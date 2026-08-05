@@ -36,14 +36,19 @@ def run():
     except Exception as e:
         print("  略過（可能是 SQLite 環境，或型別/數值已存在）：", str(e)[:150])
 
-    print("步驟 1／3：補齊 features 資料表欄位...")
-    with engine.begin() as conn:
-        for stmt in ALTER_STATEMENTS:
-            try:
+    print("步驟 1／3：補齊 features / tcmsp_diseases 資料表欄位...")
+    # 重要：每句 ALTER 都要用「獨立交易」執行，不能共用同一個 engine.begin()。
+    # PostgreSQL 的交易機制是「一句失敗，整個交易裡後面所有語句都會被連坐拖累失敗」
+    # （錯誤訊息會是 InFailedSqlTransaction），即使那句語句本身完全沒問題。
+    # 先前的版本共用同一個交易，導致只要第一句「欄位已存在」失敗，
+    # 後面真正需要執行的 ALTER（例如新增 disease_cn_name 欄位）永遠不會真的跑到。
+    for stmt in ALTER_STATEMENTS:
+        try:
+            with engine.begin() as conn:
                 conn.execute(text(stmt))
-                print("  執行成功：", stmt)
-            except Exception as e:
-                print("  略過（可能欄位已存在）：", stmt, "-", str(e)[:120])
+            print("  執行成功：", stmt)
+        except Exception as e:
+            print("  略過（可能欄位已存在）：", stmt, "-", str(e)[:120])
 
     print("步驟 2/3：依 FEATURE_CONFIG 回填既有功能項目的導覽資料...")
     db = SessionLocal()
