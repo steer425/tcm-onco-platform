@@ -85,7 +85,7 @@ def get_full_data(current_user: models.User = Depends(get_current_user), db: Ses
         "diseases": [
             {
                 "dis_id": d.dis_id, "disease_id": d.disease_id, "disease_name": d.disease_name,
-                "icd9": d.icd9, "icd10": d.icd10,
+                "disease_cn_name": d.disease_cn_name, "icd9": d.icd9, "icd10": d.icd10,
             }
             for d in diseases
         ],
@@ -162,3 +162,53 @@ def admin_delete_herb(herb_id: int, db: Session = Depends(get_db), admin: models
     _invalidate_full_data_cache()
     write_audit_log(db, admin, "delete_tcmsp_herb_soft", "tcmsp_herb", str(herb_id), f"下架藥材 {herb.herb_en_name}")
     return {"message": "已下架（軟刪除）"}
+
+
+# ---------------------------------------------------------------------------
+# 後台管理（僅限管理者）：疾病中文名稱維護
+# 疾病本身不提供新增/刪除（隨 TCMSP 匯入腳本管理），只開放編輯中文名稱／備注，
+# 供管理者逐步補齊、修正翻譯。
+# ---------------------------------------------------------------------------
+
+@router.get("/diseases", summary="（後台）查詢疾病列表（可搜尋、可篩選尚無中文名稱的項目）")
+def admin_list_diseases(keyword: Optional[str] = None, missing_cn_only: Optional[bool] = None,
+                         db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
+    q = db.query(models.TcmspDisease)
+    if keyword:
+        q = q.filter(
+            (models.TcmspDisease.disease_name.ilike(f"%{keyword}%")) |
+            (models.TcmspDisease.disease_cn_name.ilike(f"%{keyword}%")) |
+            (models.TcmspDisease.dis_id.ilike(f"%{keyword}%"))
+        )
+    if missing_cn_only:
+        q = q.filter(
+            (models.TcmspDisease.disease_cn_name.is_(None)) | (models.TcmspDisease.disease_cn_name == "")
+        )
+    diseases = q.order_by(models.TcmspDisease.disease_id).all()
+    return [
+        {
+            "dis_id": d.dis_id, "disease_id": d.disease_id, "disease_name": d.disease_name,
+            "disease_cn_name": d.disease_cn_name, "icd9": d.icd9, "icd10": d.icd10, "notes": d.notes,
+        }
+        for d in diseases
+    ]
+
+
+@router.put("/diseases/{dis_id}", summary="（後台）編輯疾病中文名稱／備注")
+def admin_update_disease(dis_id: str, payload: dict, db: Session = Depends(get_db),
+                          admin: models.User = Depends(require_admin)):
+    disease = db.query(models.TcmspDisease).filter(models.TcmspDisease.dis_id == dis_id).first()
+    if not disease:
+        raise HTTPException(status_code=404, detail="找不到疾病資料")
+    if "disease_cn_name" in payload:
+        disease.disease_cn_name = payload["disease_cn_name"] or None
+    if "notes" in payload:
+        disease.notes = payload["notes"]
+    db.commit()
+    _invalidate_full_data_cache()
+    write_audit_log(db, admin, "update_tcmsp_disease", "tcmsp_disease", dis_id,
+                     f"編輯疾病中文名稱 {disease.disease_name} → {disease.disease_cn_name}")
+    return {
+        "dis_id": disease.dis_id, "disease_name": disease.disease_name,
+        "disease_cn_name": disease.disease_cn_name, "notes": disease.notes,
+    }

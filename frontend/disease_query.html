@@ -169,12 +169,17 @@ function renderDiseaseList(filter) {
   const kw = (filter || "").trim().toLowerCase();
   let list = DATA.diseases.slice().sort((a, b) => (a.disease_name || "").localeCompare(b.disease_name || ""));
   if (kw) {
-    list = list.filter(d => (d.disease_name || "").toLowerCase().includes(kw) || String(d.dis_id).includes(kw));
+    list = list.filter(d =>
+      (d.disease_name || "").toLowerCase().includes(kw) ||
+      (d.disease_cn_name || "").toLowerCase().includes(kw) ||
+      String(d.dis_id).includes(kw)
+    );
   }
   listEl.innerHTML = list.map(d => {
     const cnt = (targetsByDisease.get(d.dis_id) || new Set()).size;
+    const cnName = d.disease_cn_name ? escapeHtml(d.disease_cn_name) : '';
     return `<div class="disRow" data-id="${d.dis_id}">
-      <div class="name">${escapeHtml(d.disease_name || "(未命名)")} ${cnt ? `<span class="badge">${cnt} 個靶點</span>` : ""}</div>
+      <div class="name">${cnName ? cnName + ' ' : ''}${escapeHtml(d.disease_name || "(未命名)")} ${cnt ? `<span class="badge">${cnt} 個靶點</span>` : ""}</div>
       <div class="meta">${d.icd9 ? "ICD9: " + d.icd9 : ""} ${d.icd10 ? " ICD10: " + d.icd10 : ""}</div>
     </div>`;
   }).join("");
@@ -212,7 +217,7 @@ function selectDisease(disId) {
   document.getElementById("emptyState").style.display = "none";
   document.getElementById("body").style.display = "flex";
   document.getElementById("disHeader").innerHTML = `
-    <h2>${escapeHtml(currentDisease.disease_name || "(未命名)")}</h2>
+    <h2>${currentDisease.disease_cn_name ? escapeHtml(currentDisease.disease_cn_name) + '　' : ''}${escapeHtml(currentDisease.disease_name || "(未命名)")}</h2>
     <div class="meta">${currentDisease.icd9 ? "ICD9: " + currentDisease.icd9 : ""} ${currentDisease.icd10 ? "　ICD10: " + currentDisease.icd10 : ""} ${!currentDisease.icd9 && !currentDisease.icd10 ? "（無 ICD 編碼資料）" : ""}</div>
   `;
 
@@ -258,7 +263,7 @@ function buildGraphData() {
   const MAX_TARGETS = 8, MAX_ING_PER_TARGET = 4, MAX_HERB_PER_ING = 3;
 
   const disNodeId = "dis-" + currentDisease.dis_id;
-  nodes.push({ id: disNodeId, label: currentDisease.disease_name, color: "#c0533e", shape: "dot", size: 22, font: { color: "#fff" } });
+  nodes.push({ id: disNodeId, label: currentDisease.disease_cn_name || currentDisease.disease_name, color: "#c0533e", shape: "dot", size: 22, font: { color: "#fff" } });
 
   const shownTargets = currentRelated.targets.slice(0, MAX_TARGETS);
   const shownIngredientIds = new Set();

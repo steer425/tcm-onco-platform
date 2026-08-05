@@ -22,6 +22,7 @@ ALTER_STATEMENTS = [
     "ALTER TABLE features ADD COLUMN nav_label VARCHAR",
     "ALTER TABLE features ADD COLUMN page_url VARCHAR",
     "ALTER TABLE features ADD COLUMN sort_order INTEGER DEFAULT 0 NOT NULL",
+    "ALTER TABLE tcmsp_diseases ADD COLUMN disease_cn_name VARCHAR",
 ]
 
 
@@ -78,6 +79,24 @@ def run():
             updated += 1
         db.commit()
         print(f"完成，共處理 {updated} 筆功能項目。")
+
+        print("步驟 3/3：回填疾病中文名稱種子資料（只補目前是空值的項目，不覆蓋既有翻譯）...")
+        import json
+        from pathlib import Path
+        seed_path = Path(__file__).resolve().parent.parent / "data_import" / "disease_cn_name_seed.json"
+        if seed_path.is_file():
+            with open(seed_path, encoding="utf-8") as f:
+                seed = json.load(f)
+            filled = 0
+            for dis_id, cn_name in seed.items():
+                disease = db.query(models.TcmspDisease).filter(models.TcmspDisease.dis_id == dis_id).first()
+                if disease and not disease.disease_cn_name:
+                    disease.disease_cn_name = cn_name
+                    filled += 1
+            db.commit()
+            print(f"  已回填 {filled} 筆疾病中文名稱")
+        else:
+            print("  找不到種子檔案，略過（正常情況：尚未執行過 TCMSP 資料匯入）")
     finally:
         db.close()
 

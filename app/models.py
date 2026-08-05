@@ -278,6 +278,7 @@ class TcmspDisease(Base):
     dis_id = Column(String, primary_key=True)  # 例如 DIS00001
     disease_id = Column(Integer, nullable=True)
     disease_name = Column(String, nullable=True)
+    disease_cn_name = Column(String, nullable=True)  # 中文名稱，可於後台補充/修正
     icd9 = Column(String, nullable=True)
     icd10 = Column(String, nullable=True)
     notes = Column(Text, nullable=True)

@@ -9,11 +9,14 @@
 """
 import json
 import sys
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
 from app import models
 from app.database import SessionLocal, engine, Base
+
+DISEASE_CN_SEED_PATH = Path(__file__).resolve().parent.parent / "data_import" / "disease_cn_name_seed.json"
 
 
 def _s(v):
@@ -28,6 +31,13 @@ def import_data(json_path: str):
     Base.metadata.create_all(bind=engine)
     db: Session = SessionLocal()
     try:
+        print("備份既有疾病中文名稱（避免重新匯入時洗掉管理者手動修正過的翻譯）...")
+        existing_disease_cn = {
+            row.dis_id: row.disease_cn_name
+            for row in db.query(models.TcmspDisease).filter(models.TcmspDisease.disease_cn_name.isnot(None)).all()
+        }
+        print(f"  備份了 {len(existing_disease_cn)} 筆既有中文名稱")
+
         print("清空既有 TCMSP 資料表...")
         db.query(models.TcmspTargetDisease).delete()
         db.query(models.TcmspIngredientTarget).delete()
@@ -76,10 +86,19 @@ def import_data(json_path: str):
         ])
 
         print(f"匯入 {len(data['diseases'])} 個疾病...")
+        disease_cn_seed = {}
+        if DISEASE_CN_SEED_PATH.is_file():
+            with open(DISEASE_CN_SEED_PATH, encoding="utf-8") as f:
+                disease_cn_seed = json.load(f)
+            print(f"  （其中 {len(disease_cn_seed)} 筆帶入既有的中文名稱種子資料）")
+        # 合併優先順序：管理者手動修正過的值 > 種子資料 > 空值
+        merged_disease_cn = {**disease_cn_seed, **existing_disease_cn}
         db.bulk_insert_mappings(models.TcmspDisease, [
             {
                 "dis_id": d["dis_id"], "disease_id": d.get("disease_id"),
-                "disease_name": d.get("disease_name"), "icd9": d.get("icd9"), "icd10": d.get("icd10"),
+                "disease_name": d.get("disease_name"),
+                "disease_cn_name": merged_disease_cn.get(d["dis_id"]),
+                "icd9": d.get("icd9"), "icd10": d.get("icd10"),
             }
             for d in data["diseases"]
         ])
