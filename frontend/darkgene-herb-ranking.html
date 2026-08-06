@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>中藥暗黑基因覆蓋統計 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+<style>
+  .stat-cards { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+  .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; min-width: 140px; }
+  .stat-card b { display: block; font-size: 26px; }
+  .stat-card span { font-size: 12px; color: var(--muted); }
+  table.stats-table th { cursor: pointer; user-select: none; }
+  table.stats-table th:hover { color: var(--primary); }
+  table.stats-table th .sort-arrow { font-size: 10px; margin-left: 3px; color: var(--muted); }
+  .rank-badge { display: inline-block; width: 24px; text-align: center; font-weight: 700; color: var(--muted); }
+  .rank-badge.top1 { color: #c99a3d; }
+  .rank-badge.top2 { color: #999; }
+  .rank-badge.top3 { color: #a86a3d; }
+  .gene-tag { display: inline-block; background: #e3ecf5; color: #1c4d78; border-radius: 4px; padding: 1px 6px; font-size: 11px; margin: 2px 3px 2px 0; }
+  .count-num { color: var(--primary); font-weight: 700; font-size: 15px; }
+  .herb-row { cursor: pointer; }
+  .herb-row:hover td { background: #f0f3f1; }
+</style>
+</head>
+<body data-current-page="darkgene-herb-ranking.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">中藥暗黑基因覆蓋統計</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <p class="hint-msg" style="margin-top:0;">
+        統計每種藥材連結到幾個「不重複」的暗黑基因（Herb → Ingredients → Targets → Dark Genes，同一個基因透過多個成分/靶點連到同一藥材只算一次）。
+        點藥材列可以到藥材查詢站看完整說明。這是機制層級的資料關聯，<b>不是臨床療效證據</b>，僅供研究篩選參考，正式提供醫療建議前仍需要醫師/專業人員審核。
+      </p>
+      <div class="stat-cards">
+        <div class="stat-card"><b id="statHerbTotal">-</b><span>有暗黑基因關聯的藥材數</span></div>
+        <div class="stat-card"><b id="statMaxCount">-</b><span>單一藥材最多覆蓋基因數</span></div>
+        <div class="stat-card"><b id="statTopHerb">-</b><span>覆蓋最多的藥材</span></div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+        <input id="herbSearchInput" placeholder="搜尋藥材（中文/拼音/英文）" style="max-width:220px;" />
+        <span class="hint-msg" id="herbCountHint" style="margin-left:auto;"></span>
+      </div>
+
+      <table class="stats-table" id="statsTable">
+        <thead>
+          <tr>
+            <th style="cursor:default;">排名</th>
+            <th data-sort="herb_cn_name">中文名稱 <span class="sort-arrow"></span></th>
+            <th data-sort="herb_pinyin">拼音 <span class="sort-arrow"></span></th>
+            <th data-sort="herb_en_name">English Name <span class="sort-arrow"></span></th>
+            <th data-sort="dark_gene_count">覆蓋暗黑基因數 <span class="sort-arrow"></span></th>
+            <th>比對到的基因</th>
+          </tr>
+        </thead>
+        <tbody id="statsBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/site-lang.js"></script>
+<script src="js/darkgene-herb-ranking.js"></script>
+</body>
+</html>

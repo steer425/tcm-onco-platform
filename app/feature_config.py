@@ -70,6 +70,9 @@ FEATURE_CONFIG = [
     {"code": "F3-5", "module": "目標三/四", "name": "暗黑基因統計",
      "nav_label": "暗黑基因統計", "page_url": "darkgene-stats.html",
      "show_frontend": True, "show_backend": True, "sort_order": 84},
+    {"code": "F3-6", "module": "目標三/四", "name": "中藥暗黑基因覆蓋統計",
+     "nav_label": "中藥暗黑基因覆蓋統計", "page_url": "darkgene-herb-ranking.html",
+     "show_frontend": True, "show_backend": True, "sort_order": 85},
 
     # ---- 目標五：中藥行 ----
     {"code": "F5-1", "module": "目標五", "name": "中藥行資料管理（後台）",

@@ -113,6 +113,69 @@ def public_get_gene_stats(only_with_target: bool = True, current_user: models.Us
     return {"total": len(results), "genes": results}
 
 
+@router.get("/public/herb-stats", summary="（前台）中藥暗黑基因覆蓋統計：以藥材為主，列出每種藥材連結到幾個不重複的暗黑基因")
+def public_get_herb_stats(only_with_gene: bool = True, current_user: models.User = Depends(get_current_user),
+                           db: Session = Depends(get_db)):
+    genes = db.query(models.DarkGene).filter(models.DarkGene.status == "active").all()
+    all_targets = db.query(models.TcmspTarget).all()
+
+    # 步驟 1：算出「單詞 -> 符合的靶點 tar_id 集合」，再反推「靶點 -> 命中的暗黑基因集合」
+    word_to_target_ids = {}
+    for t in all_targets:
+        words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
+        for w in words:
+            word_to_target_ids.setdefault(w, set()).add(t.tar_id)
+
+    target_to_gene_ids = {}  # 只會有跟暗黑基因有關的靶點才會出現在這裡（約 50~100 個）
+    for g in genes:
+        for sym in _gene_symbols_for_match(g):
+            for tar_id in word_to_target_ids.get(sym, set()):
+                target_to_gene_ids.setdefault(tar_id, set()).add(g.id)
+
+    if not target_to_gene_ids:
+        return {"total": 0, "herbs": []}
+
+    # 步驟 2：掃一次「成分-靶點」關聯，只留跟上面那些靶點有關的，換算成「成分 -> 命中的暗黑基因集合」
+    relevant_tar_ids = set(target_to_gene_ids.keys())
+    mol_to_gene_ids = {}
+    ingredient_target_rows = db.query(models.TcmspIngredientTarget).filter(
+        models.TcmspIngredientTarget.tar_id.in_(relevant_tar_ids)
+    ).all()
+    for r in ingredient_target_rows:
+        mol_to_gene_ids.setdefault(r.mol_id, set()).update(target_to_gene_ids.get(r.tar_id, set()))
+
+    # 步驟 3：掃一次「藥材-成分」關聯，把成分對應到的暗黑基因歸到藥材身上（用集合自動去重）
+    relevant_mol_ids = set(mol_to_gene_ids.keys())
+    herb_to_gene_ids = {}
+    herb_ingredient_rows = db.query(models.TcmspHerbIngredient).filter(
+        models.TcmspHerbIngredient.mol_id.in_(relevant_mol_ids)
+    ).all() if relevant_mol_ids else []
+    for r in herb_ingredient_rows:
+        herb_to_gene_ids.setdefault(r.herb_id, set()).update(mol_to_gene_ids.get(r.mol_id, set()))
+
+    herb_ids = list(herb_to_gene_ids.keys())
+    herbs = db.query(models.TcmspHerb).filter(
+        models.TcmspHerb.id.in_(herb_ids), models.TcmspHerb.status == "active"
+    ).all() if herb_ids else []
+    genes_by_id = {g.id: g for g in genes}
+
+    results = []
+    all_herbs_with_data = herbs if only_with_gene else db.query(models.TcmspHerb).filter(models.TcmspHerb.status == "active").all()
+    for h in all_herbs_with_data:
+        gene_ids = herb_to_gene_ids.get(h.id, set())
+        if only_with_gene and not gene_ids:
+            continue
+        results.append({
+            "herb_id": h.id, "herb_cn_name": h.herb_cn_name, "herb_pinyin": h.herb_pinyin,
+            "herb_en_name": h.herb_en_name,
+            "dark_gene_count": len(gene_ids),
+            "gene_symbols": sorted([genes_by_id[gid].hugo_symbol for gid in gene_ids if gid in genes_by_id]),
+        })
+
+    results.sort(key=lambda r: (-r["dark_gene_count"], r["herb_cn_name"] or ""))
+    return {"total": len(results), "herbs": results}
+
+
 @router.get("/public/list", response_model=List[schemas.DarkGeneOut], summary="（前台）查詢暗黑基因清單（含是否有中藥靶點標記，供查詢站使用）")
 def public_list_genes(keyword: Optional[str] = None, gene_type: Optional[str] = None,
                        has_tcmsp_target: Optional[bool] = None,
