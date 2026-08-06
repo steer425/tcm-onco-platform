@@ -1,5 +1,6 @@
 import csv
 import io
+import re
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -145,3 +146,82 @@ async def import_genes(file: UploadFile = File(...), db: Session = Depends(get_d
     write_audit_log(db, admin, "import_dark_genes", "dark_gene", "bulk",
                      f"匯入暗黑基因清單：新增 {created} 筆、更新 {updated} 筆（檔案：{file.filename}）")
     return {"message": "匯入完成", "created": created, "updated": updated}
+
+
+# ---------------------------------------------------------------------------
+# 暗黑基因－靶點關聯：拿基因符號（含別名）去比對 TCMSP 靶點名稱，
+# 找出相關的成分／候選藥材。屬於研究輔助功能（機制層級關聯，非臨床療效證據），
+# 正式提供醫療建議前仍需要醫師/專業人員審核（詳見 rules.md）。
+# ---------------------------------------------------------------------------
+
+def _gene_symbols_for_match(gene: models.DarkGene) -> List[str]:
+    symbols = [gene.hugo_symbol.strip().upper()]
+    if gene.gene_aliases:
+        symbols += [a.strip().upper() for a in gene.gene_aliases.split(",") if a.strip()]
+    return symbols
+
+
+@router.get("/{gene_id}/tcmsp-links", summary="查詢暗黑基因-靶點關聯：比對 TCMSP 靶點名稱，列出候選藥材")
+def get_gene_tcmsp_links(gene_id: str, current_user: models.User = Depends(get_current_user),
+                          db: Session = Depends(get_db)):
+    gene = db.query(models.DarkGene).filter(models.DarkGene.id == gene_id).first()
+    if not gene:
+        raise HTTPException(status_code=404, detail="找不到基因資料")
+
+    symbols = set(_gene_symbols_for_match(gene))
+    all_targets = db.query(models.TcmspTarget).all()
+    matched_targets = []
+    for t in all_targets:
+        words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
+        if words & symbols:
+            matched_targets.append(t)
+
+    if not matched_targets:
+        return {
+            "gene": {"id": gene.id, "hugo_symbol": gene.hugo_symbol, "gene_aliases": gene.gene_aliases},
+            "matched_targets": [], "ingredients": [], "herbs": [],
+        }
+
+    tar_ids = [t.tar_id for t in matched_targets]
+    ingredient_target_rows = db.query(models.TcmspIngredientTarget).filter(
+        models.TcmspIngredientTarget.tar_id.in_(tar_ids)
+    ).all()
+    mol_ids = list({r.mol_id for r in ingredient_target_rows})
+
+    herb_ingredient_rows = db.query(models.TcmspHerbIngredient).filter(
+        models.TcmspHerbIngredient.mol_id.in_(mol_ids)
+    ).all() if mol_ids else []
+    herb_ids = list({r.herb_id for r in herb_ingredient_rows})
+
+    ingredients = db.query(models.TcmspIngredient).filter(models.TcmspIngredient.mol_id.in_(mol_ids)).all() if mol_ids else []
+    herbs = db.query(models.TcmspHerb).filter(
+        models.TcmspHerb.id.in_(herb_ids), models.TcmspHerb.status == "active"
+    ).all() if herb_ids else []
+
+    # 每種藥材附上「透過幾個成分連結到這個基因」的計數，方便排序找出關聯性較強的候選藥材
+    mol_to_herbs = {}
+    for r in herb_ingredient_rows:
+        mol_to_herbs.setdefault(r.mol_id, set()).add(r.herb_id)
+    herb_hit_count = {}
+    for mol_id in mol_ids:
+        for herb_id in mol_to_herbs.get(mol_id, set()):
+            herb_hit_count[herb_id] = herb_hit_count.get(herb_id, 0) + 1
+
+    return {
+        "gene": {"id": gene.id, "hugo_symbol": gene.hugo_symbol, "gene_aliases": gene.gene_aliases, "gene_type": gene.gene_type},
+        "matched_targets": [
+            {"tar_id": t.tar_id, "target_name": t.target_name, "drugbank_id": t.drugbank_id, "kegg": t.kegg}
+            for t in matched_targets
+        ],
+        "ingredients": [
+            {"mol_id": i.mol_id, "molecule_name": i.molecule_name, "ob": i.ob, "dl": i.dl}
+            for i in ingredients
+        ],
+        "herbs": sorted([
+            {
+                "herb_id": h.id, "herb_cn_name": h.herb_cn_name, "herb_pinyin": h.herb_pinyin,
+                "herb_en_name": h.herb_en_name, "matched_ingredient_count": herb_hit_count.get(h.id, 0),
+            }
+            for h in herbs
+        ], key=lambda x: -x["matched_ingredient_count"]),
+    }

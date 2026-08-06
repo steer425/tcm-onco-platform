@@ -121,6 +121,19 @@
   </div>
 </div>
 
+<div id="linksModal" class="modal-backdrop" style="display:none;">
+  <div class="modal" style="max-width:720px; max-height:82vh; overflow-y:auto;">
+    <h3 id="linksModalTitle">暗黑基因-靶點關聯</h3>
+    <p class="hint-msg" style="margin-top:0;">
+      依基因符號（含別名）比對 TCMSP 靶點名稱，列出候選藥材。這是機制層級的資料關聯（成分-靶點預測資料），<b>不是臨床療效證據</b>，僅供研究篩選參考，正式提供醫療建議前仍需要醫師/專業人員審核。
+    </p>
+    <div id="linksModalBody">載入中...</div>
+    <div style="margin-top:16px; display:flex; justify-content:flex-end;">
+      <button class="secondary" id="linksModalClose">關閉</button>
+    </div>
+  </div>
+</div>
+
 <script src="js/api.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/site-lang.js"></script>

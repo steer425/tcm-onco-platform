@@ -46,6 +46,7 @@ function renderTable() {
       <td class="yn-cell">${g.cosmic_cgc ? "✓" : ""}</td>
       <td><span class="status-pill ${g.status === 'active' ? 'status-active' : 'status-inactive'}">${g.status === 'active' ? '使用中' : '已刪除'}</span></td>
       <td class="actions">
+        <button class="secondary" onclick="viewGeneLinks('${g.id}','${escapeHtml(g.hugo_symbol)}')">靶點關聯</button>
         <button class="secondary" onclick="openEdit('${g.id}')">編輯</button>
         ${g.status === 'active' ? `<button class="danger" onclick="deleteGene('${g.id}')">刪除</button>` : ''}
       </td>
@@ -196,3 +197,55 @@ async function doImport(file) {
 
 loadUserInfo();
 loadGenes();
+
+// ---------- 暗黑基因-靶點關聯 ----------
+window.viewGeneLinks = async (geneId, symbol) => {
+  document.getElementById("linksModalTitle").textContent = `暗黑基因-靶點關聯：${symbol}`;
+  document.getElementById("linksModalBody").innerHTML = "載入中...";
+  document.getElementById("linksModal").style.display = "flex";
+  try {
+    const data = await api(`/dark-genes/${geneId}/tcmsp-links`);
+    renderLinksBody(data);
+  } catch (err) {
+    document.getElementById("linksModalBody").innerHTML = `<p class="hint-msg">載入失敗：${err.message}</p>`;
+  }
+};
+
+function renderLinksBody(data) {
+  const body = document.getElementById("linksModalBody");
+  if (!data.matched_targets.length) {
+    body.innerHTML = `<p class="hint-msg">這個基因（含別名）目前沒有比對到任何 TCMSP 靶點名稱，代表 TCMSP 資料庫裡沒有直接對應的候選藥材資料。</p>`;
+    return;
+  }
+
+  body.innerHTML = `
+    <h4 style="margin-bottom:6px;">比對到的 TCMSP 靶點（${data.matched_targets.length} 個）</h4>
+    <table style="margin-bottom:16px;">
+      <thead><tr><th>Tar ID</th><th>Target Name</th><th>DrugBank ID</th></tr></thead>
+      <tbody>
+        ${data.matched_targets.map(t => `<tr><td>${t.tar_id}</td><td>${escapeHtml(t.target_name)}</td><td>${t.drugbank_id || '<span class="hint-msg">-</span>'}</td></tr>`).join("")}
+      </tbody>
+    </table>
+
+    <h4 style="margin-bottom:6px;">候選藥材（共 ${data.herbs.length} 種，依關聯成分數排序）</h4>
+    ${data.herbs.length ? `
+      <table>
+        <thead><tr><th>中文名稱</th><th>拼音</th><th>English Name</th><th>關聯成分數</th></tr></thead>
+        <tbody>
+          ${data.herbs.map(h => `<tr>
+            <td>${escapeHtml(h.herb_cn_name || "")}</td>
+            <td>${escapeHtml(h.herb_pinyin || "")}</td>
+            <td>${escapeHtml(h.herb_en_name || "")}</td>
+            <td>${h.matched_ingredient_count}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    ` : '<p class="hint-msg">比對到靶點，但目前沒有已下架以外的候選藥材資料。</p>'}
+
+    <p class="hint-msg" style="margin-top:10px;">共 ${data.ingredients.length} 個相關成分。這份清單可以到「TCMSP 藥材關聯查詢站」搜尋任一藥材名稱進一步查看完整關聯與網絡圖。</p>
+  `;
+}
+
+document.getElementById("linksModalClose").addEventListener("click", () => {
+  document.getElementById("linksModal").style.display = "none";
+});
