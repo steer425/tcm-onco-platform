@@ -1,5 +1,36 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.20.0 — 2026-08-06（暗黑基因關聯查詢站：比照藥材/疾病查詢站的呈現方式）
+
+### 問題
+
+v1.19.1 把「基因-靶點關聯」做成 Modal 彈出視窗，跟藥材/疾病查詢站「左側清單、右側說明與關聯」的呈現方式不一致。
+
+### 修正：新增專屬查詢站頁面
+
+新頁面 `darkgene_query.html`（F3-3，前台功能），完全比照 `tcmsp_query.html`／`disease_query.html` 的視覺風格與版面配置：
+
+- **左側**：1245 個暗黑基因清單，可搜尋基因符號/別名，新增「**只顯示有中藥靶點的基因**」勾選框（篩選出目前比對到 49 個基因）
+- **右側**：
+  - 基因說明：Hugo Symbol、Gene Type 標籤、Entrez Gene ID、別名、「是否有中藥靶點」狀態標籤
+  - **串連 OncoKB**：「在 OncoKB 查看完整基因說明」按鈕，連到 `https://www.oncokb.org/gene/{symbol}/somatic`
+  - KPI 統計卡片、Gene → Targets → Ingredients → Herbs 網絡關聯圖、分頁籤表格（Related Targets／Ingredients／Herbs）、JSON/CSV 下載
+  - 畫面上明確標示「機制層級資料關聯，不是臨床療效證據」的警語
+
+### 後端調整
+
+- `GET /dark-genes/public/list` 新增 `has_tcmsp_target` 欄位（是否比對到 TCMSP 靶點）與對應篩選參數，用「單詞索引」一次算完 1245 個基因的比對結果（不用每個基因各自重新掃 1751 個靶點），本機測試整份清單含比對結果耗時約 0.2 秒
+- `GET /dark-genes/{gene_id}/tcmsp-links` 補上 `ingredient_target`、`herb_ingredient` 原始關聯邊資料，供前端畫網絡圖使用
+
+### 部署注意事項
+
+需要重新執行遷移腳本（回填新增的 F3-3 功能項目）：
+
+```bash
+$env:DATABASE_URL="你的 Neon 連線字串"
+python -m app.migrate_schema
+```
+
 ## v1.19.1 — 2026-08-06（新增「暗黑基因-靶點關聯」功能）
 
 ### 新增功能

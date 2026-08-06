@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>暗黑基因關聯查詢站</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/standalone/umd/vis-network.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+<style>
+:root{--bg:#0f1115;--panel:#171a20;--line:#2a2d34;--muted:#8a8f98;--herb:#c99a3d;--mol:#3b82c4;--tgt:#3a9d63;--gene:#8b5fbf;}
+html,body{margin:0;padding:0;background:var(--bg);color:#eee;font-family:"Noto Sans TC","Helvetica Neue",Arial,sans-serif;}
+#platformNav{display:flex;align-items:center;gap:16px;padding:8px 22px;background:#20303f;border-bottom:1px solid var(--line);font-size:12.5px;}
+#platformNav a{color:#8fc3ea;text-decoration:none;}
+#platformNav a:hover{text-decoration:underline;}
+#platformNav span{color:var(--muted);}
+#header{padding:14px 22px 10px;border-bottom:1px solid var(--line);}
+#header h1{margin:0 0 4px;font-size:18px;font-weight:600;}
+#header p{margin:0;font-size:12px;color:var(--muted);line-height:1.6;}
+#layout{display:flex;height:calc(100vh - 116px);min-height:600px;}
+#genePanel{width:320px;flex-shrink:0;border-right:1px solid var(--line);display:flex;flex-direction:column;}
+#geneSearch{margin:10px;padding:8px 10px;background:#1c1f26;border:1px solid #3a3d44;color:#eee;border-radius:6px;font-size:13px;}
+#filterBar{padding:0 12px 8px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+#geneStats{padding:0 12px 6px;font-size:11.5px;color:var(--muted);}
+#geneList{flex:1;overflow-y:auto;border-top:1px solid var(--line);}
+.geneRow{padding:8px 12px;border-bottom:1px solid #1e2128;cursor:pointer;font-size:12.5px;}
+.geneRow:hover{background:#1a1d23;}
+.geneRow.active{background:#20303f;}
+.geneRow .name{font-weight:600;}
+.geneRow .meta{color:var(--muted);font-size:11px;}
+.badge{display:inline-block;background:#204a33;color:#8be0af;border-radius:4px;padding:0 5px;font-size:10.5px;margin-left:6px;}
+.badge-none{display:inline-block;background:#333;color:#999;border-radius:4px;padding:0 5px;font-size:10.5px;margin-left:6px;}
+#main{flex:1;display:flex;flex-direction:column;min-width:0;overflow-y:auto;}
+#geneHeader{padding:14px 20px;border-bottom:1px solid var(--line);}
+#geneHeader h2{margin:0 0 4px;font-size:17px;}
+#geneHeader .meta{color:var(--muted);font-size:12.5px;}
+#emptyState{padding:60px 20px;text-align:center;color:var(--muted);font-size:14px;}
+.gene-type-pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;margin-left:8px;}
+.type-oncogene{background:#fdecea;color:#a83232;}
+.type-tsg{background:#e3ecf5;color:#1c4d78;}
+.type-both{background:#f5ecdc;color:#7a5420;}
+.type-neither,.type-insufficient{background:#333;color:#999;}
+.has-target-yes{background:#204a33;color:#8be0af;}
+.has-target-no{background:#3a2a2a;color:#d99;}
+.kpi{display:flex;gap:12px;padding:12px 20px;flex-wrap:wrap;}
+.kpi div{background:#1c1f26;border:1px solid #2a2d34;border-radius:10px;padding:10px 16px;min-width:110px;}
+.kpi b{display:block;font-size:20px;}
+.kpi span{font-size:11px;color:var(--muted);}
+#toolbar2{display:flex;gap:8px;padding:8px 20px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line);}
+button{background:#26292f;border:1px solid #3a3d44;color:#eee;padding:6px 11px;border-radius:6px;font-size:12px;cursor:pointer;}
+button:hover{background:#31353c;}
+button.primary{background:#2f5c8a;border-color:#3d70a3;}
+button.primary:hover{background:#396d9e;}
+a.oncokb-link{display:inline-block;background:#5a3d8a;border:1px solid #7654ac;color:#fff;padding:6px 12px;border-radius:6px;font-size:12px;text-decoration:none;}
+a.oncokb-link:hover{background:#6c48a5;}
+#network{height:340px;border-bottom:1px solid var(--line);position:relative;flex-shrink:0;}
+#network .placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:20px;}
+.tabs{display:flex;gap:6px;padding:8px 16px 0;}
+.tabs button{background:#1c1f26;}
+.tabs button.active{background:#2f5c8a;border-color:#3d70a3;}
+#tableWrap{flex:1;overflow:auto;padding:8px 16px 16px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{position:sticky;top:0;background:#1c1f26;text-align:left;padding:7px 8px;color:#bcd;border-bottom:1px solid var(--line);white-space:nowrap;}
+td{padding:6px 8px;border-bottom:1px solid #23262c;vertical-align:top;}
+tr:hover td{background:#171a20;}
+.na{color:#666;font-style:italic;}
+.small{font-size:11px;color:var(--muted);}
+.disclaimer{background:#1c1f26;border:1px solid #3a3d44;border-radius:8px;padding:10px 14px;margin:12px 20px 0;font-size:11.5px;color:var(--muted);line-height:1.6;}
+</style>
+</head>
+<body>
+<div id="platformNav">
+  <a href="dashboard.html">← 返回 Dashboard</a>
+  <span>|</span>
+  <span>TCM 中藥腫瘤篩選平台 — 目標三/四　暗黑基因關聯查詢站</span>
+  <span style="flex:1"></span>
+  <a href="dark-genes.html">基因資料管理（CRUD/匯入）</a>
+  <span>|</span>
+  <a href="#" id="platformLogout">登出</a>
+</div>
+<div id="header">
+  <h1>暗黑基因關聯查詢站</h1>
+  <p>左側選一個癌症基因，右側顯示基因說明（含 <a href="https://www.oncokb.org/cancer-genes" target="_blank" style="color:#8fc3ea;">OncoKB</a> 對照連結）與 TCMSP 中藥靶點關聯（Gene → Targets → Ingredients → Herbs）。資料來源：OncoKB 癌症基因參考清單 + TCMSP 藥材關聯資料。</p>
+</div>
+<div id="layout">
+  <div id="genePanel">
+    <input id="geneSearch" placeholder="搜尋基因符號/別名..." />
+    <div id="filterBar">
+      <label><input type="checkbox" id="hasTcmspFilter"> 只顯示有中藥靶點的基因</label>
+    </div>
+    <div id="geneStats" class="small"></div>
+    <div id="geneList"></div>
+  </div>
+  <div id="main">
+    <div id="geneHeader"><div id="emptyState">← 請從左側選擇一個基因</div></div>
+    <div id="bodyWrap" style="display:none; flex:1; min-height:0; flex-direction:column;">
+      <div class="kpi">
+        <div><b id="kpiTargets">0</b><span>Related Targets</span></div>
+        <div><b id="kpiIngredients">0</b><span>Related Ingredients</span></div>
+        <div><b id="kpiHerbs">0</b><span>Related Herbs</span></div>
+      </div>
+      <div class="disclaimer">⚠️ 這是機制層級的資料關聯（TCMSP 成分-靶點預測資料），<b>不是臨床療效證據</b>，僅供研究篩選參考。正式提供醫療建議前仍需要醫師/專業人員審核。</div>
+      <div id="toolbar2">
+        <a class="oncokb-link" id="oncokbLink" href="#" target="_blank">↗ 在 OncoKB 查看完整基因說明</a>
+        <span style="flex:1"></span>
+        <button id="downloadJsonBtn">⬇ JSON</button>
+        <button id="downloadCsvBtn">⬇ CSV</button>
+      </div>
+      <div id="network"><div class="placeholder">選擇基因後顯示關聯網絡圖</div></div>
+      <div class="tabs">
+        <button class="active" data-tab="targets">Related Targets</button>
+        <button data-tab="ingredients">Related Ingredients</button>
+        <button data-tab="herbs">Related Herbs</button>
+      </div>
+      <div id="tableWrap"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+if (!localStorage.getItem("tcm_token")) { window.location.href = "index.html"; }
+</script>
+<script src="js/api.js"></script>
+<script>
+let uiLang = localStorage.getItem('tcm_ui_lang') || 'tw';
+let convToTw = null, convToCn = null;
+function initOpenCC(){
+  try { convToTw = OpenCC.Converter({from:'cn',to:'tw'}); convToCn = OpenCC.Converter({from:'tw',to:'cn'}); } catch(e){}
+}
+function zhConv(text){
+  if(!text) return text;
+  try { return uiLang === 'tw' ? (convToTw ? convToTw(text) : text) : (convToCn ? convToCn(text) : text); }
+  catch(e){ return text; }
+}
+
+let allGenes = [];
+let currentGene = null;
+let currentDetail = null;
+let activeTab = "targets";
+let network = null;
+
+function escapeHtml(s){
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+
+async function bootstrap(){
+  const listEl = document.getElementById("geneList");
+  listEl.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:12.5px;">資料載入中，請稍候...</div>';
+  try {
+    allGenes = await api("/dark-genes/public/list");
+  } catch(e) {
+    listEl.innerHTML = '<div style="padding:20px;color:#e08080;font-size:12.5px;">資料載入失敗：' + e.message + '</div>';
+    return;
+  }
+  renderStats();
+  renderList();
+}
+
+function renderStats(){
+  const withTarget = allGenes.filter(g => g.has_tcmsp_target).length;
+  document.getElementById("geneStats").textContent = `共 ${allGenes.length} 個基因，其中 ${withTarget} 個已比對到 TCMSP 靶點`;
+}
+
+function renderList(filter){
+  const kw = (filter || document.getElementById("geneSearch").value || "").trim().toLowerCase();
+  const onlyWithTarget = document.getElementById("hasTcmspFilter").checked;
+  let list = allGenes;
+  if (kw) {
+    list = list.filter(g => (g.hugo_symbol||"").toLowerCase().includes(kw) || (g.gene_aliases||"").toLowerCase().includes(kw));
+  }
+  if (onlyWithTarget) list = list.filter(g => g.has_tcmsp_target);
+
+  const listEl = document.getElementById("geneList");
+  listEl.innerHTML = list.map(g => `
+    <div class="geneRow" data-id="${g.id}">
+      <div class="name">${escapeHtml(g.hugo_symbol)} ${g.has_tcmsp_target ? '<span class="badge">有中藥靶點</span>' : ''}</div>
+      <div class="meta">${g.gene_type || '未分類'} ${g.gene_aliases ? '· ' + escapeHtml(g.gene_aliases) : ''}</div>
+    </div>
+  `).join("") || '<div style="padding:20px;color:var(--muted);font-size:12.5px;">沒有符合條件的基因</div>';
+
+  listEl.querySelectorAll(".geneRow").forEach(row => {
+    row.addEventListener("click", () => selectGene(row.dataset.id));
+  });
+}
+
+document.getElementById("geneSearch").addEventListener("input", () => renderList());
+document.getElementById("hasTcmspFilter").addEventListener("change", () => renderList());
+
+async function selectGene(geneId){
+  currentGene = allGenes.find(g => g.id === geneId);
+  if (!currentGene) return;
+  document.querySelectorAll(".geneRow").forEach(r => r.classList.toggle("active", r.dataset.id === geneId));
+
+  document.getElementById("emptyState").style.display = "none";
+  document.getElementById("bodyWrap").style.display = "flex";
+
+  const typeClass = currentGene.gene_type === "ONCOGENE" ? "type-oncogene"
+    : currentGene.gene_type === "TSG" ? "type-tsg"
+    : currentGene.gene_type === "ONCOGENE_AND_TSG" ? "type-both" : "type-neither";
+
+  document.getElementById("geneHeader").innerHTML = `
+    <h2>${escapeHtml(currentGene.hugo_symbol)}
+      ${currentGene.gene_type ? `<span class="gene-type-pill ${typeClass}">${currentGene.gene_type}</span>` : ''}
+      <span class="gene-type-pill ${currentGene.has_tcmsp_target ? 'has-target-yes' : 'has-target-no'}">是否有中藥靶點：${currentGene.has_tcmsp_target ? '有' : '無'}</span>
+    </h2>
+    <div class="meta">
+      Entrez Gene ID: ${currentGene.entrez_gene_id || '-'}　
+      ${currentGene.gene_aliases ? '別名：' + escapeHtml(currentGene.gene_aliases) : ''}
+    </div>
+  `;
+  document.getElementById("oncokbLink").href = `https://www.oncokb.org/gene/${encodeURIComponent(currentGene.hugo_symbol)}/somatic`;
+
+  document.getElementById("tableWrap").innerHTML = '<p class="small">載入關聯資料中...</p>';
+  try {
+    currentDetail = await api(`/dark-genes/${geneId}/tcmsp-links`);
+  } catch(e) {
+    document.getElementById("tableWrap").innerHTML = '<p class="small">載入失敗：' + escapeHtml(e.message) + '</p>';
+    return;
+  }
+  if (currentGene.id !== geneId) return;
+
+  document.getElementById("kpiTargets").textContent = currentDetail.matched_targets.length;
+  document.getElementById("kpiIngredients").textContent = currentDetail.ingredients.length;
+  document.getElementById("kpiHerbs").textContent = currentDetail.herbs.length;
+
+  renderTable();
+  renderNetwork();
+}
+
+document.querySelectorAll(".tabs button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeTab = btn.dataset.tab;
+    renderTable();
+  });
+});
+
+function renderTable(){
+  const wrap = document.getElementById("tableWrap");
+  if (!currentDetail) { wrap.innerHTML = ""; return; }
+  if (activeTab === "targets") {
+    wrap.innerHTML = `<table><thead><tr><th>Tar ID</th><th>Target Name</th><th>DrugBank ID</th></tr></thead><tbody>
+      ${currentDetail.matched_targets.map(t => `<tr><td>${t.tar_id}</td><td>${escapeHtml(t.target_name)}</td><td>${t.drugbank_id || '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="3" class="small">此基因目前沒有比對到任何 TCMSP 靶點</td></tr>'}
+    </tbody></table>`;
+  } else if (activeTab === "ingredients") {
+    wrap.innerHTML = `<table><thead><tr><th>Mol ID</th><th>Molecule Name</th><th>OB%</th><th>DL</th></tr></thead><tbody>
+      ${currentDetail.ingredients.map(i => `<tr><td>${i.mol_id}</td><td>${escapeHtml(i.molecule_name)}</td><td>${i.ob ?? '<span class="na">-</span>'}</td><td>${i.dl ?? '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="4" class="small">無資料</td></tr>'}
+    </tbody></table>`;
+  } else {
+    wrap.innerHTML = `<table><thead><tr><th>Herb ID</th><th>中文名稱</th><th>拼音</th><th>English Name</th><th>關聯成分數</th></tr></thead><tbody>
+      ${currentDetail.herbs.map(h => `<tr><td>${h.herb_id}</td><td>${escapeHtml(zhConv(h.herb_cn_name))}</td><td>${escapeHtml(h.herb_pinyin)}</td><td>${escapeHtml(h.herb_en_name)}</td><td>${h.matched_ingredient_count}</td></tr>`).join("") || '<tr><td colspan="5" class="small">無資料</td></tr>'}
+    </tbody></table>`;
+  }
+}
+
+function renderNetwork(){
+  const container = document.getElementById("network");
+  if (!currentDetail || !currentDetail.matched_targets.length) {
+    container.innerHTML = '<div class="placeholder">此基因目前沒有比對到任何 TCMSP 靶點，無法顯示關聯網絡圖</div>';
+    return;
+  }
+  const nodes = [];
+  const edges = [];
+  const geneNodeId = "gene-" + currentGene.id;
+  nodes.push({ id: geneNodeId, label: currentGene.hugo_symbol, color: "#8b5fbf", shape: "dot", size: 22, font: { color: "#fff" } });
+
+  const ingredientsById = new Map(currentDetail.ingredients.map(i => [i.mol_id, i]));
+  const herbsById = new Map(currentDetail.herbs.map(h => [h.herb_id, h]));
+  const molsByTarget = new Map();
+  currentDetail.ingredient_target.forEach(r => {
+    if (!molsByTarget.has(r.tar_id)) molsByTarget.set(r.tar_id, []);
+    molsByTarget.get(r.tar_id).push(r.mol_id);
+  });
+  const herbsByMol = new Map();
+  currentDetail.herb_ingredient.forEach(r => {
+    if (!herbsByMol.has(r.mol_id)) herbsByMol.set(r.mol_id, []);
+    herbsByMol.get(r.mol_id).push(r.herb_id);
+  });
+
+  const shownMol = new Set(), shownHerb = new Set();
+  currentDetail.matched_targets.slice(0, 8).forEach(t => {
+    const tid = "tgt-" + t.tar_id;
+    nodes.push({ id: tid, label: t.target_name, color: "#3a9d63", shape: "dot", size: 14 });
+    edges.push({ from: geneNodeId, to: tid });
+
+    (molsByTarget.get(t.tar_id) || []).slice(0, 5).forEach(molId => {
+      const ing = ingredientsById.get(molId);
+      if (!ing) return;
+      const iid = "mol-" + molId;
+      if (!shownMol.has(molId)) {
+        nodes.push({ id: iid, label: ing.molecule_name, color: "#3b82c4", shape: "dot", size: 10 });
+        shownMol.add(molId);
+      }
+      edges.push({ from: tid, to: iid });
+
+      (herbsByMol.get(molId) || []).slice(0, 3).forEach(herbId => {
+        const herb = herbsById.get(herbId);
+        if (!herb) return;
+        const hid = "herb-" + herbId;
+        if (!shownHerb.has(herbId)) {
+          nodes.push({ id: hid, label: zhConv(herb.herb_cn_name) || herb.herb_en_name, color: "#c99a3d", shape: "dot", size: 8 });
+          shownHerb.add(herbId);
+        }
+        edges.push({ from: iid, to: hid });
+      });
+    });
+  });
+
+  network = new vis.Network(container, { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) }, {
+    physics: { stabilization: true, barnesHut: { gravitationalConstant: -3000, springLength: 90 } },
+    interaction: { hover: true },
+    edges: { color: "#3a3d44", width: 1 },
+    nodes: { borderWidth: 0, font: { color: "#ccc", size: 10 } },
+  });
+}
+
+document.getElementById("downloadJsonBtn").addEventListener("click", () => {
+  if (!currentGene || !currentDetail) return;
+  downloadBlob(JSON.stringify({ gene: currentGene, ...currentDetail }, null, 2), `darkgene_${currentGene.hugo_symbol}.json`, "application/json");
+});
+document.getElementById("downloadCsvBtn").addEventListener("click", () => {
+  if (!currentGene || !currentDetail) return;
+  let csv = "type,id,name\n";
+  currentDetail.matched_targets.forEach(t => csv += `target,${t.tar_id},"${(t.target_name||"").replace(/"/g,'""')}"\n`);
+  currentDetail.ingredients.forEach(i => csv += `ingredient,${i.mol_id},"${(i.molecule_name||"").replace(/"/g,'""')}"\n`);
+  currentDetail.herbs.forEach(h => csv += `herb,${h.herb_id},"${(h.herb_cn_name||h.herb_en_name||"").replace(/"/g,'""')}"\n`);
+  downloadBlob(csv, `darkgene_${currentGene.hugo_symbol}.csv`, "text/csv");
+});
+function downloadBlob(content, filename, mime){
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+
+document.getElementById("platformLogout").addEventListener("click", async (e) => {
+  e.preventDefault();
+  try { await api(`/auth/logout?login_log_id=${getLoginLogId()}`, { method: "POST" }); } catch(err) {}
+  clearSession();
+  window.location.href = "index.html";
+});
+
+initOpenCC();
+bootstrap();
+</script>
+</body>
+</html>

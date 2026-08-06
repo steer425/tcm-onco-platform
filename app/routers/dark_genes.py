@@ -21,8 +21,25 @@ def _yn_to_bool(v: Optional[str]) -> bool:
 # 前台／一般登入使用者：查詢
 # ---------------------------------------------------------------------------
 
-@router.get("/public/list", response_model=List[schemas.DarkGeneOut], summary="（前台）查詢暗黑基因清單（輕量，供查詢/篩選使用）")
+def _build_target_word_index(db: Session):
+    """建立「單詞 → 是否有任何 TCMSP 靶點名稱包含這個詞」的索引，
+    這樣判斷「1245 個基因裡哪些比對得到靶點」時，每個基因只需要查表，
+    不需要每個基因都重新掃過一次全部 1751 個靶點名稱。"""
+    all_targets = db.query(models.TcmspTarget.target_name).all()
+    word_set = set()
+    for (name,) in all_targets:
+        word_set |= set(re.findall(r"[A-Za-z0-9]+", (name or "").upper()))
+    return word_set
+
+
+def _gene_has_tcmsp_target(gene: models.DarkGene, target_word_set) -> bool:
+    symbols = _gene_symbols_for_match(gene)
+    return any(s in target_word_set for s in symbols)
+
+
+@router.get("/public/list", response_model=List[schemas.DarkGeneOut], summary="（前台）查詢暗黑基因清單（含是否有中藥靶點標記，供查詢站使用）")
 def public_list_genes(keyword: Optional[str] = None, gene_type: Optional[str] = None,
+                       has_tcmsp_target: Optional[bool] = None,
                        current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     q = db.query(models.DarkGene).filter(models.DarkGene.status == "active")
     if keyword:
@@ -33,7 +50,15 @@ def public_list_genes(keyword: Optional[str] = None, gene_type: Optional[str] = 
     if gene_type:
         q = q.filter(models.DarkGene.gene_type == gene_type)
     genes = q.order_by(models.DarkGene.hugo_symbol).all()
-    return genes
+
+    target_word_set = _build_target_word_index(db)
+    results = []
+    for g in genes:
+        out = schemas.DarkGeneOut.model_validate(g)
+        out.has_tcmsp_target = _gene_has_tcmsp_target(g, target_word_set)
+        if has_tcmsp_target is None or out.has_tcmsp_target == has_tcmsp_target:
+            results.append(out)
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +242,8 @@ def get_gene_tcmsp_links(gene_id: str, current_user: models.User = Depends(get_c
             {"mol_id": i.mol_id, "molecule_name": i.molecule_name, "ob": i.ob, "dl": i.dl}
             for i in ingredients
         ],
+        "ingredient_target": [{"mol_id": r.mol_id, "tar_id": r.tar_id} for r in ingredient_target_rows],
+        "herb_ingredient": [{"herb_id": r.herb_id, "mol_id": r.mol_id} for r in herb_ingredient_rows],
         "herbs": sorted([
             {
                 "herb_id": h.id, "herb_cn_name": h.herb_cn_name, "herb_pinyin": h.herb_pinyin,

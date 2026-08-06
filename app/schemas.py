@@ -536,6 +536,7 @@ class DarkGeneOut(BaseModel):
     gene_aliases: Optional[str]
     status: str
     notes: Optional[str]
+    has_tcmsp_target: bool = False  # 是否比對到 TCMSP 靶點資料，於 router 內計算覆寫
     created_at: datetime
 
     class Config:

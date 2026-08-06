@@ -61,6 +61,9 @@ FEATURE_CONFIG = [
     {"code": "F3-2", "module": "目標三/四", "name": "暗黑基因管理（癌症基因參考資料）",
      "nav_label": "暗黑基因管理", "page_url": "dark-genes.html",
      "show_frontend": False, "show_backend": True, "sort_order": 81},
+    {"code": "F3-3", "module": "目標三/四", "name": "暗黑基因關聯查詢站",
+     "nav_label": "暗黑基因關聯查詢站", "page_url": "darkgene_query.html",
+     "show_frontend": True, "show_backend": False, "sort_order": 82},
 
     # ---- 目標五：中藥行 ----
     {"code": "F5-1", "module": "目標五", "name": "中藥行資料管理（後台）",
