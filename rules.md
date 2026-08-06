@@ -50,6 +50,20 @@ Dashboard 頁面的四張卡片（主機資訊／版本資訊／專案文件／2
 
 所以同一張卡片，可以設定成「只給管理者看」「只給一般使用者看」「兩邊都看」「兩邊都不看（＝直接關掉 enabled）」，在「角色管理」頁面任一角色的「權限矩陣」視窗個別勾選即可，不需要區分是不是有 `page_url`。
 
+## 四之一、查詢站類頁面標準功能清單
+
+目前三個查詢站（`tcmsp_query.html`／`disease_query.html`／`darkgene_query.html`）都必須具備以下功能，新增任何一個查詢站類頁面時，這份清單就是驗收標準：
+
+| # | 功能 | 說明 | 對應元素/實作方式 |
+|---|---|---|---|
+| 1 | 繁體/簡體語系切換 | 搜尋欄旁的下拉選單，用 OpenCC-JS 即時轉換頁面中文顯示（中文名稱、網絡圖節點文字等） | `<select id="uiLangSelect">`，狀態存 `localStorage.tcm_ui_lang`，切換時重繪清單與詳情 |
+| 2 | 淺色/深色主題切換 | 頂部導覽列「🌗 切換淺色/深色」，套用個人化設定裡的查詢站配色偏好 | `<a id="themeToggleLink">` + `body[data-page-theme="light"]` CSS 覆寫區塊，讀寫 `/user-preferences/query_station_theme` |
+| 3 | 個人化設定連結 | 頂部導覽列可以直接連到個人化設定頁面 | `<a href="personal-settings.html">` |
+| 4 | 網絡關聯圖全螢幕放大 | 「⛶ 放大檢視關聯圖」按鈕，開啟全螢幕 Modal，可點節點看詳情 | `#networkModal` / `#networkModalCanvas` / `#networkNodeDetail`，`renderNetwork(containerId, isModal)` 要能同時畫背景小圖跟全螢幕大圖 |
+| 5 | 選取項目變更時同步更新全螢幕畫布 | 如果全螢幕正開著，切換挑選器/顯示層級/選取項目時，全螢幕那張圖也要跟著更新，不能只更新看不到的背景小圖 | 用 `modalOpen` 旗標追蹤全螢幕開關狀態，重繪時判斷是否要同步呼叫 `renderNetwork("networkModalCanvas", true)` |
+| 6 | JSON/CSV 下載 | 下載目前選取項目的關聯資料 | `#downloadJsonBtn` / `#downloadCsvBtn` |
+| 7 | 空白狀態提示 | 尚未選擇項目時顯示的提示文字 | `#emptyState`，**必須是跟 `#xxxHeader`／`#bodyWrap` 平行的兄弟元素**，見下一節的重要規範 |
+
 ## 五之一、查詢站類頁面（左側清單／右側詳情）的結構規範
 
 TCMSP 藥材查詢站、疾病查詢站、暗黑基因查詢站都用「左側清單、右側詳情」版面。這種頁面的空白提示元素（`#emptyState`）**絕對不能巢狀放在會被整段覆寫的容器裡**（例如 `#xxxHeader`）。

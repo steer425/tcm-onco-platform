@@ -65,6 +65,52 @@ tr:hover td{background:#171a20;}
 .na{color:#666;font-style:italic;}
 .small{font-size:11px;color:var(--muted);}
 .disclaimer{background:#1c1f26;border:1px solid #3a3d44;border-radius:8px;padding:10px 14px;margin:12px 20px 0;font-size:11.5px;color:var(--muted);line-height:1.6;}
+
+/* 淺色主題（個人化設定：關聯查詢站 CSS 設定），比照藥材/疾病查詢站同樣的覆寫作法 */
+body[data-page-theme="light"]{background:#f5f7f5;color:#24312a;}
+body[data-page-theme="light"] #header{border-color:#dfe5e0;}
+body[data-page-theme="light"] #header p{color:#6b7a70;}
+body[data-page-theme="light"] #genePanel{border-color:#dfe5e0;}
+body[data-page-theme="light"] #geneSearch,
+body[data-page-theme="light"] input,
+body[data-page-theme="light"] select{background:#fff;border-color:#c8d0cb;color:#24312a;}
+body[data-page-theme="light"] #geneStats,
+body[data-page-theme="light"] .small,
+body[data-page-theme="light"] #filterBar{color:#6b7a70;}
+body[data-page-theme="light"] #geneList{border-color:#dfe5e0;}
+body[data-page-theme="light"] .geneRow{border-bottom-color:#e8ece8;}
+body[data-page-theme="light"] .geneRow:hover{background:#f0f3f1;}
+body[data-page-theme="light"] .geneRow.active{background:#e2ede6;}
+body[data-page-theme="light"] .geneRow .meta{color:#6b7a70;}
+body[data-page-theme="light"] .badge{background:#e8f3ec;color:#1f4f37;}
+body[data-page-theme="light"] .badge-none{background:#eee;color:#888;}
+body[data-page-theme="light"] #geneHeader{border-color:#dfe5e0;}
+body[data-page-theme="light"] #geneHeader .meta{color:#6b7a70;}
+body[data-page-theme="light"] .kpi div{background:#fff;border-color:#dfe5e0;}
+body[data-page-theme="light"] #toolbar2{border-color:#dfe5e0;}
+body[data-page-theme="light"] button{background:#eef1ee;border-color:#c8d0cb;color:#24312a;}
+body[data-page-theme="light"] button:hover{background:#e0e5e0;}
+body[data-page-theme="light"] button.primary{background:#2f6f4f;border-color:#1f4f37;color:#fff;}
+body[data-page-theme="light"] a.oncokb-link{background:#5a3d8a;color:#fff;}
+body[data-page-theme="light"] #network{border-color:#dfe5e0;background:#fafcfa;}
+body[data-page-theme="light"] .tabs button{background:#eef1ee;color:#24312a;}
+body[data-page-theme="light"] .tabs button.active{background:#2f6f4f;border-color:#1f4f37;color:#fff;}
+body[data-page-theme="light"] th{background:#f0f3f1;color:#3a4a42;border-bottom-color:#dfe5e0;}
+body[data-page-theme="light"] td{border-bottom-color:#e8ece8;}
+body[data-page-theme="light"] tr:hover td{background:#f7f9f7;}
+body[data-page-theme="light"] .na{color:#9aa5a0;}
+body[data-page-theme="light"] .disclaimer{background:#fdf3e0;border-color:#e8d5a8;color:#7a5a20;}
+body[data-page-theme="light"] #networkModal{background:#fff;}
+body[data-page-theme="light"] #networkModalBar{border-color:#dfe5e0;background:#f7f9f7;}
+body[data-page-theme="light"] #networkModalBar b{color:#24312a;}
+body[data-page-theme="light"] #networkNodeDetail{border-color:#dfe5e0;background:#fafcfa;color:#24312a;}
+#networkModal{display:none;position:fixed;inset:0;z-index:9999;flex-direction:column;background:#0b0d11;}
+#networkModalBar{display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);flex-shrink:0;flex-wrap:wrap;}
+#networkModalBar b{color:#eee;font-size:14px;flex:1;}
+#networkModalMain{flex:1;display:flex;min-height:0;}
+#networkModalCanvas{flex:1;min-height:0;}
+#networkNodeDetail{display:none;width:300px;flex-shrink:0;border-left:1px solid var(--line);overflow:auto;padding:14px;background:#12151b;color:#eee;}
+#networkNodeDetail table td{border-bottom:1px solid #23262c;}
 </style>
 </head>
 <body>
@@ -75,6 +121,10 @@ tr:hover td{background:#171a20;}
   <span style="flex:1"></span>
   <a href="dark-genes.html">基因資料管理（CRUD/匯入）</a>
   <span>|</span>
+  <a href="#" id="themeToggleLink">🌗 切換淺色/深色</a>
+  <span>|</span>
+  <a href="personal-settings.html">個人化設定</a>
+  <span>|</span>
   <a href="#" id="platformLogout">登出</a>
 </div>
 <div id="header">
@@ -83,7 +133,13 @@ tr:hover td{background:#171a20;}
 </div>
 <div id="layout">
   <div id="genePanel">
-    <input id="geneSearch" placeholder="搜尋基因符號/別名..." />
+    <div style="display:flex; gap:6px; padding:10px 10px 0;">
+      <input id="geneSearch" placeholder="搜尋基因符號/別名..." style="flex:1; margin:0;" />
+      <select id="uiLangSelect" title="介面語系" style="width:90px;">
+        <option value="tw">繁體中文</option>
+        <option value="cn">简体中文</option>
+      </select>
+    </div>
     <div id="filterBar">
       <label><input type="checkbox" id="hasTcmspFilter"> 只顯示有中藥靶點的基因</label>
     </div>
@@ -102,6 +158,7 @@ tr:hover td{background:#171a20;}
       <div class="disclaimer">⚠️ 這是機制層級的資料關聯（TCMSP 成分-靶點預測資料），<b>不是臨床療效證據</b>，僅供研究篩選參考。正式提供醫療建議前仍需要醫師/專業人員審核。</div>
       <div id="toolbar2">
         <a class="oncokb-link" id="oncokbLink" href="#" target="_blank">↗ 在 OncoKB 查看完整基因說明</a>
+        <button id="fsNet">⛶ 放大檢視關聯圖</button>
         <span style="flex:1"></span>
         <button id="downloadJsonBtn">⬇ JSON</button>
         <button id="downloadCsvBtn">⬇ CSV</button>
@@ -114,6 +171,17 @@ tr:hover td{background:#171a20;}
       </div>
       <div id="tableWrap"></div>
     </div>
+  </div>
+</div>
+
+<div id="networkModal">
+  <div id="networkModalBar">
+    <b id="networkModalTitle"></b>
+    <button id="networkModalClose">✕ 關閉</button>
+  </div>
+  <div id="networkModalMain">
+    <div id="networkModalCanvas"></div>
+    <div id="networkNodeDetail"></div>
   </div>
 </div>
 
@@ -138,6 +206,7 @@ let currentGene = null;
 let currentDetail = null;
 let activeTab = "targets";
 let network = null;
+let modalNetwork = null;
 
 function escapeHtml(s){
   return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
@@ -224,7 +293,8 @@ async function selectGene(geneId){
   document.getElementById("kpiHerbs").textContent = currentDetail.herbs.length;
 
   renderTable();
-  renderNetwork();
+  renderNetwork("network", false);
+  if (modalOpen) renderNetwork("networkModalCanvas", true);
 }
 
 document.querySelectorAll(".tabs button").forEach(btn => {
@@ -254,12 +324,7 @@ function renderTable(){
   }
 }
 
-function renderNetwork(){
-  const container = document.getElementById("network");
-  if (!currentDetail || !currentDetail.matched_targets.length) {
-    container.innerHTML = '<div class="placeholder">此基因目前沒有比對到任何 TCMSP 靶點，無法顯示關聯網絡圖</div>';
-    return;
-  }
+function buildGraphData(){
   const nodes = [];
   const edges = [];
   const geneNodeId = "gene-" + currentGene.id;
@@ -307,13 +372,64 @@ function renderNetwork(){
     });
   });
 
-  network = new vis.Network(container, { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) }, {
+  return { nodes, edges };
+}
+
+let modalOpen = false; // 全螢幕檢視是否開啟中，開啟時要同步重繪，不能只更新看不到的背景小圖
+
+function renderNetwork(containerId, isModal){
+  const container = document.getElementById(containerId || "network");
+  if (!currentDetail || !currentDetail.matched_targets.length) {
+    container.innerHTML = '<div class="placeholder">此基因目前沒有比對到任何 TCMSP 靶點，無法顯示關聯網絡圖</div>';
+    return;
+  }
+  const { nodes, edges } = buildGraphData();
+  const dataSet = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+  const net = new vis.Network(container, dataSet, {
     physics: { stabilization: true, barnesHut: { gravitationalConstant: -3000, springLength: 90 } },
     interaction: { hover: true },
     edges: { color: "#3a3d44", width: 1 },
     nodes: { borderWidth: 0, font: { color: "#ccc", size: 10 } },
   });
+  net.on("click", (params) => {
+    if (params.nodes.length && isModal) showNodeDetail(params.nodes[0], dataSet.nodes);
+  });
+  if (isModal) { modalNetwork = net; } else { network = net; }
 }
+
+function showNodeDetail(nodeId, nodesDataSet){
+  const panel = document.getElementById("networkNodeDetail");
+  const node = nodesDataSet.get(nodeId);
+  if (!node) { panel.style.display = "none"; return; }
+  let rows = [];
+  if (nodeId.startsWith("gene-")) {
+    rows = [["Hugo Symbol", currentGene.hugo_symbol], ["Gene Type", currentGene.gene_type || "-"], ["Entrez Gene ID", currentGene.entrez_gene_id || "-"], ["別名", currentGene.gene_aliases || "-"]];
+  } else if (nodeId.startsWith("tgt-")) {
+    const t = currentDetail.matched_targets.find(x => "tgt-" + x.tar_id === nodeId);
+    rows = t ? [["Target Name", t.target_name], ["Tar ID", t.tar_id], ["DrugBank ID", t.drugbank_id || "-"]] : [];
+  } else if (nodeId.startsWith("mol-")) {
+    const i = currentDetail.ingredients.find(x => "mol-" + x.mol_id === nodeId);
+    rows = i ? [["Molecule Name", i.molecule_name], ["Mol ID", i.mol_id], ["OB%", i.ob ?? "-"], ["DL", i.dl ?? "-"]] : [];
+  } else if (nodeId.startsWith("herb-")) {
+    const h = currentDetail.herbs.find(x => "herb-" + x.herb_id === nodeId);
+    rows = h ? [["中文名稱", h.herb_cn_name || "-"], ["拼音", h.herb_pinyin || "-"], ["英文學名", h.herb_en_name || "-"]] : [];
+  }
+  panel.innerHTML = `<h3 style="margin-top:0;">節點詳情</h3><table>${rows.map(([k,v]) => `<tr><td class="small" style="padding:4px 8px 4px 0;">${k}</td><td>${escapeHtml(v)}</td></tr>`).join("")}</table>`;
+  panel.style.display = "block";
+}
+
+document.getElementById("fsNet").addEventListener("click", () => {
+  if (!currentGene) return;
+  document.getElementById("networkModalTitle").textContent = "暗黑基因-靶點關聯網絡圖：" + currentGene.hugo_symbol;
+  document.getElementById("networkNodeDetail").style.display = "none";
+  document.getElementById("networkModal").style.display = "flex";
+  modalOpen = true;
+  setTimeout(() => renderNetwork("networkModalCanvas", true), 50);
+});
+document.getElementById("networkModalClose").addEventListener("click", () => {
+  document.getElementById("networkModal").style.display = "none";
+  modalOpen = false;
+});
 
 document.getElementById("downloadJsonBtn").addEventListener("click", () => {
   if (!currentGene || !currentDetail) return;
@@ -342,7 +458,34 @@ document.getElementById("platformLogout").addEventListener("click", async (e) =>
   window.location.href = "index.html";
 });
 
+document.getElementById('uiLangSelect').value = uiLang;
+document.getElementById('uiLangSelect').addEventListener('change', (e) => {
+  uiLang = e.target.value;
+  localStorage.setItem('tcm_ui_lang', uiLang);
+  renderList();
+  if (currentGene) selectGene(currentGene.id);
+});
 initOpenCC();
+
+// ---------- 個人化設定：查詢站淺色/深色主題 ----------
+let queryStationTheme = 'dark';
+async function loadQueryStationTheme(){
+  try {
+    const data = await api('/user-preferences/query_station_theme');
+    queryStationTheme = data.value || 'dark';
+  } catch(e) { queryStationTheme = 'dark'; }
+  document.body.setAttribute('data-page-theme', queryStationTheme);
+}
+document.getElementById('themeToggleLink').addEventListener('click', async (e) => {
+  e.preventDefault();
+  queryStationTheme = queryStationTheme === 'dark' ? 'light' : 'dark';
+  document.body.setAttribute('data-page-theme', queryStationTheme);
+  try {
+    await api('/user-preferences/query_station_theme', { method: 'PUT', body: JSON.stringify({ value: queryStationTheme }) });
+  } catch(err) { /* 儲存失敗不影響當下畫面已切換的結果 */ }
+});
+loadQueryStationTheme();
+
 bootstrap();
 </script>
 </body>
