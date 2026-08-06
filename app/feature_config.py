@@ -58,6 +58,9 @@ FEATURE_CONFIG = [
     {"code": "F3-1", "module": "目標三/四", "name": "客戶資料管理（病患基本資料/就診紀錄）",
      "nav_label": "客戶資料管理", "page_url": "patients.html",
      "show_frontend": False, "show_backend": True, "sort_order": 80},
+    {"code": "F3-2", "module": "目標三/四", "name": "暗黑基因管理（癌症基因參考資料）",
+     "nav_label": "暗黑基因管理", "page_url": "dark-genes.html",
+     "show_frontend": False, "show_backend": True, "sort_order": 81},
 
     # ---- 目標五：中藥行 ----
     {"code": "F5-1", "module": "目標五", "name": "中藥行資料管理（後台）",

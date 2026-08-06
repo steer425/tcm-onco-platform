@@ -1,5 +1,41 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.19.0 — 2026-08-06（暗黑基因管理：資料匯入 + 完整 CRUD）
+
+### 新增功能
+
+分析使用者提供的 `cancerGeneList.tsv`（OncoKB 癌症基因參考清單，1245 個基因），建立正式的資料庫層與後台管理功能，對應目標三「NVIDIA BioNeMo + Google AlphaGenome 暗黑基因組分析」的基礎參考資料。
+
+- 新增資料表 `dark_genes`，欄位對應原始 TSV 的全部 16 個欄位：Hugo Symbol、Entrez Gene ID、GRCh37/38 Isoform 與 RefSeq、Gene Type（ONCOGENE/TSG/ONCOGENE_AND_TSG/NEITHER/INSUFFICIENT_EVIDENCE）、出現次數、OncoKB/MSK-IMPACT/MSK-HEME/FOUNDATION ONE/FOUNDATION ONE HEME/Vogelstein/COSMIC CGC 各資源標記（Yes/No 轉為布林值）、基因別名
+- 新頁面 `dark-genes.html`（F3-2，僅限管理者）：
+  - **拖拉或點選上傳 TSV 檔案匯入**，依 Hugo Symbol 自動 upsert（已存在的基因會更新欄位、不存在的會新增），**不會清空重建整張表**——因為這張表之後可能會有後台手動新增/編輯的資料，清空重建會把這些洗掉（跟 TCMSP 藥材資料「先清空再匯入」的做法不同，這裡刻意設計成 upsert）
+  - 完整 CRUD：新增/編輯/軟刪除，搜尋（基因符號/別名）、依類型/狀態篩選
+- 後端新增 `POST /dark-genes/import`（上傳檔案匯入）與完整 CRUD 端點，另外也提供 CLI 版本 `python -m app.import_dark_genes data_import/cancer_gene_list.tsv`（部署時可直接執行，效果與網頁上傳完全一樣）
+- 原始 TSV 檔案存放於 `data_import/cancer_gene_list.tsv`，供之後重新匯入或更新版本使用
+- 已透過完整測試驗證：匯入 1245 筆全數正確（型別統計：ONCOGENE 443、TSG 340、ONCOGENE_AND_TSG 66、INSUFFICIENT_EVIDENCE 149、NEITHER 22、未分類 225）、搜尋、前台篩選、CRUD、重複匯入的 upsert 冪等性（不會累加/重複）
+
+### 部署注意事項
+
+需要重新執行遷移腳本（回填新增的 F3-2 功能項目；`dark_genes` 屬於全新資料表，一般啟動流程的 `create_all` 會自動建立，不需要遷移腳本處理）：
+
+```bash
+$env:DATABASE_URL="你的 Neon 連線字串"
+python -m app.migrate_schema
+```
+
+接著匯入正式的基因參考資料（跟遷移腳本分開執行）：
+
+```bash
+python -m app.import_dark_genes data_import/cancer_gene_list.tsv
+```
+
+也可以不跑指令，改成部署完成後直接到「暗黑基因管理」頁面用網頁上傳 `data_import/cancer_gene_list.tsv` 這個檔案，效果相同。
+
+### 已知限制
+
+- 這批資料是公開的 OncoKB 癌症基因參考清單，屬於基因層級的中性參考資訊（不含任何病患個資），不像病患資料需要遮罩保護
+- 目前跟客戶資料管理（`patients.html`）之間還沒有實際串接（例如病患的基因檢測結果連結到這張表），這需要等檢體/定序/分析/變異/解讀/品質那六層資料模型實作後才能真正串起來
+
 ## v1.18.0 — 2026-08-05（全站語系設定、中藥行地圖、客戶資料管理）
 
 ### 1. 全站語系設定（繁體中文／简体中文）

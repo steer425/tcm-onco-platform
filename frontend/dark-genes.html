@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>暗黑基因管理 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+<style>
+  .yn-cell { text-align: center; }
+  .gene-type-pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+  .type-oncogene { background:#fdecea; color:#a83232; }
+  .type-tsg { background:#e3ecf5; color:#1c4d78; }
+  .type-both { background:#f5ecdc; color:#7a5420; }
+  .type-neither, .type-insufficient { background:#f0f0f0; color:#777; }
+  .status-pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:600; }
+  .status-active { background:#e8f3ec; color:#1f4f37; }
+  .status-inactive { background:#fdecea; color:#c0392b; }
+  #importDropZone { border: 2px dashed var(--border); border-radius: 10px; padding: 24px; text-align: center; color: var(--muted); cursor: pointer; }
+  #importDropZone:hover { border-color: var(--primary); color: var(--primary); }
+</style>
+</head>
+<body data-current-page="dark-genes.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">暗黑基因管理</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <p class="hint-msg" style="margin-top:0;">
+        癌症基因參考資料（資料來源：OncoKB 癌症基因列表），對應目標三「NVIDIA BioNeMo + Google AlphaGenome 暗黑基因組分析」的基礎參考資料層。
+        正式串接 AlphaGenome 進行基因預測與提供醫療建議前，仍需要專業人員/醫師審核機制。
+      </p>
+      <div id="importDropZone">
+        <input type="file" id="importFileInput" accept=".tsv,.txt" style="display:none;" />
+        📂 點此選擇 TSV 檔案匯入（例如 OncoKB 癌症基因列表），依 Hugo Symbol 自動新增/更新，不會清空既有資料
+      </div>
+      <p id="importMsg" class="hint-msg"></p>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap;">
+        <input id="searchInput" placeholder="搜尋基因符號/別名" style="max-width:220px;" />
+        <select id="typeFilter" style="max-width:180px;">
+          <option value="">全部類型</option>
+          <option value="ONCOGENE">ONCOGENE</option>
+          <option value="TSG">TSG</option>
+          <option value="ONCOGENE_AND_TSG">ONCOGENE_AND_TSG</option>
+          <option value="NEITHER">NEITHER</option>
+          <option value="INSUFFICIENT_EVIDENCE">INSUFFICIENT_EVIDENCE</option>
+        </select>
+        <select id="statusFilter" style="max-width:140px;">
+          <option value="">全部狀態</option>
+          <option value="active">使用中</option>
+          <option value="inactive">已刪除</option>
+        </select>
+        <span class="hint-msg" id="countHint" style="margin-left:auto;"></span>
+        <button id="newBtn">＋ 新增基因</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Hugo Symbol</th><th>類型</th><th>Entrez ID</th><th>出現次數</th>
+            <th>OncoKB</th><th>MSK-IMPACT</th><th>COSMIC</th><th>狀態</th><th style="width:150px;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<div id="geneModal" class="modal-backdrop" style="display:none;">
+  <div class="modal" style="max-width:600px;">
+    <h3 id="geneModalTitle">新增基因</h3>
+    <input type="hidden" id="geneId" />
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <div><label>Hugo Symbol *</label><input id="geneSymbol" /></div>
+      <div><label>Entrez Gene ID</label><input id="geneEntrez" /></div>
+      <div><label>Gene Type</label>
+        <select id="geneType">
+          <option value="">（未分類）</option>
+          <option value="ONCOGENE">ONCOGENE</option>
+          <option value="TSG">TSG</option>
+          <option value="ONCOGENE_AND_TSG">ONCOGENE_AND_TSG</option>
+          <option value="NEITHER">NEITHER</option>
+          <option value="INSUFFICIENT_EVIDENCE">INSUFFICIENT_EVIDENCE</option>
+        </select>
+      </div>
+      <div><label>出現次數</label><input id="geneOccurrence" type="number" /></div>
+      <div><label>GRCh37 Isoform</label><input id="geneGrch37Iso" /></div>
+      <div><label>GRCh37 RefSeq</label><input id="geneGrch37Ref" /></div>
+      <div><label>GRCh38 Isoform</label><input id="geneGrch38Iso" /></div>
+      <div><label>GRCh38 RefSeq</label><input id="geneGrch38Ref" /></div>
+    </div>
+    <label>基因別名（Gene Aliases）</label>
+    <input id="geneAliases" />
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin:10px 0;">
+      <label><input type="checkbox" id="geneOncoKB"> OncoKB Annotated</label>
+      <label><input type="checkbox" id="geneMskImpact"> MSK-IMPACT</label>
+      <label><input type="checkbox" id="geneMskHeme"> MSK-HEME</label>
+      <label><input type="checkbox" id="geneF1"> FOUNDATION ONE</label>
+      <label><input type="checkbox" id="geneF1Heme"> FOUNDATION ONE HEME</label>
+      <label><input type="checkbox" id="geneVogelstein"> Vogelstein</label>
+      <label><input type="checkbox" id="geneCosmic"> COSMIC CGC</label>
+    </div>
+    <label>備注</label>
+    <textarea id="geneNotes" rows="2"></textarea>
+
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="secondary" id="geneModalCancel">關閉</button>
+      <button id="geneModalSave">儲存</button>
+    </div>
+    <div id="geneModalMsg" class="hint-msg"></div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/site-lang.js"></script>
+<script src="js/dark-genes.js"></script>
+</body>
+</html>

@@ -472,3 +472,71 @@ class EncounterOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---------- 暗黑基因（癌症基因參考資料）----------
+
+class DarkGeneCreate(BaseModel):
+    hugo_symbol: str
+    entrez_gene_id: Optional[str] = None
+    grch37_isoform: Optional[str] = None
+    grch37_refseq: Optional[str] = None
+    grch38_isoform: Optional[str] = None
+    grch38_refseq: Optional[str] = None
+    gene_type: Optional[str] = None
+    occurrence_count: Optional[int] = None
+    oncokb_annotated: bool = False
+    msk_impact: bool = False
+    msk_heme: bool = False
+    foundation_one: bool = False
+    foundation_one_heme: bool = False
+    vogelstein: bool = False
+    cosmic_cgc: bool = False
+    gene_aliases: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class DarkGeneUpdate(BaseModel):
+    entrez_gene_id: Optional[str] = None
+    grch37_isoform: Optional[str] = None
+    grch37_refseq: Optional[str] = None
+    grch38_isoform: Optional[str] = None
+    grch38_refseq: Optional[str] = None
+    gene_type: Optional[str] = None
+    occurrence_count: Optional[int] = None
+    oncokb_annotated: Optional[bool] = None
+    msk_impact: Optional[bool] = None
+    msk_heme: Optional[bool] = None
+    foundation_one: Optional[bool] = None
+    foundation_one_heme: Optional[bool] = None
+    vogelstein: Optional[bool] = None
+    cosmic_cgc: Optional[bool] = None
+    gene_aliases: Optional[str] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class DarkGeneOut(BaseModel):
+    id: str
+    hugo_symbol: str
+    entrez_gene_id: Optional[str]
+    grch37_isoform: Optional[str]
+    grch37_refseq: Optional[str]
+    grch38_isoform: Optional[str]
+    grch38_refseq: Optional[str]
+    gene_type: Optional[str]
+    occurrence_count: Optional[int]
+    oncokb_annotated: bool
+    msk_impact: bool
+    msk_heme: bool
+    foundation_one: bool
+    foundation_one_heme: bool
+    vogelstein: bool
+    cosmic_cgc: bool
+    gene_aliases: Optional[str]
+    status: str
+    notes: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

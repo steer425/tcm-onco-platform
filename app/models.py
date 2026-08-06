@@ -420,6 +420,37 @@ class Encounter(Base):
     patient = relationship("Patient", back_populates="encounters")
 
 
+class DarkGene(Base):
+    """暗黑基因（癌症相關基因參考資料）。資料來源：OncoKB 癌症基因列表（公開參考資料集）。
+    對應目標三（NVIDIA BioNeMo + Google AlphaGenome 暗黑基因組分析）的基礎參考資料層。
+    正式串接 AlphaGenome 進行基因預測前，仍需要專業人員/醫師審核機制，
+    詳見 rules.md／docs/2026_goals.md 已記錄的規劃與法規限制。
+    """
+    __tablename__ = "dark_genes"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    hugo_symbol = Column(String, unique=True, nullable=False, index=True)  # 基因符號，例如 ABL1
+    entrez_gene_id = Column(String, nullable=True)
+    grch37_isoform = Column(String, nullable=True)
+    grch37_refseq = Column(String, nullable=True)
+    grch38_isoform = Column(String, nullable=True)
+    grch38_refseq = Column(String, nullable=True)
+    gene_type = Column(String, nullable=True)  # ONCOGENE / TSG / ONCOGENE_AND_TSG / NEITHER / INSUFFICIENT_EVIDENCE
+    occurrence_count = Column(Integer, nullable=True)  # 在幾個資源清單中出現（Column K-P 統計）
+    oncokb_annotated = Column(Boolean, default=False, nullable=False)
+    msk_impact = Column(Boolean, default=False, nullable=False)
+    msk_heme = Column(Boolean, default=False, nullable=False)
+    foundation_one = Column(Boolean, default=False, nullable=False)
+    foundation_one_heme = Column(Boolean, default=False, nullable=False)
+    vogelstein = Column(Boolean, default=False, nullable=False)
+    cosmic_cgc = Column(Boolean, default=False, nullable=False)
+    gene_aliases = Column(Text, nullable=True)
+    status = Column(String, default="active", nullable=False)  # active / inactive（軟刪除）
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class LoginLog(Base):
     __tablename__ = "login_logs"
 
