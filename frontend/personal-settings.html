@@ -5,6 +5,7 @@
 <title>個人化設定 - TCM 平台</title>
 <link rel="stylesheet" href="css/style.css">
 <script src="js/theme.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
 <style>
   .theme-grid { display: flex; gap: 16px; flex-wrap: wrap; }
   .theme-option { border: 2px solid var(--border); border-radius: 10px; padding: 14px; width: 180px; cursor: pointer; text-align: center; }
@@ -30,6 +31,14 @@
     </div>
 
     <div class="card">
+      <h3 style="margin-top:0;">全站語系</h3>
+      <p class="hint-msg" style="margin-top:0;">
+        套用於<b>整個後台系統</b>（所有頁面，不只查詢站）。這是你個人的偏好設定，只影響你自己看到的畫面，切換後下次登入會自動套用。
+      </p>
+      <div class="theme-grid" id="langGrid">載入中...</div>
+    </div>
+
+    <div class="card">
       <h3 style="margin-top:0;">關聯查詢站 CSS 設定</h3>
       <p class="hint-msg" style="margin-top:0;">
         套用於「TCMSP 藥材關聯查詢站」與「TCMSP 疾病關聯查詢站」兩個頁面。這是<b>你個人的偏好設定</b>，只影響你自己看到的畫面，不會影響其他使用者；設定後會記住，下次登入直接套用。
@@ -41,6 +50,7 @@
 
 <script src="js/api.js"></script>
 <script src="js/nav.js"></script>
+<script src="js/site-lang.js"></script>
 <script src="js/personal-settings.js"></script>
 </body>
 </html>

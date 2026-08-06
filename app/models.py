@@ -368,6 +368,58 @@ class AnnouncementFile(Base):
     announcement = relationship("Announcement", back_populates="files")
 
 
+class Patient(Base):
+    """病患基本資料。欄位參照中國國家衛健委《電子病歷基本數據集》標準命名，
+    屬於敏感個資（PII），id_number 這類欄位在 API 回傳時一律遮罩，
+    需要透過專門的「顯示完整證件號碼」端點才能看到明碼，且會記錄稽核紀錄。
+    這是目標三（DNA檢測/精準醫療）與目標四（中藥複方建議）的基礎資料層，
+    正式提供醫療建議前仍需要醫師/專業人員審核機制（詳見 rules.md／docs/2026_goals.md）。
+    """
+    __tablename__ = "patients"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    patient_id = Column(String, unique=True, nullable=False)   # 病患院內唯一識別碼
+    id_type = Column(String, nullable=True)                    # 證件類型（身分證/護照/居留證...）
+    id_number = Column(String, nullable=True)                  # 證件號碼（明碼儲存，API 回傳一律遮罩）
+    name = Column(String, nullable=False)
+    sex_code = Column(String, nullable=True)                   # 性別代碼
+    birth_date = Column(String, nullable=True)                 # 出生日期（YYYY-MM-DD）
+    nationality_code = Column(String, nullable=True)
+    ethnicity_code = Column(String, nullable=True)              # 民族
+    address = Column(String, nullable=True)
+    telephone = Column(String, nullable=True)
+    medical_record_no = Column(String, nullable=True)           # 病歷號
+    status = Column(String, default="active", nullable=False)   # active / inactive（軟刪除）
+    notes = Column(Text, nullable=True)
+    created_by = Column(String, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    encounters = relationship("Encounter", back_populates="patient", cascade="all, delete-orphan")
+
+
+class Encounter(Base):
+    """就診紀錄（對應病患-就診-檢體-定序-分析-變異-解讀-品質八層資料模型中的「就診」層）。
+    其餘六層（檢體/定序/分析/變異/解讀/品質）屬於目標三 DNA 檢測範疇，規劃於後續版本擴充。
+    """
+    __tablename__ = "encounters"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    encounter_id = Column(String, unique=True, nullable=False)  # 就診識別碼
+    patient_id = Column(String, ForeignKey("patients.id"), nullable=False)
+    medical_institution = Column(String, nullable=True)          # 醫療機構
+    department = Column(String, nullable=True)                   # 科別
+    diagnosis_code = Column(String, nullable=True)                # 診斷代碼
+    diagnosis_name = Column(String, nullable=True)
+    encounter_date = Column(String, nullable=True)                # 就診日期（YYYY-MM-DD）
+    status = Column(String, default="active", nullable=False)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    patient = relationship("Patient", back_populates="encounters")
+
+
 class LoginLog(Base):
     __tablename__ = "login_logs"
 

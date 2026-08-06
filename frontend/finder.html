@@ -5,9 +5,13 @@
 <title>中藥行地理推薦 - TCM 平台</title>
 <link rel="stylesheet" href="css/style.css">
 <script src="js/theme.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
   .pharmacy-list { display: grid; gap: 14px; }
   .pharmacy-item { border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .pharmacy-item.highlighted { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(47,111,79,0.15); }
   .pharmacy-item h4 { margin: 0 0 6px; }
   .pharmacy-meta { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
   .stars { color: #d69e2e; }
@@ -16,6 +20,8 @@
   .rating-select { display: flex; gap: 6px; margin: 8px 0; }
   .rating-select button { padding: 4px 8px; background: #fff; border: 1px solid var(--border); color: #d69e2e; }
   .rating-select button.selected { background: #d69e2e; color: #fff; border-color: #d69e2e; }
+  #pharmacyMap { height: 380px; border-radius: 10px; margin-bottom: 16px; border: 1px solid var(--border); }
+  .leaflet-popup-content b { display: block; margin-bottom: 4px; }
 </style>
 </head>
 <body data-current-page="finder.html">
@@ -38,12 +44,15 @@
       <p class="hint-msg">需要瀏覽器授權「使用您的位置」才能依距離排序；若不授權，仍可瀏覽全部中藥行清單（依名稱排序）。</p>
     </div>
 
+    <div id="pharmacyMap"></div>
+
     <div class="pharmacy-list" id="pharmacyList"></div>
   </main>
 </div>
 
 <script src="js/api.js"></script>
 <script src="js/nav.js"></script>
+<script src="js/site-lang.js"></script>
 <script src="js/finder.js"></script>
 </body>
 </html>

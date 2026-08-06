@@ -90,3 +90,6 @@ function bindLogout() {
 
 requireLogin();
 renderNav();
+if (typeof loadAndApplySiteLanguage === "function") {
+  loadAndApplySiteLanguage();
+}

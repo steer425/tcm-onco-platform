@@ -55,6 +55,9 @@ FEATURE_CONFIG = [
     {"code": "F0-18", "module": "目標零", "name": "個人化設定",
      "nav_label": "個人化設定", "page_url": "personal-settings.html",
      "show_frontend": True, "show_backend": True, "sort_order": 47},
+    {"code": "F3-1", "module": "目標三/四", "name": "客戶資料管理（病患基本資料/就診紀錄）",
+     "nav_label": "客戶資料管理", "page_url": "patients.html",
+     "show_frontend": False, "show_backend": True, "sort_order": 80},
 
     # ---- 目標五：中藥行 ----
     {"code": "F5-1", "module": "目標五", "name": "中藥行資料管理（後台）",

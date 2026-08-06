@@ -1,6 +1,63 @@
 let pharmacies = [];
 let myLocation = null; // { lat, lng }
 let currentUserId = null;
+let pharmacyMap = null;
+let pharmacyMarkers = {}; // pharmacy.id -> L.Marker
+let myLocationMarker = null;
+
+function initMap() {
+  pharmacyMap = L.map('pharmacyMap').setView([25.0478, 121.5319], 12); // 預設中心：台北車站附近
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 貢獻者',
+    maxZoom: 19,
+  }).addTo(pharmacyMap);
+}
+
+function renderMapMarkers() {
+  // 清掉舊標記
+  Object.values(pharmacyMarkers).forEach(m => pharmacyMap.removeLayer(m));
+  pharmacyMarkers = {};
+
+  const bounds = [];
+  pharmacies.forEach((p) => {
+    if (p.latitude == null || p.longitude == null) return;
+    const lat = parseFloat(p.latitude), lng = parseFloat(p.longitude);
+    const marker = L.marker([lat, lng]).addTo(pharmacyMap);
+    marker.bindPopup(`
+      <b>${escapeHtmlFinder(p.name)}</b>
+      ${p.address ? escapeHtmlFinder(p.address) + '<br>' : ''}
+      ${p.avg_rating ? '★'.repeat(Math.round(p.avg_rating)) + ' ' + p.avg_rating + ' 分' : '尚無評價'}
+    `);
+    marker.on('click', () => highlightPharmacyCard(p.id));
+    pharmacyMarkers[p.id] = marker;
+    bounds.push([lat, lng]);
+  });
+
+  if (myLocation) {
+    if (myLocationMarker) pharmacyMap.removeLayer(myLocationMarker);
+    myLocationMarker = L.circleMarker([myLocation.lat, myLocation.lng], {
+      radius: 8, color: '#2563a8', fillColor: '#4a90d9', fillOpacity: 0.8,
+    }).addTo(pharmacyMap).bindPopup('您目前的位置');
+    bounds.push([myLocation.lat, myLocation.lng]);
+  }
+
+  if (bounds.length) {
+    pharmacyMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+  }
+}
+
+function highlightPharmacyCard(pharmacyId) {
+  document.querySelectorAll('.pharmacy-item').forEach(el => el.classList.remove('highlighted'));
+  const card = document.getElementById(`pharmacy-card-${pharmacyId}`);
+  if (card) {
+    card.classList.add('highlighted');
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function escapeHtmlFinder(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
 
 async function loadUserInfo() {
   try {
@@ -41,12 +98,24 @@ function render() {
     list.sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
   }
 
+  if (pharmacyMap) renderMapMarkers();
+
   const container = document.getElementById("pharmacyList");
   container.innerHTML = "";
   list.forEach((p) => {
     const myReview = (p.reviews || []).find(r => r.user_id === currentUserId);
     const div = document.createElement("div");
     div.className = "card pharmacy-item";
+    div.id = `pharmacy-card-${p.id}`;
+    div.style.cursor = "pointer";
+    div.addEventListener("click", (e) => {
+      if (e.target.closest("button, textarea, .rating-select")) return; // 不要干擾評價互動
+      const marker = pharmacyMarkers[p.id];
+      if (marker && pharmacyMap) {
+        pharmacyMap.setView(marker.getLatLng(), 16);
+        marker.openPopup();
+      }
+    });
     div.innerHTML = `
       <h4>${p.name} ${p.distance !== undefined ? `<span style="color:#6b7a70; font-size:13px; font-weight:normal;">距離約 ${p.distance.toFixed(1)} 公里</span>` : ""}</h4>
       <div class="pharmacy-meta">📍 ${p.address}　${p.phone ? "📞 " + p.phone : ""}</div>
@@ -154,4 +223,5 @@ document.getElementById("locateBtn").addEventListener("click", () => {
   );
 });
 
+initMap();
 loadUserInfo().then(loadPharmacies);

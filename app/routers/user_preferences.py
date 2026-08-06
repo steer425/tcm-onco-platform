@@ -10,6 +10,7 @@ router = APIRouter(prefix="/user-preferences", tags=["個人化設定（每位�
 # 目前支援的設定鍵值（供前台選單使用，之後有新的個人化設定項目可以繼續加）
 ALLOWED_KEYS = {
     "query_station_theme": {"label": "關聯查詢站 CSS 設定", "options": ["dark", "light"], "default": "dark"},
+    "site_language": {"label": "全站語系", "options": ["tw", "cn"], "default": "tw"},
 }
 
 

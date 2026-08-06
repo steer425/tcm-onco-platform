@@ -380,3 +380,95 @@ class AnnouncementOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---------- 病患基本資料 / 就診紀錄 ----------
+
+class PatientCreate(BaseModel):
+    patient_id: str
+    id_type: Optional[str] = None
+    id_number: Optional[str] = None
+    name: str
+    sex_code: Optional[str] = None
+    birth_date: Optional[str] = None
+    nationality_code: Optional[str] = None
+    ethnicity_code: Optional[str] = None
+    address: Optional[str] = None
+    telephone: Optional[str] = None
+    medical_record_no: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class PatientUpdate(BaseModel):
+    id_type: Optional[str] = None
+    id_number: Optional[str] = None
+    name: Optional[str] = None
+    sex_code: Optional[str] = None
+    birth_date: Optional[str] = None
+    nationality_code: Optional[str] = None
+    ethnicity_code: Optional[str] = None
+    address: Optional[str] = None
+    telephone: Optional[str] = None
+    medical_record_no: Optional[str] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class PatientOut(BaseModel):
+    id: str
+    patient_id: str
+    id_type: Optional[str]
+    id_number_masked: str = ""  # 遮罩後的證件號碼，例如 A12***678，於 router 內覆寫
+    name: str
+    sex_code: Optional[str]
+    birth_date: Optional[str]
+    nationality_code: Optional[str]
+    ethnicity_code: Optional[str]
+    address: Optional[str]
+    telephone: Optional[str]
+    medical_record_no: Optional[str]
+    status: str
+    notes: Optional[str]
+    encounter_count: int = 0
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EncounterCreate(BaseModel):
+    encounter_id: str
+    patient_id: str  # Patient.id（內部 UUID，不是 patient_id 欄位）
+    medical_institution: Optional[str] = None
+    department: Optional[str] = None
+    diagnosis_code: Optional[str] = None
+    diagnosis_name: Optional[str] = None
+    encounter_date: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class EncounterUpdate(BaseModel):
+    medical_institution: Optional[str] = None
+    department: Optional[str] = None
+    diagnosis_code: Optional[str] = None
+    diagnosis_name: Optional[str] = None
+    encounter_date: Optional[str] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class EncounterOut(BaseModel):
+    id: str
+    encounter_id: str
+    patient_id: str
+    medical_institution: Optional[str]
+    department: Optional[str]
+    diagnosis_code: Optional[str]
+    diagnosis_name: Optional[str]
+    encounter_date: Optional[str]
+    status: str
+    notes: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

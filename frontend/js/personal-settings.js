@@ -39,5 +39,39 @@ window.applyQueryStationTheme = async (themeId) => {
   }
 };
 
+const LANG_OPTIONS = [
+  { id: "tw", name: "繁體中文（預設）" },
+  { id: "cn", name: "简体中文" },
+];
+
+async function loadSiteLanguage() {
+  const grid = document.getElementById("langGrid");
+  try {
+    const data = await api("/user-preferences/site_language");
+    grid.innerHTML = LANG_OPTIONS.map((l) => {
+      const isActive = l.id === data.value;
+      return `
+        <div class="theme-option ${isActive ? "active" : ""}" onclick="applySiteLanguagePref('${l.id}')">
+          <div style="font-weight:600; font-size:14px; padding:10px 0;">${l.name}</div>
+          ${isActive ? '<div class="host-detail">目前使用中</div>' : ''}
+        </div>
+      `;
+    }).join("");
+  } catch (err) {
+    grid.innerHTML = `<p class="hint-msg">載入失敗：${err.message}</p>`;
+  }
+}
+
+window.applySiteLanguagePref = async (lang) => {
+  try {
+    await api("/user-preferences/site_language", { method: "PUT", body: JSON.stringify({ value: lang }) });
+    if (typeof applySiteLanguage === "function") await applySiteLanguage(lang);
+    await loadSiteLanguage();
+  } catch (err) {
+    alert("儲存失敗：" + err.message);
+  }
+};
+
 loadUserInfo();
+loadSiteLanguage();
 loadQueryStationTheme();
