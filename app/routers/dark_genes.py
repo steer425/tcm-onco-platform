@@ -252,3 +252,88 @@ def get_gene_tcmsp_links(gene_id: str, current_user: models.User = Depends(get_c
             for h in herbs
         ], key=lambda x: -x["matched_ingredient_count"]),
     }
+
+
+# ---------------------------------------------------------------------------
+# 藥材－暗黑基因關聯（反向查詢）：給一個藥材，找出它的成分連結到哪些 TCMSP 靶點，
+# 再拿這些靶點名稱去比對暗黑基因清單，列出「這個藥材的成分可能作用在哪些癌症基因上」。
+# 跟「暗黑基因-靶點關聯」是同一套比對演算法，只是方向相反（藥材出發，而不是基因出發）。
+# ---------------------------------------------------------------------------
+
+@router.get("/herb-links/{herb_id}", summary="查詢藥材-暗黑基因關聯：這個藥材的成分連結到哪些靶點，再比對出哪些暗黑基因")
+def get_herb_dark_gene_links(herb_id: int, current_user: models.User = Depends(get_current_user),
+                              db: Session = Depends(get_db)):
+    herb = db.query(models.TcmspHerb).filter(models.TcmspHerb.id == herb_id, models.TcmspHerb.status == "active").first()
+    if not herb:
+        raise HTTPException(status_code=404, detail="找不到藥材資料")
+
+    herb_ingredient_rows = db.query(models.TcmspHerbIngredient).filter(models.TcmspHerbIngredient.herb_id == herb_id).all()
+    mol_ids = [r.mol_id for r in herb_ingredient_rows]
+
+    ingredient_target_rows = db.query(models.TcmspIngredientTarget).filter(
+        models.TcmspIngredientTarget.mol_id.in_(mol_ids)
+    ).all() if mol_ids else []
+    tar_ids = list({r.tar_id for r in ingredient_target_rows})
+
+    ingredients = db.query(models.TcmspIngredient).filter(models.TcmspIngredient.mol_id.in_(mol_ids)).all() if mol_ids else []
+    targets = db.query(models.TcmspTarget).filter(models.TcmspTarget.tar_id.in_(tar_ids)).all() if tar_ids else []
+
+    # 建立「單詞 -> 符合的暗黑基因」索引（同一套演算法，只是索引方向相反），
+    # 避免每個靶點都重新掃一次全部 1245 個基因。
+    all_genes = db.query(models.DarkGene).filter(models.DarkGene.status == "active").all()
+    word_to_genes = {}
+    for g in all_genes:
+        for sym in _gene_symbols_for_match(g):
+            word_to_genes.setdefault(sym, []).append(g)
+
+    target_gene_matches = {}  # tar_id -> [gene, ...]
+    all_matched_genes = {}  # gene.id -> {gene info, matched_target_ids: set()}
+    for t in targets:
+        words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
+        matched = []
+        for w in words:
+            matched.extend(word_to_genes.get(w, []))
+        target_gene_matches[t.tar_id] = matched
+        for g in matched:
+            if g.id not in all_matched_genes:
+                all_matched_genes[g.id] = {
+                    "id": g.id, "hugo_symbol": g.hugo_symbol, "gene_type": g.gene_type,
+                    "entrez_gene_id": g.entrez_gene_id, "matched_target_ids": set(),
+                }
+            all_matched_genes[g.id]["matched_target_ids"].add(t.tar_id)
+
+    target_gene_edges = []
+    for tar_id, genes in target_gene_matches.items():
+        for g in genes:
+            target_gene_edges.append({"tar_id": tar_id, "gene_id": g.id})
+
+    return {
+        "herb": {
+            "herb_id": herb.id, "herb_cn_name": herb.herb_cn_name, "herb_pinyin": herb.herb_pinyin,
+            "herb_en_name": herb.herb_en_name,
+        },
+        "ingredients": [
+            {"mol_id": i.mol_id, "molecule_name": i.molecule_name, "ob": i.ob, "dl": i.dl}
+            for i in ingredients
+        ],
+        "targets": [
+            {
+                "tar_id": t.tar_id, "target_name": t.target_name, "drugbank_id": t.drugbank_id,
+                "matched_genes": [
+                    {"id": g.id, "hugo_symbol": g.hugo_symbol, "gene_type": g.gene_type}
+                    for g in target_gene_matches.get(t.tar_id, [])
+                ],
+            }
+            for t in targets
+        ],
+        "herb_ingredient": [{"herb_id": r.herb_id, "mol_id": r.mol_id} for r in herb_ingredient_rows],
+        "ingredient_target": [{"mol_id": r.mol_id, "tar_id": r.tar_id} for r in ingredient_target_rows],
+        "target_gene": target_gene_edges,
+        "matched_genes": sorted([
+            {
+                "id": v["id"], "hugo_symbol": v["hugo_symbol"], "gene_type": v["gene_type"],
+                "entrez_gene_id": v["entrez_gene_id"], "matched_target_count": len(v["matched_target_ids"]),
+            }
+            for v in all_matched_genes.values()
+        ], key=lambda x: -x["matched_target_count"]),
+    }
