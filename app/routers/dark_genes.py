@@ -68,6 +68,51 @@ def public_get_stats(current_user: models.User = Depends(get_current_user), db: 
     }
 
 
+@router.get("/public/gene-stats", summary="（前台）逐基因統計：以 Hugo Symbol 為主，列出每個基因比對到的靶點數與候選中藥數")
+def public_get_gene_stats(only_with_target: bool = True, current_user: models.User = Depends(get_current_user),
+                           db: Session = Depends(get_db)):
+    genes = db.query(models.DarkGene).filter(models.DarkGene.status == "active").all()
+    all_targets = db.query(models.TcmspTarget).all()
+
+    # 建立「單詞 -> 符合的靶點 tar_id 集合」索引，避免每個基因都重新掃一次全部 1751 個靶點
+    word_to_target_ids = {}
+    for t in all_targets:
+        words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
+        for w in words:
+            word_to_target_ids.setdefault(w, set()).add(t.tar_id)
+
+    results = []
+    for g in genes:
+        symbols = _gene_symbols_for_match(g)
+        matched_tar_ids = set()
+        for sym in symbols:
+            matched_tar_ids |= word_to_target_ids.get(sym, set())
+
+        herb_count = 0
+        if matched_tar_ids:
+            mol_ids = {
+                r.mol_id for r in db.query(models.TcmspIngredientTarget.mol_id).filter(
+                    models.TcmspIngredientTarget.tar_id.in_(matched_tar_ids)
+                ).distinct().all()
+            }
+            if mol_ids:
+                herb_count = db.query(models.TcmspHerbIngredient.herb_id).filter(
+                    models.TcmspHerbIngredient.mol_id.in_(mol_ids)
+                ).distinct().count()
+
+        if only_with_target and not matched_tar_ids:
+            continue
+
+        results.append({
+            "id": g.id, "hugo_symbol": g.hugo_symbol, "gene_type": g.gene_type,
+            "entrez_gene_id": g.entrez_gene_id, "gene_aliases": g.gene_aliases,
+            "target_count": len(matched_tar_ids), "herb_count": herb_count,
+        })
+
+    results.sort(key=lambda r: (-r["target_count"], -r["herb_count"], r["hugo_symbol"]))
+    return {"total": len(results), "genes": results}
+
+
 @router.get("/public/list", response_model=List[schemas.DarkGeneOut], summary="（前台）查詢暗黑基因清單（含是否有中藥靶點標記，供查詢站使用）")
 def public_list_genes(keyword: Optional[str] = None, gene_type: Optional[str] = None,
                        has_tcmsp_target: Optional[bool] = None,
