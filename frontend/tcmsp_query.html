@@ -354,13 +354,19 @@ async function bootstrapData(){
   }
   rebuildIndexes();
 
-  // 決定預設顯示的藥材：優先用後台設定的「預設藥材」，沒設定時才退回搜尋人參
+  // 決定預設顯示的藥材：網址參數 ?herb=xxx > 後台設定的「預設藥材」> 退回搜尋人參
   setProgress(40, '判斷預設藥材...');
   let defaultHerb = null;
-  try {
-    const cfg = await api('/system-settings/default-herb');
-    if (cfg.herb_id) defaultHerb = herbsById.get(cfg.herb_id);
-  } catch (e) { /* 拿不到設定就退回人參 */ }
+  const urlHerbId = new URLSearchParams(window.location.search).get('herb');
+  if (urlHerbId && herbsById.get(parseInt(urlHerbId, 10))) {
+    defaultHerb = herbsById.get(parseInt(urlHerbId, 10));
+  }
+  if (!defaultHerb) {
+    try {
+      const cfg = await api('/system-settings/default-herb');
+      if (cfg.herb_id) defaultHerb = herbsById.get(cfg.herb_id);
+    } catch (e) { /* 拿不到設定就退回人參 */ }
+  }
   if (!defaultHerb) {
     defaultHerb = DATA.herbs.find(h => (h.herb_en_name || '').toLowerCase().startsWith('panax ginseng'))
       || DATA.herbs.find(h => (h.herb_en_name || '').toLowerCase().includes('ginseng'));

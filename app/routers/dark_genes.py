@@ -37,6 +37,37 @@ def _gene_has_tcmsp_target(gene: models.DarkGene, target_word_set) -> bool:
     return any(s in target_word_set for s in symbols)
 
 
+@router.get("/public/stats", summary="（前台）暗黑基因統計：依 Gene Type 分組，統計有/沒有比對到 TCMSP 靶點的基因數")
+def public_get_stats(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    genes = db.query(models.DarkGene).filter(models.DarkGene.status == "active").all()
+    target_word_set = _build_target_word_index(db)
+
+    by_type = {}
+    total_with_target = 0
+    for g in genes:
+        gtype = g.gene_type or "（未分類）"
+        has_target = _gene_has_tcmsp_target(g, target_word_set)
+        if gtype not in by_type:
+            by_type[gtype] = {"gene_type": gtype, "total": 0, "with_target": 0, "without_target": 0}
+        by_type[gtype]["total"] += 1
+        if has_target:
+            by_type[gtype]["with_target"] += 1
+            total_with_target += 1
+        else:
+            by_type[gtype]["without_target"] += 1
+
+    rows = sorted(by_type.values(), key=lambda r: -r["total"])
+    for r in rows:
+        r["percent_with_target"] = round(r["with_target"] / r["total"] * 100, 1) if r["total"] else 0.0
+
+    return {
+        "total_genes": len(genes),
+        "total_with_target": total_with_target,
+        "total_without_target": len(genes) - total_with_target,
+        "by_type": rows,
+    }
+
+
 @router.get("/public/list", response_model=List[schemas.DarkGeneOut], summary="（前台）查詢暗黑基因清單（含是否有中藥靶點標記，供查詢站使用）")
 def public_list_genes(keyword: Optional[str] = None, gene_type: Optional[str] = None,
                        has_tcmsp_target: Optional[bool] = None,

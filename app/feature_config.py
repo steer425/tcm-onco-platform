@@ -67,6 +67,9 @@ FEATURE_CONFIG = [
     {"code": "F3-4", "module": "目標三/四", "name": "藥材與暗黑基因關聯（預設人參）",
      "nav_label": "藥材與暗黑基因關聯", "page_url": "ginseng_darkgene.html",
      "show_frontend": True, "show_backend": False, "sort_order": 83},
+    {"code": "F3-5", "module": "目標三/四", "name": "暗黑基因統計",
+     "nav_label": "暗黑基因統計", "page_url": "darkgene-stats.html",
+     "show_frontend": True, "show_backend": True, "sort_order": 84},
 
     # ---- 目標五：中藥行 ----
     {"code": "F5-1", "module": "目標五", "name": "中藥行資料管理（後台）",
