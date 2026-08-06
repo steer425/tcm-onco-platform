@@ -193,3 +193,35 @@ window.chooseDefaultDisease = async (disId) => {
 
 loadDefaultHerbState();
 loadDefaultDiseaseState();
+
+// ---------- 查詢站關聯網絡圖：節點數量上限預設值 ----------
+async function loadGraphLimits() {
+  try {
+    const data = await api("/system-settings/graph-limits");
+    document.getElementById("graphLimit1").value = data.graph_limit_level1;
+    document.getElementById("graphLimit2").value = data.graph_limit_level2;
+    document.getElementById("graphLimit3").value = data.graph_limit_level3;
+  } catch (err) {
+    document.getElementById("graphLimitsMsg").textContent = "載入失敗：" + err.message;
+  }
+}
+
+document.getElementById("saveGraphLimitsBtn").addEventListener("click", async () => {
+  const msg = document.getElementById("graphLimitsMsg");
+  try {
+    await api("/system-settings/graph-limits", {
+      method: "PUT",
+      body: JSON.stringify({
+        graph_limit_level1: parseInt(document.getElementById("graphLimit1").value, 10),
+        graph_limit_level2: parseInt(document.getElementById("graphLimit2").value, 10),
+        graph_limit_level3: parseInt(document.getElementById("graphLimit3").value, 10),
+      }),
+    });
+    msg.textContent = "已儲存 ✓";
+    setTimeout(() => { msg.textContent = ""; }, 1500);
+  } catch (err) {
+    msg.textContent = "儲存失敗：" + err.message;
+  }
+});
+
+loadGraphLimits();

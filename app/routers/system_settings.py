@@ -83,3 +83,40 @@ def set_default_disease(payload: dict, db: Session = Depends(get_db), admin: mod
     _set_setting_value(db, "default_disease_id", dis_id)
     write_audit_log(db, admin, "update_default_disease", "system_setting", "default_disease_id", f"設定預設疾病 dis_id={dis_id}")
     return {"message": "已更新", "dis_id": dis_id}
+
+
+# ---------------------------------------------------------------------------
+# 查詢站關聯網絡圖：每層節點顯示數量上限的「預設值」，三個查詢站（藥材/疾病/暗黑基因）共用同一組設定。
+# 使用者在畫面上還是可以自行調整下拉選單，這裡只是決定「網頁一開始載入時」預設選中哪個數字，
+# 不用像先前那樣寫死在前端程式碼裡（例如之前寫死「15」，改動還要重新部署前端）。
+# ---------------------------------------------------------------------------
+
+GRAPH_LIMIT_KEYS = {
+    "graph_limit_level1": {"label": "網絡圖第一層節點數量上限（例如：每個藥材最多顯示幾個靶點）", "default": 8},
+    "graph_limit_level2": {"label": "網絡圖第二層節點數量上限（例如：每個靶點最多顯示幾個成分/疾病）", "default": 5},
+    "graph_limit_level3": {"label": "網絡圖第三層節點數量上限（例如：每個成分最多顯示幾種藥材）", "default": 15},
+}
+
+
+@router.get("/graph-limits", summary="查詢查詢站網絡圖節點數量上限的預設值（登入即可查詢）")
+def get_graph_limits(db: Session = Depends(get_db)):
+    result = {}
+    for key, meta in GRAPH_LIMIT_KEYS.items():
+        value = _get_setting_value(db, key)
+        result[key] = int(value) if value else meta["default"]
+    return result
+
+
+@router.put("/graph-limits", summary="（後台）設定查詢站網絡圖節點數量上限的預設值")
+def set_graph_limits(payload: dict, db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
+    updated = {}
+    for key in GRAPH_LIMIT_KEYS:
+        if key in payload:
+            value = int(payload[key])
+            if value < 1 or value > 9999:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=400, detail=f"{key} 必須介於 1~9999 之間")
+            _set_setting_value(db, key, value)
+            updated[key] = value
+    write_audit_log(db, admin, "update_graph_limits", "system_setting", "graph_limits", f"設定網絡圖節點數量上限預設值：{updated}")
+    return {"message": "已更新", **updated}

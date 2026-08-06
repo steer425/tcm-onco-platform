@@ -62,7 +62,22 @@ Dashboard 頁面的四張卡片（主機資訊／版本資訊／專案文件／2
 | 4 | 網絡關聯圖全螢幕放大 | 「⛶ 放大檢視關聯圖」按鈕，開啟全螢幕 Modal，可點節點看詳情 | `#networkModal` / `#networkModalCanvas` / `#networkNodeDetail`，`renderNetwork(containerId, isModal)` 要能同時畫背景小圖跟全螢幕大圖 |
 | 5 | 選取項目變更時同步更新全螢幕畫布 | 如果全螢幕正開著，切換挑選器/顯示層級/選取項目時，全螢幕那張圖也要跟著更新，不能只更新看不到的背景小圖 | 用 `modalOpen` 旗標追蹤全螢幕開關狀態，重繪時判斷是否要同步呼叫 `renderNetwork("networkModalCanvas", true)` |
 | 6 | JSON/CSV 下載 | 下載目前選取項目的關聯資料 | `#downloadJsonBtn` / `#downloadCsvBtn` |
-| 7 | 空白狀態提示 | 尚未選擇項目時顯示的提示文字 | `#emptyState`，**必須是跟 `#xxxHeader`／`#bodyWrap` 平行的兄弟元素**，見下一節的重要規範 |
+| 7 | 網絡圖每層節點數量可調整 | 下拉選單調整每層最多顯示幾個節點，**預設選中的數字要讀取後台可設定的參數**，不能寫死在前端程式碼裡（改動還要重新部署才生效） | `#maxTargetsSel` / `#maxIngSel` / `#maxHerbSel`，`buildGraphData()` 讀選單的值；預設值透過 `GET /system-settings/graph-limits` 取得（管理者在「系統設定」頁面用數字輸入框設定，不是寫死的下拉選項），`ensureOptionAndSelect()` 負責把管理者設定的值動態加進選單並選中 |
+| 8 | 顯示層級勾選（全螢幕內也要有） | 可以勾選/取消每一層要不要顯示（例如 Related Targets／Related Ingredients／Related Herbs），逐層關係，關掉上層自動關閉並鎖定下層；**主畫面跟全螢幕 Modal 都要有各自一份勾選框，但共用同一份狀態** | `#layerXxx` / `#modalLayerXxx` 一組 checkbox，`layerVisibility` 物件記錄狀態，`onLayerChange()` 處理連動鎖定，改變後要重算 `currentRelated`（依層級篩選過的資料）並重繪表格＋兩份網絡圖 |
+| 9 | 欄寬可拖曳調整 | 表格每一欄右側邊界可以拖曳調整寬度，切換分頁籤時要記住各分頁籤自己的欄寬 | `.col-resizer`（每個 `<th>` 內插入的拖曳把手），`colWidths = { tabName: [w0, w1, ...] }`，`makeColumnsResizable()` 在每次 `renderTable()` 結尾呼叫 |
+| 10 | 上下邊界（關聯圖／表格高度比例）可拖曳調整 | 網絡圖跟下方表格中間有一條可以上下拖曳的把手，調整兩者的高度比例 | `#netResizeHandle`，`initNetworkResize()` 只需要呼叫一次（頁面初始化時），用 `mousedown`/`mousemove`/`mouseup` 控制 `#network` 的 `style.height` |
+| 11 | 版面配置命名儲存/套用/刪除 | 把目前的欄寬設定＋關聯圖高度存成一個有名字的版面，之後可以下拉選單套用或刪除 | `LAYOUT_STORAGE_KEY`（**每個查詢站要用不同的 key**，例如 `disease_query_layout_presets_v1`，避免三站互相覆蓋），存在 `localStorage`，`#layoutPresetSelect` / `#applyLayoutBtn` / `#layoutNameInput` / `#saveLayoutBtn` / `#deleteLayoutBtn` |
+| 12 | 空白狀態提示 | 尚未選擇項目時顯示的提示文字 | `#emptyState`，**必須是跟 `#xxxHeader`／`#bodyWrap` 平行的兄弟元素**，見下一節的重要規範 |
+
+### 後台可設定的查詢站參數
+
+「系統設定」頁面的「查詢站關聯網絡圖：節點數量上限預設值」卡片，用**數字輸入框**（不是預先寫死的下拉選項）設定三個查詢站共用的網絡圖節點數量上限預設值：
+
+- `graph_limit_level1`：第一層（例如每個藥材/疾病/基因最多顯示幾個靶點）
+- `graph_limit_level2`：第二層（例如每個靶點最多顯示幾個成分）
+- `graph_limit_level3`：第三層（例如每個成分最多顯示幾種藥材）
+
+對應 API：`GET/PUT /system-settings/graph-limits`（沿用 `SystemSetting` 通用 key-value 機制，PUT 僅限管理者，數值需介於 1~9999）。**這幾個數字不應該再寫死在任何前端程式碼裡**——之前寫死「3」導致 BRCA1 的 12 種藥材被裁到只剩 3 個顯示，這是真實發生過的 bug（v1.21.1），所以才改成這樣可設定的架構。
 
 ## 五之一、查詢站類頁面（左側清單／右側詳情）的結構規範
 

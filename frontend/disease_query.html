@@ -110,6 +110,9 @@ tr:hover td{background:#171a20;}
 #networkModalCanvas{flex:1;min-height:0;}
 #networkNodeDetail{display:none;width:300px;flex-shrink:0;border-left:1px solid var(--line);overflow:auto;padding:14px;background:#12151b;color:#eee;}
 #networkNodeDetail table td{border-bottom:1px solid #23262c;}
+.col-resizer{position:absolute;right:0;top:0;bottom:0;width:6px;cursor:col-resize;user-select:none;}
+.col-resizer:hover{background:rgba(125,184,232,.4);}
+#netResizeHandle{height:7px;cursor:row-resize;background:#1c1f26;border-bottom:1px solid var(--line);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#555;font-size:10px;letter-spacing:2px;}
 </style>
 </head>
 <body>
@@ -186,10 +189,18 @@ tr:hover td{background:#171a20;}
         <div id="pickerCol"></div>
         <div id="contentCol">
           <div id="network"><div class="placeholder">選擇疾病後顯示關聯網絡圖</div></div>
+          <div id="netResizeHandle" title="拖曳調整關聯圖／表格的高度比例">⋯</div>
           <div class="tabs">
             <button class="active" data-tab="targets">Related Targets</button>
             <button data-tab="ingredients">Related Ingredients</button>
             <button data-tab="herbs">Related Herbs</button>
+            <span style="flex:1"></span>
+            <span class="small">版面：</span>
+            <select id="layoutPresetSelect" style="font-size:11px;"></select>
+            <button id="applyLayoutBtn">套用</button>
+            <input id="layoutNameInput" placeholder="版面名稱" style="width:100px;font-size:11px;background:#1c1f26;color:#eee;border:1px solid #3a3d44;border-radius:6px;padding:4px 6px;">
+            <button id="saveLayoutBtn">儲存目前版面</button>
+            <button id="deleteLayoutBtn">刪除</button>
           </div>
           <div id="tableWrap"></div>
         </div>
@@ -249,6 +260,26 @@ function zhConv(text){
   if(!text) return text;
   try { return uiLang === 'tw' ? (convToTw ? convToTw(text) : text) : (convToCn ? convToCn(text) : text); }
   catch(e) { return text; }
+}
+
+// ---------- 網絡圖節點數量上限：讀取後台設定的預設值 ----------
+function ensureOptionAndSelect(selectEl, value){
+  if (!selectEl || value == null) return;
+  const strVal = String(value);
+  if (![...selectEl.options].some(o => o.value === strVal)) {
+    const opt = document.createElement('option');
+    opt.value = strVal; opt.textContent = strVal + '（管理者設定）';
+    selectEl.insertBefore(opt, selectEl.firstChild);
+  }
+  selectEl.value = strVal;
+}
+async function applyGraphLimitDefaults(){
+  try {
+    const limits = await api('/system-settings/graph-limits');
+    ensureOptionAndSelect(document.getElementById('maxTargetsSel'), limits.graph_limit_level1);
+    ensureOptionAndSelect(document.getElementById('maxIngSel'), limits.graph_limit_level2);
+    ensureOptionAndSelect(document.getElementById('maxHerbSel'), limits.graph_limit_level3);
+  } catch(e) { /* 拿不到就沿用畫面上寫好的預設選項 */ }
 }
 
 function rebuildIndexes(){
@@ -566,6 +597,7 @@ function renderTable() {
       ${currentRelated.herbs.map(h => `<tr><td>${h.herb_id}</td><td>${escapeHtml(zhConv(h.herb_cn_name))}</td><td>${escapeHtml(h.herb_pinyin)}</td><td>${escapeHtml(h.herb_en_name)}</td><td>${escapeHtml(zhConv(h.child_cn_name)) || '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="5" class="small">無資料（可能已被顯示層級或挑選器篩掉）</td></tr>'}
     </tbody></table>`;
   }
+  makeColumnsResizable();
 }
 
 // ---------- Network graph ----------
@@ -791,6 +823,112 @@ document.getElementById('loadAllBtn').addEventListener('click', async () => {
   }
 });
 
+// ---------- 網絡圖／表格高度可拖曳調整 ----------
+let networkHeight = 340;
+function initNetworkResize(){
+  const handle = document.getElementById('netResizeHandle');
+  const netEl = document.getElementById('network');
+  if(!handle || !netEl) return;
+  netEl.style.height = networkHeight + 'px';
+  let dragging = false, startY = 0, startH = 0;
+  handle.onmousedown = (e) => {
+    dragging = true; startY = e.clientY; startH = netEl.getBoundingClientRect().height;
+    document.body.style.userSelect = 'none';
+  };
+  window.addEventListener('mousemove', (e) => {
+    if(!dragging) return;
+    let h = startH + (e.clientY - startY);
+    h = Math.max(120, Math.min(h, window.innerHeight - 220));
+    netEl.style.height = h + 'px';
+    networkHeight = h;
+    if(mainNetwork){ mainNetwork.redraw(); }
+  });
+  window.addEventListener('mouseup', () => { if(dragging){ dragging = false; document.body.style.userSelect = ''; } });
+}
+
+// ---------- 表格欄寬可拖曳調整 ----------
+let colWidths = {}; // { tabName: [w0, w1, ...] }
+function makeColumnsResizable(){
+  const table = document.querySelector('#tableWrap table');
+  if(!table) return;
+  const ths = table.querySelectorAll('thead th');
+  const saved = colWidths[activeTab];
+  ths.forEach((th, idx) => {
+    th.style.position = 'relative';
+    if(saved && saved[idx]) th.style.width = saved[idx] + 'px';
+    const grip = document.createElement('span');
+    grip.className = 'col-resizer';
+    th.appendChild(grip);
+    grip.onmousedown = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const startX = e.clientX, startW = th.getBoundingClientRect().width;
+      function onMove(ev){
+        const w = Math.max(40, Math.round(startW + (ev.clientX - startX)));
+        th.style.width = w + 'px';
+        colWidths[activeTab] = colWidths[activeTab] || [];
+        colWidths[activeTab][idx] = w;
+      }
+      function onUp(){ window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); }
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    };
+  });
+}
+
+// ---------- 命名版面配置（高度＋欄寬），存在 localStorage ----------
+const LAYOUT_STORAGE_KEY = 'disease_query_layout_presets_v1';
+function loadLayoutPresets(){ try{ return JSON.parse(localStorage.getItem(LAYOUT_STORAGE_KEY) || '{}'); }catch(e){ return {}; } }
+function saveLayoutPresets(p){ localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(p)); }
+function refreshLayoutPresetOptions(){
+  const sel = document.getElementById('layoutPresetSelect');
+  if(!sel) return;
+  const presets = loadLayoutPresets();
+  const names = Object.keys(presets);
+  sel.innerHTML = '<option value="">-- 選擇已儲存版面 --</option>' + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+}
+function saveCurrentLayout(name){
+  if(!name){ alert('請先輸入版面名稱'); return; }
+  const presets = loadLayoutPresets();
+  presets[name] = presets[name] || {};
+  presets[name].networkHeight = networkHeight;
+  presets[name].cols = colWidths;
+  saveLayoutPresets(presets);
+  refreshLayoutPresetOptions();
+  document.getElementById('layoutPresetSelect').value = name;
+}
+function applyLayoutPreset(name){
+  if(!name) return;
+  const presets = loadLayoutPresets();
+  const p = presets[name];
+  if(!p) return;
+  if(p.networkHeight){
+    networkHeight = p.networkHeight;
+    const netEl = document.getElementById('network');
+    if(netEl){ netEl.style.height = networkHeight + 'px'; if(mainNetwork) mainNetwork.redraw(); }
+  }
+  if(p.cols){
+    colWidths = JSON.parse(JSON.stringify(p.cols));
+    makeColumnsResizable();
+  }
+}
+function deleteLayoutPreset(name){
+  if(!name) return;
+  const presets = loadLayoutPresets();
+  delete presets[name];
+  saveLayoutPresets(presets);
+  refreshLayoutPresetOptions();
+}
+
+document.getElementById('applyLayoutBtn').addEventListener('click', () => applyLayoutPreset(document.getElementById('layoutPresetSelect').value));
+document.getElementById('saveLayoutBtn').addEventListener('click', () => saveCurrentLayout(document.getElementById('layoutNameInput').value.trim()));
+document.getElementById('deleteLayoutBtn').addEventListener('click', () => {
+  const name = document.getElementById('layoutPresetSelect').value;
+  if(name && confirm(`確定刪除版面「${name}」？`)) deleteLayoutPreset(name);
+});
+refreshLayoutPresetOptions();
+initNetworkResize();
+
+applyGraphLimitDefaults();
 bootstrapData();
 </script>
 </body>

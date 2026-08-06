@@ -48,6 +48,23 @@
     </div>
 
     <div class="card">
+      <h3 style="margin-top:0;">查詢站關聯網絡圖：節點數量上限預設值</h3>
+      <p class="hint-msg" style="margin-top:0;">
+        套用於藥材/疾病/暗黑基因三個查詢站的關聯網絡圖，決定頁面一開始載入時下拉選單預設選中的數字（使用者仍可以自行在畫面上調整）。
+      </p>
+      <label>第一層（例如：每個藥材/疾病/基因最多顯示幾個靶點）</label>
+      <input id="graphLimit1" type="number" min="1" max="9999" style="max-width:140px;" />
+      <label>第二層（例如：每個靶點最多顯示幾個成分）</label>
+      <input id="graphLimit2" type="number" min="1" max="9999" style="max-width:140px;" />
+      <label>第三層（例如：每個成分最多顯示幾種藥材）</label>
+      <input id="graphLimit3" type="number" min="1" max="9999" style="max-width:140px;" />
+      <div style="margin-top:10px;">
+        <button id="saveGraphLimitsBtn">儲存</button>
+        <span id="graphLimitsMsg" class="hint-msg"></span>
+      </div>
+    </div>
+
+    <div class="card">
       <h3 style="margin-top:0;">查詢站預設項目</h3>
       <p class="hint-msg" style="margin-top:0;">
         TCMSP 藥材／疾病關聯查詢站首次載入時，只會顯示這裡設定的項目（其餘項目使用者可以自行搜尋，或按「載入全部」看全部資料），藉此加快首次載入速度。

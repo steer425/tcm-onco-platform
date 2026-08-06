@@ -102,6 +102,8 @@ body[data-page-theme="light"] .na{color:#9aa5a0;}
 body[data-page-theme="light"] .disclaimer{background:#fdf3e0;border-color:#e8d5a8;color:#7a5a20;}
 body[data-page-theme="light"] #networkModal{background:#fff;}
 body[data-page-theme="light"] #networkModalBar{border-color:#dfe5e0;background:#f7f9f7;}
+body[data-page-theme="light"] #layerBar,
+body[data-page-theme="light"] #networkModalLayerBar{border-color:#dfe5e0;background:#fafcfa;}
 body[data-page-theme="light"] #networkModalBar b{color:#24312a;}
 body[data-page-theme="light"] #networkNodeDetail{border-color:#dfe5e0;background:#fafcfa;color:#24312a;}
 #networkModal{display:none;position:fixed;inset:0;z-index:9999;flex-direction:column;background:#0b0d11;}
@@ -111,6 +113,9 @@ body[data-page-theme="light"] #networkNodeDetail{border-color:#dfe5e0;background
 #networkModalCanvas{flex:1;min-height:0;}
 #networkNodeDetail{display:none;width:300px;flex-shrink:0;border-left:1px solid var(--line);overflow:auto;padding:14px;background:#12151b;color:#eee;}
 #networkNodeDetail table td{border-bottom:1px solid #23262c;}
+.col-resizer{position:absolute;right:0;top:0;bottom:0;width:6px;cursor:col-resize;user-select:none;}
+.col-resizer:hover{background:rgba(125,184,232,.4);}
+#netResizeHandle{height:7px;cursor:row-resize;background:#1c1f26;border-bottom:1px solid var(--line);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#555;font-size:10px;letter-spacing:2px;}
 </style>
 </head>
 <body>
@@ -160,14 +165,33 @@ body[data-page-theme="light"] #networkNodeDetail{border-color:#dfe5e0;background
         <a class="oncokb-link" id="oncokbLink" href="#" target="_blank">↗ 在 OncoKB 查看完整基因說明</a>
         <button id="fsNet">⛶ 放大檢視關聯圖</button>
         <span style="flex:1"></span>
+        <span class="small">網絡圖每層最多顯示：</span>
+        <select id="maxTargetsSel"><option value="5">5個靶點</option><option value="8" selected>8個靶點</option><option value="15">15個靶點</option><option value="9999">全部</option></select>
+        <select id="maxIngSel"><option value="3">3個成分</option><option value="5" selected>5個成分</option><option value="10">10個成分</option><option value="9999">全部</option></select>
+        <select id="maxHerbSel"><option value="3">3個藥材</option><option value="6">6個藥材</option><option value="15" selected>15個藥材</option><option value="9999">全部</option></select>
         <button id="downloadJsonBtn">⬇ JSON</button>
         <button id="downloadCsvBtn">⬇ CSV</button>
       </div>
+      <div id="layerBar" style="display:flex; gap:10px; align-items:center; padding:6px 20px; border-bottom:1px solid var(--line); flex-wrap:wrap; background:#12151b;">
+        <span class="small">顯示層級：</span>
+        <label class="small"><input type="checkbox" id="layerTargets" checked> Related Targets</label>
+        <label class="small"><input type="checkbox" id="layerIngredients" checked> Related Ingredients</label>
+        <label class="small"><input type="checkbox" id="layerHerbs" checked> Related Herbs</label>
+        <span class="small">規則：Gene → Targets → Ingredients → Herbs 是逐層關係，關掉上層會自動一併關閉並鎖定下層</span>
+      </div>
       <div id="network"><div class="placeholder">選擇基因後顯示關聯網絡圖</div></div>
+      <div id="netResizeHandle" title="拖曳調整關聯圖／表格的高度比例">⋯</div>
       <div class="tabs">
         <button class="active" data-tab="targets">Related Targets</button>
         <button data-tab="ingredients">Related Ingredients</button>
         <button data-tab="herbs">Related Herbs</button>
+        <span style="flex:1"></span>
+        <span class="small">版面：</span>
+        <select id="layoutPresetSelect" style="font-size:11px;"></select>
+        <button id="applyLayoutBtn">套用</button>
+        <input id="layoutNameInput" placeholder="版面名稱" style="width:100px;font-size:11px;background:#1c1f26;color:#eee;border:1px solid #3a3d44;border-radius:6px;padding:4px 6px;">
+        <button id="saveLayoutBtn">儲存目前版面</button>
+        <button id="deleteLayoutBtn">刪除</button>
       </div>
       <div id="tableWrap"></div>
     </div>
@@ -178,6 +202,12 @@ body[data-page-theme="light"] #networkNodeDetail{border-color:#dfe5e0;background
   <div id="networkModalBar">
     <b id="networkModalTitle"></b>
     <button id="networkModalClose">✕ 關閉</button>
+  </div>
+  <div id="networkModalLayerBar" style="display:flex; gap:10px; align-items:center; padding:6px 16px; border-bottom:1px solid var(--line); flex-shrink:0; flex-wrap:wrap; background:#10131a;">
+    <span class="small">顯示層級：</span>
+    <label class="small"><input type="checkbox" id="modalLayerTargets" checked> Related Targets</label>
+    <label class="small"><input type="checkbox" id="modalLayerIngredients" checked> Related Ingredients</label>
+    <label class="small"><input type="checkbox" id="modalLayerHerbs" checked> Related Herbs</label>
   </div>
   <div id="networkModalMain">
     <div id="networkModalCanvas"></div>
@@ -201,9 +231,59 @@ function zhConv(text){
   catch(e){ return text; }
 }
 
+// ---------- 網絡圖節點數量上限：讀取後台設定的預設值 ----------
+function ensureOptionAndSelect(selectEl, value){
+  if (!selectEl || value == null) return;
+  const strVal = String(value);
+  if (![...selectEl.options].some(o => o.value === strVal)) {
+    const opt = document.createElement('option');
+    opt.value = strVal; opt.textContent = strVal + '（管理者設定）';
+    selectEl.insertBefore(opt, selectEl.firstChild);
+  }
+  selectEl.value = strVal;
+}
+async function applyGraphLimitDefaults(){
+  try {
+    const limits = await api('/system-settings/graph-limits');
+    ensureOptionAndSelect(document.getElementById('maxTargetsSel'), limits.graph_limit_level1);
+    ensureOptionAndSelect(document.getElementById('maxIngSel'), limits.graph_limit_level2);
+    ensureOptionAndSelect(document.getElementById('maxHerbSel'), limits.graph_limit_level3);
+  } catch(e) { /* 拿不到就沿用畫面上寫好的預設選項 */ }
+}
+
 let allGenes = [];
 let currentGene = null;
 let currentDetail = null;
+let layerVisibility = { targets: true, ingredients: true, herbs: true };
+
+function syncLayerCheckboxes(targetsCb, ingCb, herbCb){
+  targetsCb.checked = layerVisibility.targets;
+  ingCb.checked = layerVisibility.ingredients;
+  ingCb.disabled = !layerVisibility.targets;
+  herbCb.checked = layerVisibility.herbs;
+  herbCb.disabled = !layerVisibility.ingredients || !layerVisibility.targets;
+}
+function onLayerChange(key, value){
+  if (key === 'targets') layerVisibility.targets = value;
+  if (key === 'ingredients') layerVisibility.ingredients = value;
+  if (key === 'herbs') layerVisibility.herbs = value;
+  if (!layerVisibility.targets) { layerVisibility.ingredients = false; layerVisibility.herbs = false; }
+  else if (!layerVisibility.ingredients) { layerVisibility.herbs = false; }
+  syncLayerCheckboxes(document.getElementById('layerTargets'), document.getElementById('layerIngredients'), document.getElementById('layerHerbs'));
+  syncLayerCheckboxes(document.getElementById('modalLayerTargets'), document.getElementById('modalLayerIngredients'), document.getElementById('modalLayerHerbs'));
+  recomputeRelated();
+  renderTable();
+  renderNetwork('network', false);
+  if (modalOpen) renderNetwork('networkModalCanvas', true);
+}
+['layerTargets','layerIngredients','layerHerbs'].forEach((id, idx) => {
+  const key = ['targets','ingredients','herbs'][idx];
+  document.getElementById(id).addEventListener('change', (e) => onLayerChange(key, e.target.checked));
+});
+['modalLayerTargets','modalLayerIngredients','modalLayerHerbs'].forEach((id, idx) => {
+  const key = ['targets','ingredients','herbs'][idx];
+  document.getElementById(id).addEventListener('change', (e) => onLayerChange(key, e.target.checked));
+});
 let activeTab = "targets";
 let network = null;
 let modalNetwork = null;
@@ -288,13 +368,27 @@ async function selectGene(geneId){
   }
   if (currentGene.id !== geneId) return;
 
-  document.getElementById("kpiTargets").textContent = currentDetail.matched_targets.length;
-  document.getElementById("kpiIngredients").textContent = currentDetail.ingredients.length;
-  document.getElementById("kpiHerbs").textContent = currentDetail.herbs.length;
+  layerVisibility = { targets: true, ingredients: true, herbs: true };
+  syncLayerCheckboxes(document.getElementById('layerTargets'), document.getElementById('layerIngredients'), document.getElementById('layerHerbs'));
+  syncLayerCheckboxes(document.getElementById('modalLayerTargets'), document.getElementById('modalLayerIngredients'), document.getElementById('modalLayerHerbs'));
 
+  recomputeRelated();
   renderTable();
   renderNetwork("network", false);
   if (modalOpen) renderNetwork("networkModalCanvas", true);
+}
+
+let currentRelated = { targets: [], ingredients: [], herbs: [] };
+function recomputeRelated(){
+  if (!currentDetail) { currentRelated = { targets: [], ingredients: [], herbs: [] }; return; }
+  currentRelated = {
+    targets: layerVisibility.targets ? currentDetail.matched_targets : [],
+    ingredients: layerVisibility.ingredients ? currentDetail.ingredients : [],
+    herbs: layerVisibility.herbs ? currentDetail.herbs : [],
+  };
+  document.getElementById("kpiTargets").textContent = currentRelated.targets.length;
+  document.getElementById("kpiIngredients").textContent = currentRelated.ingredients.length;
+  document.getElementById("kpiHerbs").textContent = currentRelated.herbs.length;
 }
 
 document.querySelectorAll(".tabs button").forEach(btn => {
@@ -311,27 +405,33 @@ function renderTable(){
   if (!currentDetail) { wrap.innerHTML = ""; return; }
   if (activeTab === "targets") {
     wrap.innerHTML = `<table><thead><tr><th>Tar ID</th><th>Target Name</th><th>DrugBank ID</th></tr></thead><tbody>
-      ${currentDetail.matched_targets.map(t => `<tr><td>${t.tar_id}</td><td>${escapeHtml(t.target_name)}</td><td>${t.drugbank_id || '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="3" class="small">此基因目前沒有比對到任何 TCMSP 靶點</td></tr>'}
+      ${currentRelated.targets.map(t => `<tr><td>${t.tar_id}</td><td>${escapeHtml(t.target_name)}</td><td>${t.drugbank_id || '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="3" class="small">此基因目前沒有比對到任何 TCMSP 靶點，或已被顯示層級篩掉</td></tr>'}
     </tbody></table>`;
   } else if (activeTab === "ingredients") {
     wrap.innerHTML = `<table><thead><tr><th>Mol ID</th><th>Molecule Name</th><th>OB%</th><th>DL</th></tr></thead><tbody>
-      ${currentDetail.ingredients.map(i => `<tr><td>${i.mol_id}</td><td>${escapeHtml(i.molecule_name)}</td><td>${i.ob ?? '<span class="na">-</span>'}</td><td>${i.dl ?? '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="4" class="small">無資料</td></tr>'}
+      ${currentRelated.ingredients.map(i => `<tr><td>${i.mol_id}</td><td>${escapeHtml(i.molecule_name)}</td><td>${i.ob ?? '<span class="na">-</span>'}</td><td>${i.dl ?? '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="4" class="small">無資料（可能已被顯示層級篩掉）</td></tr>'}
     </tbody></table>`;
   } else {
     wrap.innerHTML = `<table><thead><tr><th>Herb ID</th><th>中文名稱</th><th>拼音</th><th>English Name</th><th>關聯成分數</th></tr></thead><tbody>
-      ${currentDetail.herbs.map(h => `<tr><td>${h.herb_id}</td><td>${escapeHtml(zhConv(h.herb_cn_name))}</td><td>${escapeHtml(h.herb_pinyin)}</td><td>${escapeHtml(h.herb_en_name)}</td><td>${h.matched_ingredient_count}</td></tr>`).join("") || '<tr><td colspan="5" class="small">無資料</td></tr>'}
+      ${currentRelated.herbs.map(h => `<tr><td>${h.herb_id}</td><td>${escapeHtml(zhConv(h.herb_cn_name))}</td><td>${escapeHtml(h.herb_pinyin)}</td><td>${escapeHtml(h.herb_en_name)}</td><td>${h.matched_ingredient_count}</td></tr>`).join("") || '<tr><td colspan="5" class="small">無資料（可能已被顯示層級篩掉）</td></tr>'}
     </tbody></table>`;
   }
+  makeColumnsResizable();
 }
 
 function buildGraphData(){
   const nodes = [];
   const edges = [];
+  const MAX_TARGETS = parseInt(document.getElementById("maxTargetsSel").value, 10);
+  const MAX_ING_PER_TARGET = parseInt(document.getElementById("maxIngSel").value, 10);
+  const MAX_HERB_PER_ING = parseInt(document.getElementById("maxHerbSel").value, 10);
   const geneNodeId = "gene-" + currentGene.id;
   nodes.push({ id: geneNodeId, label: currentGene.hugo_symbol, color: "#8b5fbf", shape: "dot", size: 22, font: { color: "#fff" } });
 
-  const ingredientsById = new Map(currentDetail.ingredients.map(i => [i.mol_id, i]));
-  const herbsById = new Map(currentDetail.herbs.map(h => [h.herb_id, h]));
+  if (!layerVisibility.targets) return { nodes, edges };
+
+  const ingredientsById = new Map(currentRelated.ingredients.map(i => [i.mol_id, i]));
+  const herbsById = new Map(currentRelated.herbs.map(h => [h.herb_id, h]));
   const molsByTarget = new Map();
   currentDetail.ingredient_target.forEach(r => {
     if (!molsByTarget.has(r.tar_id)) molsByTarget.set(r.tar_id, []);
@@ -344,14 +444,14 @@ function buildGraphData(){
   });
 
   const shownMol = new Set(), shownHerb = new Set();
-  currentDetail.matched_targets.slice(0, 8).forEach(t => {
+  currentRelated.targets.slice(0, MAX_TARGETS).forEach(t => {
     const tid = "tgt-" + t.tar_id;
     nodes.push({ id: tid, label: t.target_name, color: "#3a9d63", shape: "dot", size: 14 });
     edges.push({ from: geneNodeId, to: tid });
 
-    (molsByTarget.get(t.tar_id) || []).slice(0, 5).forEach(molId => {
+    if (!layerVisibility.ingredients) return;
+    (molsByTarget.get(t.tar_id) || []).filter(molId => ingredientsById.has(molId)).slice(0, MAX_ING_PER_TARGET).forEach(molId => {
       const ing = ingredientsById.get(molId);
-      if (!ing) return;
       const iid = "mol-" + molId;
       if (!shownMol.has(molId)) {
         nodes.push({ id: iid, label: ing.molecule_name, color: "#3b82c4", shape: "dot", size: 10 });
@@ -359,9 +459,9 @@ function buildGraphData(){
       }
       edges.push({ from: tid, to: iid });
 
-      (herbsByMol.get(molId) || []).slice(0, 3).forEach(herbId => {
+      if (!layerVisibility.herbs) return;
+      (herbsByMol.get(molId) || []).filter(herbId => herbsById.has(herbId)).slice(0, MAX_HERB_PER_ING).forEach(herbId => {
         const herb = herbsById.get(herbId);
-        if (!herb) return;
         const hid = "herb-" + herbId;
         if (!shownHerb.has(herbId)) {
           nodes.push({ id: hid, label: zhConv(herb.herb_cn_name) || herb.herb_en_name, color: "#c99a3d", shape: "dot", size: 8 });
@@ -381,6 +481,10 @@ function renderNetwork(containerId, isModal){
   const container = document.getElementById(containerId || "network");
   if (!currentDetail || !currentDetail.matched_targets.length) {
     container.innerHTML = '<div class="placeholder">此基因目前沒有比對到任何 TCMSP 靶點，無法顯示關聯網絡圖</div>';
+    return;
+  }
+  if (!layerVisibility.targets) {
+    container.innerHTML = '<div class="placeholder">「Related Targets」層級目前被關閉，請至少勾選這一層才能顯示網絡圖</div>';
     return;
   }
   const { nodes, edges } = buildGraphData();
@@ -417,6 +521,13 @@ function showNodeDetail(nodeId, nodesDataSet){
   panel.innerHTML = `<h3 style="margin-top:0;">節點詳情</h3><table>${rows.map(([k,v]) => `<tr><td class="small" style="padding:4px 8px 4px 0;">${k}</td><td>${escapeHtml(v)}</td></tr>`).join("")}</table>`;
   panel.style.display = "block";
 }
+
+[document.getElementById("maxTargetsSel"), document.getElementById("maxIngSel"), document.getElementById("maxHerbSel")].forEach(sel => {
+  sel.addEventListener("change", () => {
+    renderNetwork("network", false);
+    if (modalOpen) renderNetwork("networkModalCanvas", true);
+  });
+});
 
 document.getElementById("fsNet").addEventListener("click", () => {
   if (!currentGene) return;
@@ -486,6 +597,112 @@ document.getElementById('themeToggleLink').addEventListener('click', async (e) =
 });
 loadQueryStationTheme();
 
+// ---------- 網絡圖／表格高度可拖曳調整 ----------
+let networkHeight = 340;
+function initNetworkResize(){
+  const handle = document.getElementById('netResizeHandle');
+  const netEl = document.getElementById('network');
+  if(!handle || !netEl) return;
+  netEl.style.height = networkHeight + 'px';
+  let dragging = false, startY = 0, startH = 0;
+  handle.onmousedown = (e) => {
+    dragging = true; startY = e.clientY; startH = netEl.getBoundingClientRect().height;
+    document.body.style.userSelect = 'none';
+  };
+  window.addEventListener('mousemove', (e) => {
+    if(!dragging) return;
+    let h = startH + (e.clientY - startY);
+    h = Math.max(120, Math.min(h, window.innerHeight - 220));
+    netEl.style.height = h + 'px';
+    networkHeight = h;
+    if(network){ network.redraw(); }
+  });
+  window.addEventListener('mouseup', () => { if(dragging){ dragging = false; document.body.style.userSelect = ''; } });
+}
+
+// ---------- 表格欄寬可拖曳調整 ----------
+let colWidths = {};
+function makeColumnsResizable(){
+  const table = document.querySelector('#tableWrap table');
+  if(!table) return;
+  const ths = table.querySelectorAll('thead th');
+  const saved = colWidths[activeTab];
+  ths.forEach((th, idx) => {
+    th.style.position = 'relative';
+    if(saved && saved[idx]) th.style.width = saved[idx] + 'px';
+    const grip = document.createElement('span');
+    grip.className = 'col-resizer';
+    th.appendChild(grip);
+    grip.onmousedown = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const startX = e.clientX, startW = th.getBoundingClientRect().width;
+      function onMove(ev){
+        const w = Math.max(40, Math.round(startW + (ev.clientX - startX)));
+        th.style.width = w + 'px';
+        colWidths[activeTab] = colWidths[activeTab] || [];
+        colWidths[activeTab][idx] = w;
+      }
+      function onUp(){ window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); }
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    };
+  });
+}
+
+// ---------- 命名版面配置（高度＋欄寬），存在 localStorage ----------
+const LAYOUT_STORAGE_KEY = 'darkgene_query_layout_presets_v1';
+function loadLayoutPresets(){ try{ return JSON.parse(localStorage.getItem(LAYOUT_STORAGE_KEY) || '{}'); }catch(e){ return {}; } }
+function saveLayoutPresets(p){ localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(p)); }
+function refreshLayoutPresetOptions(){
+  const sel = document.getElementById('layoutPresetSelect');
+  if(!sel) return;
+  const presets = loadLayoutPresets();
+  const names = Object.keys(presets);
+  sel.innerHTML = '<option value="">-- 選擇已儲存版面 --</option>' + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+}
+function saveCurrentLayout(name){
+  if(!name){ alert('請先輸入版面名稱'); return; }
+  const presets = loadLayoutPresets();
+  presets[name] = presets[name] || {};
+  presets[name].networkHeight = networkHeight;
+  presets[name].cols = colWidths;
+  saveLayoutPresets(presets);
+  refreshLayoutPresetOptions();
+  document.getElementById('layoutPresetSelect').value = name;
+}
+function applyLayoutPreset(name){
+  if(!name) return;
+  const presets = loadLayoutPresets();
+  const p = presets[name];
+  if(!p) return;
+  if(p.networkHeight){
+    networkHeight = p.networkHeight;
+    const netEl = document.getElementById('network');
+    if(netEl){ netEl.style.height = networkHeight + 'px'; if(network) network.redraw(); }
+  }
+  if(p.cols){
+    colWidths = JSON.parse(JSON.stringify(p.cols));
+    makeColumnsResizable();
+  }
+}
+function deleteLayoutPreset(name){
+  if(!name) return;
+  const presets = loadLayoutPresets();
+  delete presets[name];
+  saveLayoutPresets(presets);
+  refreshLayoutPresetOptions();
+}
+
+document.getElementById('applyLayoutBtn').addEventListener('click', () => applyLayoutPreset(document.getElementById('layoutPresetSelect').value));
+document.getElementById('saveLayoutBtn').addEventListener('click', () => saveCurrentLayout(document.getElementById('layoutNameInput').value.trim()));
+document.getElementById('deleteLayoutBtn').addEventListener('click', () => {
+  const name = document.getElementById('layoutPresetSelect').value;
+  if(name && confirm(`確定刪除版面「${name}」？`)) deleteLayoutPreset(name);
+});
+refreshLayoutPresetOptions();
+initNetworkResize();
+
+applyGraphLimitDefaults();
 bootstrap();
 </script>
 </body>

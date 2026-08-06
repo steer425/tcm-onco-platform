@@ -925,6 +925,8 @@ async function selectHerb(herbId){
     </div>
   `;
 
+  applyGraphLimitDefaultsToToolbar();
+
   document.getElementById('selAll').onclick = () => { selectedMols = new Set(molsByHerb.get(herbId)); renderPicker(); markPending(); };
   document.getElementById('selNone').onclick = () => { selectedMols = new Set(); renderPicker(); markPending(); };
   document.getElementById('selTop').onclick = () => {
@@ -1585,6 +1587,26 @@ document.getElementById('uiLangSelect').addEventListener('change', (e) => {
   localStorage.setItem('tcm_ui_lang', uiLang);
   refreshLanguageDisplay();
 });
+// ---------- 網絡圖節點數量上限：讀取後台設定的預設值（不用寫死在前端） ----------
+let graphLimitDefaults = { graph_limit_level1: 5, graph_limit_level2: 5, graph_limit_level3: 15 };
+async function loadGraphLimitDefaults(){
+  try { graphLimitDefaults = await api('/system-settings/graph-limits'); } catch(e) { /* 拿不到就用內建預設值 */ }
+}
+function ensureOptionAndSelect(selectEl, value){
+  if (!selectEl || value == null) return;
+  const strVal = String(value);
+  if (![...selectEl.options].some(o => o.value === strVal)) {
+    const opt = document.createElement('option');
+    opt.value = strVal; opt.textContent = strVal + '（管理者設定）';
+    selectEl.insertBefore(opt, selectEl.firstChild);
+  }
+  selectEl.value = strVal;
+}
+function applyGraphLimitDefaultsToToolbar(){
+  ensureOptionAndSelect(document.getElementById('capTgt'), graphLimitDefaults.graph_limit_level2);
+  ensureOptionAndSelect(document.getElementById('capDis'), graphLimitDefaults.graph_limit_level3);
+}
+
 initOpenCC();
 
 // ---------- 個人化設定：查詢站淺色/深色主題（依使用者帳號記住最後一次的選擇） ----------
@@ -1606,6 +1628,7 @@ document.getElementById('themeToggleLink').addEventListener('click', async (e) =
 });
 loadQueryStationTheme();
 
+loadGraphLimitDefaults();
 bootstrapData();
 
 </script>
