@@ -44,8 +44,12 @@
     <input id="fAddress" />
     <label>電話</label>
     <input id="fPhone" />
-    <label>營業時間</label>
-    <input id="fHours" placeholder="例如 09:00-18:00" />
+    <label>營業時間（文字說明）</label>
+    <input id="fHours" placeholder="例如 09:00-18:00（週日休）" />
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <div><label>開始營業（用於「營業狀態」判斷）</label><input id="fOpensAt" type="time" /></div>
+      <div><label>結束營業</label><input id="fClosesAt" type="time" /></div>
+    </div>
     <label>緯度 Latitude</label>
     <input id="fLat" type="number" step="any" placeholder="例如 25.0330" />
     <label>經度 Longitude</label>
@@ -59,6 +63,17 @@
     </select>
     <label>備注</label>
     <textarea id="fNotes" rows="2"></textarea>
+
+    <h4 style="margin-bottom:6px; margin-top:18px;">店家功能</h4>
+    <label>開幕日期（用於「最新開幕」排序，留空則以資料建立時間為準）</label>
+    <input id="fOpeningDate" type="date" />
+    <div style="display:grid; grid-template-columns:1fr 2fr; gap:10px;">
+      <div><label>折扣幅度（%）</label><input id="fDiscountPercent" type="number" min="0" max="100" placeholder="例如 20" /></div>
+      <div><label>優惠說明</label><input id="fDiscountDesc" placeholder="例如 滿千折兩百 / 全館8折" /></div>
+    </div>
+    <label>優惠期限（留空代表長期有效）</label>
+    <input id="fDiscountUntil" type="date" />
+
     <p class="hint-msg">
       不確定經緯度？可以到 Google 地圖上右鍵點選地點，選單第一行會顯示座標，複製貼上即可。
     </p>

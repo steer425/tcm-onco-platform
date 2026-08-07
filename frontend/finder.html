@@ -22,6 +22,21 @@
   .rating-select button.selected { background: #d69e2e; color: #fff; border-color: #d69e2e; }
   #pharmacyMap { height: 380px; border-radius: 10px; margin-bottom: 16px; border: 1px solid var(--border); }
   .leaflet-popup-content b { display: block; margin-bottom: 4px; }
+  .sort-btn { background: #fff; border: 1px solid var(--border); color: #444; padding: 7px 14px; border-radius: 999px; font-size: 13px; cursor: pointer; }
+  .sort-btn:hover { background: #f0f3f1; }
+  .sort-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .business-status-pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; margin-left: 8px; }
+  .bs-open { background: #e8f3ec; color: #1f4f37; }
+  .bs-closing_soon { background: #fdf3e0; color: #8a5a00; }
+  .bs-opening_soon { background: #e3ecf5; color: #1c4d78; }
+  .bs-closed { background: #f0f0f0; color: #888; }
+  .bs-unknown { background: #f0f0f0; color: #aaa; }
+  .discount-badge { display: inline-block; background: #fdecea; color: #c0392b; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; margin-left: 8px; }
+  .pharmacy-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .pharmacy-actions button { padding: 5px 12px; font-size: 12px; }
+  .favorited { background: #c0392b !important; border-color: #c0392b !important; color: #fff !important; }
+  .checkin-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; align-items: center; justify-content: center; z-index: 2000; }
+  .checkin-modal { background: #fff; border-radius: 10px; padding: 20px; width: 320px; }
 </style>
 </head>
 <body data-current-page="finder.html">
@@ -51,10 +66,43 @@
       <p class="hint-msg">需要瀏覽器授權「使用您的位置」才能依距離排序；若不授權，仍可瀏覽全部中藥行清單（依名稱排序）。「只顯示最近 N 家」需要先取得您的位置才能依距離篩選，輸入 0 或留空代表不限制。</p>
     </div>
 
+    <div class="card" style="padding:12px 18px;">
+      <div id="sortBar" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <button class="sort-btn active" data-sort="distance">📍 距離</button>
+        <button class="sort-btn" data-sort="rating">⭐ 綜合評價</button>
+        <button class="sort-btn" data-sort="checkin">✅ 到訪次數</button>
+        <button class="sort-btn" data-sort="popularity">🔥 熱門程度</button>
+        <button class="sort-btn" data-sort="business_status">🕐 營業狀態</button>
+        <button class="sort-btn" data-sort="price">💰 價格水準</button>
+        <button class="sort-btn" data-sort="discount">🏷️ 促銷優惠</button>
+        <button class="sort-btn" data-sort="newest">🆕 最新開幕</button>
+        <button class="sort-btn" data-sort="personalized">💡 個人化推薦</button>
+      </div>
+      <div id="sortSubOptions" style="margin-top:10px; display:none; font-size:13px; color:#6b7a70; align-items:center; gap:10px; flex-wrap:wrap;"></div>
+      <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
+        <input id="relevanceInput" placeholder="輸入關鍵字搜尋店名/地址/介紹（相關程度排序）" style="flex:1; max-width:360px; margin:0;" />
+        <button id="relevanceSearchBtn" class="secondary">🔍 依相關程度搜尋</button>
+      </div>
+    </div>
+
     <div id="pharmacyMap"></div>
 
     <div class="pharmacy-list" id="pharmacyList"></div>
   </main>
+</div>
+
+<div class="checkin-modal-backdrop" id="checkinModal">
+  <div class="checkin-modal">
+    <h3 style="margin-top:0;" id="checkinModalTitle">打卡</h3>
+    <label>本次消費金額（選填，新台幣）</label>
+    <input type="number" id="checkinSpending" min="0" placeholder="例如 350" style="width:100%;" />
+    <label>備注（選填）</label>
+    <input id="checkinNotes" style="width:100%;" />
+    <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end;">
+      <button class="secondary" id="checkinCancel">取消</button>
+      <button id="checkinConfirm">確認打卡</button>
+    </div>
+  </div>
 </div>
 
 <script src="js/api.js"></script>

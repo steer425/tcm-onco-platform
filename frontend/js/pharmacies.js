@@ -46,7 +46,8 @@ document.getElementById("searchInput").addEventListener("input", loadPharmacies)
 document.getElementById("newBtn").addEventListener("click", () => {
   document.getElementById("modalTitle").textContent = "新增中藥行";
   document.getElementById("pharmacyId").value = "";
-  ["fName","fAddress","fPhone","fHours","fLat","fLng","fDesc","fNotes"].forEach(id => document.getElementById(id).value = "");
+  ["fName","fAddress","fPhone","fHours","fOpensAt","fClosesAt","fLat","fLng","fDesc","fNotes",
+   "fOpeningDate","fDiscountPercent","fDiscountDesc","fDiscountUntil"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("fStatus").value = "active";
   document.getElementById("modalMsg").textContent = "";
   document.getElementById("pharmacyModal").style.display = "flex";
@@ -60,11 +61,17 @@ window.openEdit = (id) => {
   document.getElementById("fAddress").value = p.address;
   document.getElementById("fPhone").value = p.phone || "";
   document.getElementById("fHours").value = p.business_hours || "";
+  document.getElementById("fOpensAt").value = p.opens_at || "";
+  document.getElementById("fClosesAt").value = p.closes_at || "";
   document.getElementById("fLat").value = p.latitude;
   document.getElementById("fLng").value = p.longitude;
   document.getElementById("fDesc").value = p.description || "";
   document.getElementById("fStatus").value = p.status;
   document.getElementById("fNotes").value = p.notes || "";
+  document.getElementById("fOpeningDate").value = p.opening_date || "";
+  document.getElementById("fDiscountPercent").value = p.discount_percent ?? "";
+  document.getElementById("fDiscountDesc").value = p.discount_description || "";
+  document.getElementById("fDiscountUntil").value = p.discount_valid_until || "";
   document.getElementById("modalMsg").textContent = "";
   document.getElementById("pharmacyModal").style.display = "flex";
 };
@@ -72,6 +79,24 @@ window.openEdit = (id) => {
 document.getElementById("modalCancel").addEventListener("click", () => {
   document.getElementById("pharmacyModal").style.display = "none";
 });
+
+function buildPharmacyPayload() {
+  const discountPercentVal = document.getElementById("fDiscountPercent").value;
+  return {
+    name: document.getElementById("fName").value.trim(),
+    address: document.getElementById("fAddress").value.trim(),
+    phone: document.getElementById("fPhone").value.trim(),
+    business_hours: document.getElementById("fHours").value.trim(),
+    opens_at: document.getElementById("fOpensAt").value || null,
+    closes_at: document.getElementById("fClosesAt").value || null,
+    description: document.getElementById("fDesc").value.trim(),
+    notes: document.getElementById("fNotes").value.trim(),
+    opening_date: document.getElementById("fOpeningDate").value || null,
+    discount_percent: discountPercentVal ? parseInt(discountPercentVal, 10) : null,
+    discount_description: document.getElementById("fDiscountDesc").value.trim() || null,
+    discount_valid_until: document.getElementById("fDiscountUntil").value || null,
+  };
+}
 
 document.getElementById("modalSave").addEventListener("click", async () => {
   const id = document.getElementById("pharmacyId").value;
@@ -86,29 +111,12 @@ document.getElementById("modalSave").addEventListener("click", async () => {
     if (id) {
       await api(`/pharmacies/${id}`, {
         method: "PUT",
-        body: JSON.stringify({
-          name: document.getElementById("fName").value.trim(),
-          address: document.getElementById("fAddress").value.trim(),
-          phone: document.getElementById("fPhone").value.trim(),
-          business_hours: document.getElementById("fHours").value.trim(),
-          latitude: lat, longitude: lng,
-          description: document.getElementById("fDesc").value.trim(),
-          status: document.getElementById("fStatus").value,
-          notes: document.getElementById("fNotes").value.trim(),
-        }),
+        body: JSON.stringify({ ...buildPharmacyPayload(), latitude: lat, longitude: lng, status: document.getElementById("fStatus").value }),
       });
     } else {
       await api("/pharmacies", {
         method: "POST",
-        body: JSON.stringify({
-          name: document.getElementById("fName").value.trim(),
-          address: document.getElementById("fAddress").value.trim(),
-          phone: document.getElementById("fPhone").value.trim(),
-          business_hours: document.getElementById("fHours").value.trim(),
-          latitude: lat, longitude: lng,
-          description: document.getElementById("fDesc").value.trim(),
-          notes: document.getElementById("fNotes").value.trim(),
-        }),
+        body: JSON.stringify({ ...buildPharmacyPayload(), latitude: lat, longitude: lng }),
       });
     }
     document.getElementById("pharmacyModal").style.display = "none";

@@ -194,15 +194,56 @@ class Pharmacy(Base):
     address = Column(String, nullable=False)
     phone = Column(String, nullable=True)
     business_hours = Column(String, nullable=True)
+    opens_at = Column(String, nullable=True)     # 結構化營業時間（HH:MM），供「營業狀態」判斷用
+    closes_at = Column(String, nullable=True)    # 結構化營業時間（HH:MM）
     description = Column(Text, nullable=True)
     latitude = Column(String, nullable=False)   # 以字串儲存避免浮點精度問題，前端轉 float 使用
     longitude = Column(String, nullable=False)
     status = Column(Enum(PharmacyStatus), default=PharmacyStatus.active, nullable=False)
     notes = Column(Text, nullable=True)
+
+    # 熱門程度／統計欄位
+    view_count = Column(Integer, default=0, nullable=False)
+    favorite_count = Column(Integer, default=0, nullable=False)
+    share_count = Column(Integer, default=0, nullable=False)
+    nav_click_count = Column(Integer, default=0, nullable=False)  # 使用者按「路線規劃/導航」的次數
+
+    # 店家功能（後台，店家自行維護）
+    opening_date = Column(String, nullable=True)          # 開幕日期（YYYY-MM-DD），沒填就用 created_at 當「上架日期」排序
+    discount_percent = Column(Integer, nullable=True)      # 折扣幅度（例如輸入 20 代表 8 折 / 20% off）
+    discount_description = Column(String, nullable=True)   # 優惠說明文字
+    discount_valid_until = Column(String, nullable=True)   # 優惠期限（YYYY-MM-DD），為空代表長期有效
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     reviews = relationship("PharmacyReview", back_populates="pharmacy", cascade="all, delete-orphan")
+    checkins = relationship("PharmacyCheckin", back_populates="pharmacy", cascade="all, delete-orphan")
+
+
+class PharmacyCheckin(Base):
+    """中藥行打卡紀錄，附帶本次消費金額（供「價格水準」統計使用）"""
+    __tablename__ = "pharmacy_checkins"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    pharmacy_id = Column(String, ForeignKey("pharmacies.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    spending_amount = Column(Integer, nullable=True)  # 本次消費金額（新台幣），選填
+    notes = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    pharmacy = relationship("Pharmacy", back_populates="checkins")
+
+
+class PharmacyFavorite(Base):
+    """使用者收藏的中藥行"""
+    __tablename__ = "pharmacy_favorites"
+    __table_args__ = (UniqueConstraint("pharmacy_id", "user_id", name="uq_pharmacy_favorite"),)
+
+    id = Column(String, primary_key=True, default=gen_id)
+    pharmacy_id = Column(String, ForeignKey("pharmacies.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class PharmacyReview(Base):

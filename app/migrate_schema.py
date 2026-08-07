@@ -23,6 +23,16 @@ ALTER_STATEMENTS = [
     "ALTER TABLE features ADD COLUMN page_url VARCHAR",
     "ALTER TABLE features ADD COLUMN sort_order INTEGER DEFAULT 0 NOT NULL",
     "ALTER TABLE tcmsp_diseases ADD COLUMN disease_cn_name VARCHAR",
+    "ALTER TABLE pharmacies ADD COLUMN opens_at VARCHAR",
+    "ALTER TABLE pharmacies ADD COLUMN closes_at VARCHAR",
+    "ALTER TABLE pharmacies ADD COLUMN view_count INTEGER DEFAULT 0 NOT NULL",
+    "ALTER TABLE pharmacies ADD COLUMN favorite_count INTEGER DEFAULT 0 NOT NULL",
+    "ALTER TABLE pharmacies ADD COLUMN share_count INTEGER DEFAULT 0 NOT NULL",
+    "ALTER TABLE pharmacies ADD COLUMN nav_click_count INTEGER DEFAULT 0 NOT NULL",
+    "ALTER TABLE pharmacies ADD COLUMN opening_date VARCHAR",
+    "ALTER TABLE pharmacies ADD COLUMN discount_percent INTEGER",
+    "ALTER TABLE pharmacies ADD COLUMN discount_description VARCHAR",
+    "ALTER TABLE pharmacies ADD COLUMN discount_valid_until VARCHAR",
 ]
 
 

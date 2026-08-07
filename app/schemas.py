@@ -250,10 +250,16 @@ class PharmacyCreate(BaseModel):
     address: str
     phone: Optional[str] = None
     business_hours: Optional[str] = None
+    opens_at: Optional[str] = None
+    closes_at: Optional[str] = None
     description: Optional[str] = None
     latitude: float
     longitude: float
     notes: Optional[str] = None
+    opening_date: Optional[str] = None
+    discount_percent: Optional[int] = None
+    discount_description: Optional[str] = None
+    discount_valid_until: Optional[str] = None
 
 
 class PharmacyUpdate(BaseModel):
@@ -261,11 +267,17 @@ class PharmacyUpdate(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     business_hours: Optional[str] = None
+    opens_at: Optional[str] = None
+    closes_at: Optional[str] = None
     description: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     status: Optional[str] = None
     notes: Optional[str] = None
+    opening_date: Optional[str] = None
+    discount_percent: Optional[int] = None
+    discount_description: Optional[str] = None
+    discount_valid_until: Optional[str] = None
 
 
 class PharmacyOut(BaseModel):
@@ -274,6 +286,8 @@ class PharmacyOut(BaseModel):
     address: str
     phone: Optional[str]
     business_hours: Optional[str]
+    opens_at: Optional[str]
+    closes_at: Optional[str]
     description: Optional[str]
     latitude: float
     longitude: float
@@ -281,6 +295,40 @@ class PharmacyOut(BaseModel):
     notes: Optional[str]
     avg_rating: Optional[float] = None
     review_count: int = 0
+    weighted_rating: Optional[float] = None  # 加權星等（貝式平均，評價數少的店不會因為一兩則五星就衝到第一名）
+    total_stars: int = 0                      # 收到的總星等（所有評價分數加總）
+    checkin_count: int = 0
+    my_checkin_count: int = 0
+    avg_spending: Optional[float] = None
+    view_count: int = 0
+    favorite_count: int = 0
+    share_count: int = 0
+    nav_click_count: int = 0
+    popularity_score: float = 0.0
+    business_status: str = "unknown"  # open / closing_soon / opening_soon / closed / unknown
+    opening_date: Optional[str] = None
+    discount_percent: Optional[int] = None
+    discount_description: Optional[str] = None
+    discount_valid_until: Optional[str] = None
+    is_favorited: bool = False
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PharmacyCheckinCreate(BaseModel):
+    spending_amount: Optional[int] = Field(default=None, ge=0)
+    notes: Optional[str] = None
+
+
+class PharmacyCheckinOut(BaseModel):
+    id: str
+    pharmacy_id: str
+    user_id: str
+    account: Optional[str] = None
+    spending_amount: Optional[int]
+    notes: Optional[str]
     created_at: datetime
 
     class Config:
