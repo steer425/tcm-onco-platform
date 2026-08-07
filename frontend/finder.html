@@ -37,11 +37,18 @@
     </div>
 
     <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <p id="locationStatus" style="margin:0; color:#6b7a70; font-size:13px;">尚未取得您的位置</p>
-        <button id="locateBtn">取得目前位置並依距離排序</button>
+        <div style="display:flex; align-items:center; gap:16px;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin:0;">
+            只顯示最近
+            <input type="number" id="nearestLimitInput" min="0" max="100" placeholder="不限" style="width:70px; margin:0;" />
+            家
+          </label>
+          <button id="locateBtn">取得目前位置並依距離排序</button>
+        </div>
       </div>
-      <p class="hint-msg">需要瀏覽器授權「使用您的位置」才能依距離排序；若不授權，仍可瀏覽全部中藥行清單（依名稱排序）。</p>
+      <p class="hint-msg">需要瀏覽器授權「使用您的位置」才能依距離排序；若不授權，仍可瀏覽全部中藥行清單（依名稱排序）。「只顯示最近 N 家」需要先取得您的位置才能依距離篩選，輸入 0 或留空代表不限制。</p>
     </div>
 
     <div id="pharmacyMap"></div>

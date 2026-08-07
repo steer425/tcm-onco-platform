@@ -13,21 +13,28 @@ function initMap() {
   }).addTo(pharmacyMap);
 }
 
-function renderMapMarkers() {
+function renderMapMarkers(list) {
   // 清掉舊標記
   Object.values(pharmacyMarkers).forEach(m => pharmacyMap.removeLayer(m));
   pharmacyMarkers = {};
 
   const bounds = [];
-  pharmacies.forEach((p) => {
+  (list || pharmacies).forEach((p) => {
     if (p.latitude == null || p.longitude == null) return;
     const lat = parseFloat(p.latitude), lng = parseFloat(p.longitude);
     const marker = L.marker([lat, lng]).addTo(pharmacyMap);
+    const reviews = p.reviews || [];
+    const reviewLines = reviews.slice(0, 5).map(r =>
+      `<div style="margin-top:4px; font-size:12px;">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}　${escapeHtmlFinder(r.account || '匿名')}：${escapeHtmlFinder(r.comment || '（無留言）')}</div>`
+    ).join("");
     marker.bindPopup(`
-      <b>${escapeHtmlFinder(p.name)}</b>
-      ${p.address ? escapeHtmlFinder(p.address) + '<br>' : ''}
-      ${p.avg_rating ? '★'.repeat(Math.round(p.avg_rating)) + ' ' + p.avg_rating + ' 分' : '尚無評價'}
-    `);
+      <div style="max-width:240px;">
+        <b>${escapeHtmlFinder(p.name)}</b><br>
+        ${p.address ? escapeHtmlFinder(p.address) + '<br>' : ''}
+        ${p.avg_rating ? '★'.repeat(Math.round(p.avg_rating)) + '☆'.repeat(5 - Math.round(p.avg_rating)) + ` ${p.avg_rating} 分（${reviews.length} 則評價）` : '尚無評價'}
+        ${reviewLines ? `<div style="margin-top:6px; padding-top:6px; border-top:1px solid #eee; max-height:140px; overflow-y:auto;">${reviewLines}</div>` : ''}
+      </div>
+    `, { maxWidth: 260 });
     marker.on('click', () => highlightPharmacyCard(p.id));
     pharmacyMarkers[p.id] = marker;
     bounds.push([lat, lng]);
@@ -94,11 +101,17 @@ function render() {
   if (myLocation) {
     list.forEach(p => { p.distance = distanceKm(myLocation.lat, myLocation.lng, p.latitude, p.longitude); });
     list.sort((a, b) => a.distance - b.distance);
+
+    const limitInput = document.getElementById("nearestLimitInput");
+    const limit = limitInput ? parseInt(limitInput.value, 10) : 0;
+    if (limit && limit > 0) {
+      list = list.slice(0, limit);
+    }
   } else {
     list.sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
   }
 
-  if (pharmacyMap) renderMapMarkers();
+  if (pharmacyMap) renderMapMarkers(list);
 
   const container = document.getElementById("pharmacyList");
   container.innerHTML = "";
@@ -221,6 +234,16 @@ document.getElementById("locateBtn").addEventListener("click", () => {
       statusEl.textContent = "無法取得位置（" + err.message + "），請確認已授權瀏覽器使用您的位置";
     }
   );
+});
+
+document.getElementById("nearestLimitInput").addEventListener("input", (e) => {
+  let v = parseInt(e.target.value, 10);
+  if (!isNaN(v)) {
+    if (v < 0) v = 0;
+    if (v > 100) v = 100;
+    e.target.value = v;
+  }
+  render();
 });
 
 initMap();
