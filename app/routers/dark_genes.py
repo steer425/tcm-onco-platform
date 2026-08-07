@@ -476,3 +476,70 @@ def get_herb_dark_gene_links(herb_id: int, current_user: models.User = Depends(g
             for v in all_matched_genes.values()
         ], key=lambda x: -x["matched_target_count"]),
     }
+
+
+# ---------------------------------------------------------------------------
+# 病患暗黑基因彙總 -> 候選中藥（機制層級研究參考，非醫療建議，需醫師/專業人員審核）
+# ---------------------------------------------------------------------------
+
+@router.get("/patient-herb-suggestions/{patient_id}", summary="病患暗黑基因彙總的候選中藥（研究參考，非醫療建議）")
+def get_patient_herb_suggestions(patient_id: str, db: Session = Depends(get_db),
+                                  admin: models.User = Depends(require_admin)):
+    patient = db.query(models.Patient).filter(models.Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="找不到病患資料")
+
+    dark_genes_by_symbol = {g.hugo_symbol.upper(): g for g in db.query(models.DarkGene).filter(models.DarkGene.status == "active").all()}
+    variants = db.query(models.Variant).join(models.DnaImportBatch).filter(
+        models.Variant.patient_id == patient_id, models.DnaImportBatch.status == "active"
+    ).all()
+
+    matched_gene_ids = set()
+    for v in variants:
+        if v.gene_symbol and v.gene_symbol.upper() in dark_genes_by_symbol:
+            matched_gene_ids.add(dark_genes_by_symbol[v.gene_symbol.upper()].id)
+
+    if not matched_gene_ids:
+        return {"patient_id": patient_id, "matched_genes": [], "herbs": []}
+
+    matched_genes = [g for g in dark_genes_by_symbol.values() if g.id in matched_gene_ids]
+    all_targets = db.query(models.TcmspTarget).all()
+
+    target_to_gene_ids = {}
+    for g in matched_genes:
+        for sym in _gene_symbols_for_match(g):
+            for t in all_targets:
+                words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
+                if sym in words:
+                    target_to_gene_ids.setdefault(t.tar_id, set()).add(g.id)
+
+    herb_to_gene_ids = {}
+    if target_to_gene_ids:
+        relevant_tar_ids = set(target_to_gene_ids.keys())
+        mol_to_gene_ids = {}
+        for r in db.query(models.TcmspIngredientTarget).filter(models.TcmspIngredientTarget.tar_id.in_(relevant_tar_ids)).all():
+            mol_to_gene_ids.setdefault(r.mol_id, set()).update(target_to_gene_ids.get(r.tar_id, set()))
+        relevant_mol_ids = set(mol_to_gene_ids.keys())
+        if relevant_mol_ids:
+            for r in db.query(models.TcmspHerbIngredient).filter(models.TcmspHerbIngredient.mol_id.in_(relevant_mol_ids)).all():
+                herb_to_gene_ids.setdefault(r.herb_id, set()).update(mol_to_gene_ids.get(r.mol_id, set()))
+
+    herb_ids = list(herb_to_gene_ids.keys())
+    herbs = db.query(models.TcmspHerb).filter(
+        models.TcmspHerb.id.in_(herb_ids), models.TcmspHerb.status == "active"
+    ).all() if herb_ids else []
+
+    herb_results = sorted([
+        {
+            "herb_id": h.id, "herb_cn_name": h.herb_cn_name, "herb_pinyin": h.herb_pinyin, "herb_en_name": h.herb_en_name,
+            "covered_gene_count": len(herb_to_gene_ids.get(h.id, set())),
+            "covered_genes": sorted([g.hugo_symbol for g in matched_genes if g.id in herb_to_gene_ids.get(h.id, set())]),
+        }
+        for h in herbs
+    ], key=lambda x: -x["covered_gene_count"])
+
+    return {
+        "patient_id": patient_id, "patient_name": patient.name,
+        "matched_genes": [{"id": g.id, "hugo_symbol": g.hugo_symbol, "gene_type": g.gene_type} for g in matched_genes],
+        "herbs": herb_results,
+    }

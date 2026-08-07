@@ -451,6 +451,75 @@ class DarkGene(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class Specimen(Base):
+    """檢體。對應病患-就診-檢體-定序-分析-變異-解讀-品質八層資料模型的「檢體」層。"""
+    __tablename__ = "specimens"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    specimen_no = Column(String, unique=True, nullable=False)  # 檢體編號
+    patient_id = Column(String, ForeignKey("patients.id"), nullable=False)
+    encounter_id = Column(String, ForeignKey("encounters.id"), nullable=True)
+    specimen_type = Column(String, nullable=True)   # 檢體種類（血液/組織/唾液...）
+    tissue_site = Column(String, nullable=True)      # 組織部位
+    tumor_normal = Column(String, nullable=True)      # tumor / normal
+    collection_date = Column(String, nullable=True)
+    status = Column(String, default="active", nullable=False)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    batches = relationship("DnaImportBatch", back_populates="specimen", cascade="all, delete-orphan")
+
+
+class DnaImportBatch(Base):
+    """DNA 資料匯入批次。同一位病患可以有多筆匯入紀錄（例如不同時間點送驗），
+    每筆匯入都會保留成獨立批次，方便「多次匯入比較」。"""
+    __tablename__ = "dna_import_batches"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    batch_no = Column(String, unique=True, nullable=False)
+    patient_id = Column(String, ForeignKey("patients.id"), nullable=False)
+    specimen_id = Column(String, ForeignKey("specimens.id"), nullable=True)
+    source_type = Column(String, default="import", nullable=False)  # import（真實匯入）/ synthetic（測試資料產生）
+    source_filename = Column(String, nullable=True)
+    platform = Column(String, nullable=True)          # 定序平台
+    panel = Column(String, nullable=True)              # 檢測 panel
+    reference_genome = Column(String, nullable=True)   # 參考基因組版本（GRCh37/38）
+    pipeline_info = Column(String, nullable=True)       # pipeline 名稱與版本
+    variant_count = Column(Integer, default=0, nullable=False)
+    status = Column(String, default="active", nullable=False)
+    notes = Column(Text, nullable=True)
+    imported_by = Column(String, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    specimen = relationship("Specimen", back_populates="batches")
+    variants = relationship("Variant", back_populates="batch", cascade="all, delete-orphan")
+
+
+class Variant(Base):
+    """基因變異紀錄（對應「變異」＋簡化整合「品質」「解讀」欄位，避免拆太多張表）。
+    gene_symbol 對應 dark_genes.hugo_symbol，用來判斷是否命中暗黑基因清單。"""
+    __tablename__ = "variants"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    batch_id = Column(String, ForeignKey("dna_import_batches.id"), nullable=False)
+    patient_id = Column(String, ForeignKey("patients.id"), nullable=False)  # 為了查詢方便而冗余存一份
+    chromosome = Column(String, nullable=True)
+    position = Column(String, nullable=True)
+    ref_allele = Column(String, nullable=True)
+    alt_allele = Column(String, nullable=True)
+    gene_symbol = Column(String, nullable=True, index=True)  # 對應 dark_genes.hugo_symbol
+    hgvs = Column(String, nullable=True)
+    vcf_version = Column(String, nullable=True)
+    depth = Column(Integer, nullable=True)               # 品質欄位：定序深度
+    allele_fraction = Column(String, nullable=True)        # 品質欄位：變異等位基因比例
+    qc_status = Column(String, nullable=True)              # 品質欄位：pass / fail / warn
+    clinical_significance = Column(String, nullable=True)  # 解讀欄位（僅供研究參考，非臨床判讀）
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    batch = relationship("DnaImportBatch", back_populates="variants")
+
+
 class LoginLog(Base):
     __tablename__ = "login_logs"
 

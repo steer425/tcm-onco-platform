@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>DNA 資料管理 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+<style>
+  .dark-gene-row { background: #fdecea !important; }
+  .dark-gene-row td { color: #c0392b; font-weight: 600; }
+  .status-pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:600; }
+  .status-active { background:#e8f3ec; color:#1f4f37; }
+  .source-synthetic { background:#fdf3e0; color:#8a5a00; }
+  .source-import { background:#e3ecf5; color:#1c4d78; }
+  .compare-yes { color: #1f4f37; font-weight: 700; }
+  .compare-no { color: #c8ccc9; }
+  .section-divider { border-top: 2px solid var(--border); margin: 24px 0; padding-top: 20px; }
+</style>
+</head>
+<body data-current-page="dna-data.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">DNA 資料管理</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <p class="hint-msg" style="margin-top:0;">
+        病患基因變異資料管理：匯入真實資料、產生測試資料、查看是否命中暗黑基因清單（<span style="color:#c0392b;font-weight:600;">紅字標註</span>）、多次匯入比較。
+        這是研究層級的資料工具，不含任何醫療判讀或用藥建議。
+      </p>
+      <label>選擇病患</label>
+      <select id="patientSelect" style="max-width:320px;"></select>
+    </div>
+
+    <div class="card" id="batchSection" style="display:none;">
+      <h3 style="margin-top:0;">匯入批次</h3>
+      <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+        <button id="newBatchBtn">＋ 手動新增批次</button>
+        <button id="uploadBatchBtn" class="secondary">📂 上傳 CSV 匯入</button>
+        <button id="compareBtn" class="secondary">🔀 比較勾選的批次</button>
+      </div>
+      <table>
+        <thead>
+          <tr><th></th><th>批次編號</th><th>來源</th><th>變異數</th><th>平台/Panel</th><th>建立時間</th><th style="width:120px;">操作</th></tr>
+        </thead>
+        <tbody id="batchBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card" id="variantSection" style="display:none;">
+      <h3 style="margin-top:0;" id="variantTitle">變異清單</h3>
+      <table>
+        <thead><tr><th>染色體</th><th>位置</th><th>Ref&gt;Alt</th><th>基因</th><th>Depth</th><th>Allele Fraction</th><th>QC</th></tr></thead>
+        <tbody id="variantBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card" id="compareSection" style="display:none;">
+      <h3 style="margin-top:0;">多次匯入比較</h3>
+      <p class="hint-msg" style="margin-top:0;" id="compareBatchLabels"></p>
+      <table id="compareTable"></table>
+    </div>
+  </main>
+</div>
+
+<div id="newBatchModal" class="modal-backdrop" style="display:none;">
+  <div class="modal" style="max-width:640px;">
+    <h3>新增匯入批次</h3>
+    <label>批次編號 *</label>
+    <input id="nbNo" />
+    <label>平台</label>
+    <input id="nbPlatform" />
+    <label>Panel</label>
+    <input id="nbPanel" />
+    <label>參考基因組版本</label>
+    <input id="nbRefGenome" placeholder="GRCh38" />
+    <h4>變異清單</h4>
+    <div id="nbVariantRows"></div>
+    <button type="button" id="nbAddRowBtn" class="secondary">＋ 新增一列變異</button>
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="secondary" id="nbCancel">關閉</button>
+      <button id="nbSave">儲存</button>
+    </div>
+    <div id="nbMsg" class="hint-msg"></div>
+  </div>
+</div>
+
+<div id="uploadBatchModal" class="modal-backdrop" style="display:none;">
+  <div class="modal" style="max-width:520px;">
+    <h3>上傳 CSV 匯入</h3>
+    <p class="hint-msg" style="margin-top:0;">CSV 欄位需包含：chromosome, position, ref_allele, alt_allele, gene_symbol（選填：hgvs, depth, allele_fraction, qc_status, clinical_significance）</p>
+    <label>批次編號 *</label>
+    <input id="ubNo" />
+    <label>平台</label>
+    <input id="ubPlatform" />
+    <label>Panel</label>
+    <input id="ubPanel" />
+    <label>CSV 檔案 *</label>
+    <input type="file" id="ubFile" accept=".csv" />
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="secondary" id="ubCancel">關閉</button>
+      <button id="ubSave">上傳</button>
+    </div>
+    <div id="ubMsg" class="hint-msg"></div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/site-lang.js"></script>
+<script src="js/dna-data.js"></script>
+</body>
+</html>

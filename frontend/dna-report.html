@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>DNA 檢測報告 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+<style>
+  .disclaimer-banner { background: #fdf3e0; border: 1px solid #e8d5a8; border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; font-size: 13px; color: #7a5a20; line-height: 1.7; }
+  .disclaimer-banner b { color: #5a3f10; }
+  .report-header { border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-bottom: 18px; }
+  .report-header h2 { margin: 0 0 6px; }
+  .kpi-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+  .kpi-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; min-width: 130px; }
+  .kpi-box b { display: block; font-size: 24px; }
+  .kpi-box span { font-size: 12px; color: var(--muted); }
+  .gene-alert-card { border: 1px solid #f0c0b8; background: #fdf5f3; border-radius: 8px; padding: 12px 16px; margin-bottom: 10px; }
+  .gene-alert-card b { color: #c0392b; font-size: 15px; }
+  .herb-tag { display: inline-block; background: #e8f3ec; color: #1f4f37; border-radius: 4px; padding: 3px 8px; font-size: 12px; margin: 2px 4px 2px 0; }
+  @media print {
+    .sidebar, .topbar, #printBtn { display: none !important; }
+  }
+</style>
+</head>
+<body data-current-page="dna-report.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">DNA 檢測報告</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <label>選擇病患</label>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <select id="patientSelect" style="max-width:320px;"></select>
+        <button id="genReportBtn">產生報告</button>
+        <button id="printBtn" class="secondary" style="display:none;">🖨 列印/另存 PDF</button>
+      </div>
+    </div>
+
+    <div id="reportBody" style="display:none;">
+      <div class="disclaimer-banner">
+        ⚠️ <b>這份報告是研究層級的資料彙整，不是臨床診斷書，也不是用藥處方。</b><br>
+        「候選中藥」欄位是根據 TCMSP 成分-靶點預測資料計算出來的機制層級關聯，代表「這個藥材的已知成分理論上可能作用在這個基因相關的路徑上」，<b>不代表臨床療效已證實</b>。
+        本報告所列的暗黑基因（癌症相關基因）命中結果，也只是資料庫比對結果，不等於基因檢測公司出具的正式醫學報告。
+        <b>本報告內容需要由具資格的醫師與中醫師共同審核後，才能作為臨床決策參考。</b>
+      </div>
+
+      <div class="report-header">
+        <h2 id="reportPatientName"></h2>
+        <div class="hint-msg" id="reportPatientMeta"></div>
+        <div class="hint-msg" id="reportGenTime"></div>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi-box"><b id="kpiTotalVariants">-</b><span>總變異數（所有批次）</span></div>
+        <div class="kpi-box"><b id="kpiDarkGenes">-</b><span>命中暗黑基因數</span></div>
+        <div class="kpi-box"><b id="kpiHerbs">-</b><span>候選中藥種類數</span></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0;">可能的先天性腫瘤基因異常</h3>
+        <div id="geneAlertList"></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0;">機制層級候選中藥（研究參考，非用藥建議）</h3>
+        <table>
+          <thead><tr><th>中文名稱</th><th>拼音</th><th>English Name</th><th>覆蓋基因數</th><th>對應基因</th></tr></thead>
+          <tbody id="herbTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/site-lang.js"></script>
+<script src="js/dna-report.js"></script>
+</body>
+</html>

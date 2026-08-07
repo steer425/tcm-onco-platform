@@ -541,3 +541,102 @@ class DarkGeneOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---------- DNA 資料（檢體／匯入批次／變異） ----------
+
+class SpecimenCreate(BaseModel):
+    specimen_no: str
+    patient_id: str
+    encounter_id: Optional[str] = None
+    specimen_type: Optional[str] = None
+    tissue_site: Optional[str] = None
+    tumor_normal: Optional[str] = None
+    collection_date: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class SpecimenOut(BaseModel):
+    id: str
+    specimen_no: str
+    patient_id: str
+    encounter_id: Optional[str]
+    specimen_type: Optional[str]
+    tissue_site: Optional[str]
+    tumor_normal: Optional[str]
+    collection_date: Optional[str]
+    status: str
+    notes: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class VariantIn(BaseModel):
+    chromosome: Optional[str] = None
+    position: Optional[str] = None
+    ref_allele: Optional[str] = None
+    alt_allele: Optional[str] = None
+    gene_symbol: Optional[str] = None
+    hgvs: Optional[str] = None
+    vcf_version: Optional[str] = None
+    depth: Optional[int] = None
+    allele_fraction: Optional[str] = None
+    qc_status: Optional[str] = None
+    clinical_significance: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class DnaImportBatchCreate(BaseModel):
+    batch_no: str
+    patient_id: str
+    specimen_id: Optional[str] = None
+    platform: Optional[str] = None
+    panel: Optional[str] = None
+    reference_genome: Optional[str] = None
+    pipeline_info: Optional[str] = None
+    source_filename: Optional[str] = None
+    notes: Optional[str] = None
+    variants: List[VariantIn] = []
+
+
+class VariantOut(BaseModel):
+    id: str
+    batch_id: str
+    patient_id: str
+    chromosome: Optional[str]
+    position: Optional[str]
+    ref_allele: Optional[str]
+    alt_allele: Optional[str]
+    gene_symbol: Optional[str]
+    hgvs: Optional[str]
+    depth: Optional[int]
+    allele_fraction: Optional[str]
+    qc_status: Optional[str]
+    clinical_significance: Optional[str]
+    notes: Optional[str]
+    is_dark_gene: bool = False  # 是否命中暗黑基因清單，於 router 內計算覆寫
+
+    class Config:
+        from_attributes = True
+
+
+class DnaImportBatchOut(BaseModel):
+    id: str
+    batch_no: str
+    patient_id: str
+    specimen_id: Optional[str]
+    source_type: str
+    source_filename: Optional[str]
+    platform: Optional[str]
+    panel: Optional[str]
+    reference_genome: Optional[str]
+    pipeline_info: Optional[str]
+    variant_count: int
+    status: str
+    notes: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

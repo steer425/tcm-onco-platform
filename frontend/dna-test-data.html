@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>DNA 測試資料產生 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<style>
+  .patient-picker { max-height: 320px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 6px; }
+  .patient-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+  .patient-row:last-child { border-bottom: none; }
+  .patient-row:hover { background: #f7f9f7; }
+</style>
+</head>
+<body data-current-page="dna-test-data.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">DNA 測試資料產生</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <p class="hint-msg" style="margin-top:0;">
+        為選定的病患產生合成的 DNA 變異測試資料（非真實檢測結果，僅供功能展示與測試），可勾選是否要讓產生的資料裡包含命中暗黑基因清單的變異。
+      </p>
+
+      <label>選擇病患（可複選）</label>
+      <input id="patientSearch" placeholder="搜尋病患姓名/識別碼" style="max-width:300px;" />
+      <div style="margin:8px 0;"><button id="selectAllBtn" class="secondary">全選</button> <button id="selectNoneBtn" class="secondary">全不選</button></div>
+      <div class="patient-picker" id="patientPicker">載入中...</div>
+
+      <div style="margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:14px; max-width:520px;">
+        <div>
+          <label><input type="checkbox" id="includeDarkGenes" checked> 產生資料包含暗黑基因變異</label>
+        </div>
+        <div>
+          <label>每人變異筆數</label>
+          <input type="number" id="variantsPerPatient" value="10" min="1" max="100" />
+        </div>
+        <div>
+          <label>暗黑基因變異比例（0~1）</label>
+          <input type="number" id="darkGeneRatio" value="0.4" min="0" max="1" step="0.1" />
+        </div>
+      </div>
+
+      <button id="generateBtn" class="primary" style="margin-top:16px;">產生測試資料</button>
+      <div id="generateMsg" class="hint-msg" style="margin-top:10px;"></div>
+      <div id="generateResult"></div>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/site-lang.js"></script>
+<script src="js/dna-test-data.js"></script>
+</body>
+</html>

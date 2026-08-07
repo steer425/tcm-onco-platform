@@ -73,6 +73,18 @@ FEATURE_CONFIG = [
     {"code": "F3-6", "module": "目標三/四", "name": "中藥暗黑基因覆蓋統計",
      "nav_label": "中藥暗黑基因覆蓋統計", "page_url": "darkgene-herb-ranking.html",
      "show_frontend": True, "show_backend": True, "sort_order": 85},
+    {"code": "F3-7", "module": "目標三/四", "name": "DNA 資料管理（匯入/CRUD/比較）",
+     "nav_label": "DNA 資料管理", "page_url": "dna-data.html",
+     "show_frontend": False, "show_backend": True, "sort_order": 86},
+    {"code": "F3-8", "module": "目標三/四", "name": "DNA 測試資料產生",
+     "nav_label": "DNA 測試資料產生", "page_url": "dna-test-data.html",
+     "show_frontend": False, "show_backend": True, "sort_order": 87},
+    {"code": "F3-9", "module": "目標三/四", "name": "DNA 檢測報告",
+     "nav_label": "DNA 檢測報告", "page_url": "dna-report.html",
+     "show_frontend": False, "show_backend": True, "sort_order": 88},
+    {"code": "F3-10", "module": "目標三/四", "name": "病患基因統計排行",
+     "nav_label": "病患基因統計排行", "page_url": "patient-dark-gene-ranking.html",
+     "show_frontend": False, "show_backend": True, "sort_order": 89},
 
     # ---- 目標五：中藥行 ----
     {"code": "F5-1", "module": "目標五", "name": "中藥行資料管理（後台）",

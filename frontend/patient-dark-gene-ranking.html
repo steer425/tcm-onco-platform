@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>病患基因統計排行 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<style>
+  .stat-cards { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+  .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; min-width: 140px; }
+  .stat-card b { display: block; font-size: 26px; }
+  .stat-card span { font-size: 12px; color: var(--muted); }
+  table.stats-table th { cursor: pointer; user-select: none; }
+  table.stats-table th:hover { color: var(--primary); }
+  table.stats-table th .sort-arrow { font-size: 10px; margin-left: 3px; color: var(--muted); }
+  .rank-badge { display: inline-block; width: 24px; text-align: center; font-weight: 700; color: var(--muted); }
+  .rank-badge.top1 { color: #c99a3d; }
+  .rank-badge.top2 { color: #999; }
+  .rank-badge.top3 { color: #a86a3d; }
+  .gene-tag { display: inline-block; background: #fdecea; color: #c0392b; border-radius: 4px; padding: 1px 6px; font-size: 11px; margin: 2px 3px 2px 0; }
+  .patient-row { cursor: pointer; }
+  .patient-row:hover td { background: #f0f3f1; }
+</style>
+</head>
+<body data-current-page="patient-dark-gene-ranking.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">病患基因統計排行</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <p class="hint-msg" style="margin-top:0;">
+        統計每位病患的 DNA 資料裡命中了幾個「不重複」的暗黑基因（跨所有匯入批次去重）。點藍色數字/病患列可以到「DNA 檢測報告」查看該病患的完整報告。
+        這是資料庫比對結果的統計，<b>不是臨床診斷</b>，僅供研究與後續審核參考。
+      </p>
+      <div class="stat-cards">
+        <div class="stat-card"><b id="statPatientTotal">-</b><span>有暗黑基因命中的病患數</span></div>
+        <div class="stat-card"><b id="statMaxCount">-</b><span>單一病患最多命中基因數</span></div>
+        <div class="stat-card"><b id="statTopPatient">-</b><span>命中最多的病患</span></div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+        <input id="searchInput" placeholder="搜尋病患姓名/識別碼" style="max-width:220px;" />
+        <span class="hint-msg" id="countHint" style="margin-left:auto;"></span>
+      </div>
+
+      <table class="stats-table" id="statsTable">
+        <thead>
+          <tr>
+            <th style="cursor:default;">排名</th>
+            <th data-sort="patient_name">姓名 <span class="sort-arrow"></span></th>
+            <th data-sort="patient_display_id">病患識別碼 <span class="sort-arrow"></span></th>
+            <th data-sort="dark_gene_count">命中暗黑基因數 <span class="sort-arrow"></span></th>
+            <th data-sort="total_variants">總變異數 <span class="sort-arrow"></span></th>
+            <th>命中的基因</th>
+          </tr>
+        </thead>
+        <tbody id="statsBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/site-lang.js"></script>
+<script src="js/patient-dark-gene-ranking.js"></script>
+</body>
+</html>

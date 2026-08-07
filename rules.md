@@ -134,5 +134,9 @@ TCMSP 藥材查詢站、疾病查詢站、暗黑基因查詢站都用「左側�
 | `ginseng_darkgene.html` | F3-4 | 藥材與暗黑基因關聯（反向查詢：預設人參，可換其他藥材，Herb→Ingredients→Targets→Dark Genes） |
 | `darkgene-stats.html` | F3-5 | 暗黑基因統計（依 Gene Type 統計有/無中藥靶點，欄位可點擊排序，三層下鑽：統計→基因清單→候選藥材） |
 | `darkgene-herb-ranking.html` | F3-6 | 中藥暗黑基因覆蓋統計（以藥材為主，排行哪種藥材覆蓋最多不重複的暗黑基因） |
+| `dna-data.html` | F3-7 | DNA 資料管理（檢體/匯入批次/變異 CRUD，多次匯入比較，暗黑基因紅字標註） |
+| `dna-test-data.html` | F3-8 | DNA 測試資料產生（可選多位病患，可勾選是否含暗黑基因變異） |
+| `dna-report.html` | F3-9 | DNA 檢測報告（單一病患報告，含醒目的非醫療建議警語） |
+| `patient-dark-gene-ranking.html` | F3-10 | 病患基因統計排行（哪位病患命中最多不重複暗黑基因） |
 
 > 有些功能代碼共用同一個頁面（例如 F0-10/F0-12 都指向 `logs.html`），這是刻意設計：避免導覽選單出現好幾個連到同一頁的重複連結。共用頁面的功能代碼會把 `show_frontend`/`show_backend` 都設為 `false`，只有「主要代表」該頁面的那個功能代碼會顯示在導覽選單裡，其餘的僅在權限矩陣表格裡顯示頁面路徑供對照。
