@@ -90,6 +90,18 @@ function bindLogout() {
 
 requireLogin();
 renderNav();
-if (typeof loadAndApplySiteLanguage === "function") {
-  loadAndApplySiteLanguage();
-}
+
+// 呼叫全站語系套用函式（定義在 site-lang.js）。
+// 不能直接假設 site-lang.js 已經載入完成——每個頁面的 <script> 標籤順序不見得一致，
+// 如果 nav.js 剛好排在 site-lang.js 前面，這裡執行的當下 loadAndApplySiteLanguage 可能還不存在，
+// 直接判斷 typeof 會判斷失敗，導致「語系設定完全沒被套用」（這是真實發生過的 bug，
+// 使用者在登入頁選韓文，登入後系統畫面卻還是繁體中文，見 CHANGELOG）。
+// 改成輪詢等待，最多等 3 秒，不管腳本順序如何都能正確呼叫到。
+(function waitForSiteLangAndApply(retriesLeft) {
+  if (typeof loadAndApplySiteLanguage === "function") {
+    loadAndApplySiteLanguage();
+    return;
+  }
+  if (retriesLeft <= 0) return; // site-lang.js 可能真的載入失敗（例如 CDN 擋掉），放棄不強求
+  setTimeout(() => waitForSiteLangAndApply(retriesLeft - 1), 50);
+})(60); // 最多等 60 次 * 50ms = 3 秒
