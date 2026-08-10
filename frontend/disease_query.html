@@ -330,6 +330,11 @@ function mergeDiseaseDetail(detail){
   rebuildIndexes();
 }
 
+// 讓瀏覽器有機會重繪畫面，再繼續執行下一段耗時的同步運算，避免進度條看起來卡住不動
+function yieldToUI(){
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+
 function setProgress(pct, text){
   const wrap = document.getElementById('loadProgressWrap');
   if(pct === null){ if(wrap) wrap.style.display = 'none'; return; }
@@ -805,14 +810,24 @@ document.getElementById('loadAllBtn').addEventListener('click', async () => {
       }
     }
     const blob = new Blob(chunks);
+
+    setProgress(100, '下載完成，正在解析資料...');
+    await yieldToUI();
     const text = await blob.text();
     DATA = JSON.parse(text);
+
+    setProgress(100, '正在建立索引...');
+    await yieldToUI();
     rebuildIndexes();
+
+    setProgress(100, '正在統計靶點數量並更新清單...');
+    await yieldToUI();
     allDataLoaded = true;
-    btn.textContent = '✓ 已載入全部 ' + DATA.diseases.length + ' 種疾病資料';
-    btn.disabled = true;
     renderDiseaseStats();
     renderDiseaseList(document.getElementById('disSearch').value);
+
+    btn.textContent = '✓ 已載入全部 ' + DATA.diseases.length + ' 種疾病資料';
+    btn.disabled = true;
     setProgress(null);
     if (currentDisease) selectDisease(currentDisease.dis_id);
   } catch (e) {

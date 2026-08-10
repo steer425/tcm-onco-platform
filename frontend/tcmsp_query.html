@@ -331,6 +331,13 @@ function mergeHerbDetail(detail){
   rebuildIndexes();
 }
 
+// 讓瀏覽器有機會重繪畫面（例如剛呼叫過 setProgress 更新文字），再繼續執行下一段耗時的同步運算，
+// 不然像 JSON.parse／重建索引／重繪整份清單這種同步工作全部黏在一起執行，
+// 使用者只會看到進度條卡在原地不動，直到全部做完才突然跳結果，體感上像當機。
+function yieldToUI(){
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+
 function setProgress(pct, text){
   const wrap = document.getElementById('loadProgressWrap');
   if(pct === null){ wrap.style.display = 'none'; return; }
@@ -428,14 +435,24 @@ document.getElementById('loadAllBtn').addEventListener('click', async () => {
       }
     }
     const blob = new Blob(chunks);
+
+    setProgress(100, '下載完成，正在解析資料...');
+    await yieldToUI();
     const text = await blob.text();
     DATA = JSON.parse(text);
+
+    setProgress(100, '正在建立索引...');
+    await yieldToUI();
     rebuildIndexes();
+
+    setProgress(100, '正在統計成分/靶點/疾病數量並更新清單...');
+    await yieldToUI();
     allDataLoaded = true;
-    btn.textContent = '✓ 已載入全部 ' + DATA.herbs.length + ' 種藥材資料';
-    btn.disabled = true;
     renderHerbStats();
     renderHerbList(document.getElementById('herbSearch').value);
+
+    btn.textContent = '✓ 已載入全部 ' + DATA.herbs.length + ' 種藥材資料';
+    btn.disabled = true;
     setProgress(null);
     if (currentHerbId) selectHerb(currentHerbId);
   } catch (e) {

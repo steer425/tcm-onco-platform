@@ -249,6 +249,11 @@ let network = null, modalNetwork = null;
 let modalOpen = false;
 let layerVisibility = { ingredients: true, targets: true, genes: true };
 
+// 讓瀏覽器有機會重繪畫面，再繼續執行下一段耗時的同步運算，避免看起來卡住不動
+function yieldToUI(){
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+
 async function bootstrap(){
   const listEl = document.getElementById("herbList");
   listEl.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:12.5px;">資料載入中，請稍候...</div>';
@@ -258,6 +263,10 @@ async function bootstrap(){
     listEl.innerHTML = '<div style="padding:20px;color:#e08080;font-size:12.5px;">資料載入失敗：' + e.message + '</div>';
     return;
   }
+
+  listEl.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:12.5px;">正在建立藥材清單...</div>';
+  await yieldToUI();
+
   renderStats();
   renderList();
 
