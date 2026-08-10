@@ -65,6 +65,35 @@
     </div>
 
     <div class="card">
+      <h3 style="margin-top:0;">資料庫備份到本機</h3>
+      <p class="hint-msg" style="margin-top:0;">
+        建立一份完整的資料庫備份並下載到你自己的電腦。備份路徑由系統自動決定（不開放自訂），檔案內容用加密方式儲存
+        （備份裡含病患個資、DNA 資料、密碼雜湊等高度敏感資訊，即使檔案外流，沒有伺服器的密鑰也無法讀取內容）。
+        這一版還沒有做「還原」功能，只能匯出。
+      </p>
+      <button id="createBackupBtn">建立備份並下載</button>
+      <span id="backupMsg" class="hint-msg"></span>
+      <table style="margin-top:14px;">
+        <thead><tr><th>時間</th><th>狀態</th><th>大小</th><th>備注</th><th></th></tr></thead>
+        <tbody id="backupJobsBody">載入中...</tbody>
+      </table>
+    </div>
+
+    <div class="card" style="border:1px solid #d99a3d;">
+      <h3 style="margin-top:0; color:#a86a1a;">⚠️ 連線本機端資料庫（唯讀模式）</h3>
+      <p class="hint-msg" style="margin-top:0;">
+        啟用後，<b>全站無法執行任何新增/編輯/刪除操作</b>，只能瀏覽查詢，不管是前台還是後台都一樣。
+        這是系統層級的強制限制（在最底層攔截，不是單一頁面的設定），啟用中會影響所有登入的使用者，請謹慎切換。
+        關閉這個設定本身不受此限制影響，不會把自己鎖死在唯讀模式裡出不來。
+      </p>
+      <label style="display:flex; align-items:center; gap:8px; font-weight:600;">
+        <input type="checkbox" id="readOnlyModeCheckbox" style="width:auto;" />
+        啟用唯讀模式
+      </label>
+      <span id="readOnlyModeMsg" class="hint-msg"></span>
+    </div>
+
+    <div class="card">
       <h3 style="margin-top:0;">統計欄位重算</h3>
       <p class="hint-msg" style="margin-top:0;">
         藥材/疾病的靶點統計、暗黑基因的中藥靶點比對結果、藥材的暗黑基因關聯統計，這幾個數字都是預先計算好存在資料庫欄位裡（不是查詢站每次載入即時運算），

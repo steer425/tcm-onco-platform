@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app import models
@@ -128,3 +129,77 @@ def trigger_recompute_stats(db: Session = Depends(get_db), admin: models.User = 
     recompute_all_stats(db)
     write_audit_log(db, admin, "recompute_stats", "system", "stats", "手動觸發重算統計欄位")
     return {"message": "統計欄位已重算完成"}
+
+
+# ---------------------------------------------------------------------------
+# 資料庫備份到本機端（下載）
+# ---------------------------------------------------------------------------
+
+@router.post("/backup-database", response_model=None, summary="（後台）建立一份加密的資料庫備份，路徑由系統自動決定")
+def create_backup(db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
+    from app.backup_service import create_encrypted_backup
+
+    job = models.BackupJob(status=models.BackupStatus.running, notes="手動觸發，透過系統設定頁面下載到本機")
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    try:
+        file_path, size_bytes = create_encrypted_backup(db)
+        job.status = models.BackupStatus.success
+        job.file_path = file_path
+        job.size_bytes = size_bytes
+        job.finished_at = __import__("datetime").datetime.utcnow()
+        db.commit()
+        db.refresh(job)
+        write_audit_log(db, admin, "create_backup", "backup_job", job.id, f"建立資料庫備份，檔案大小 {size_bytes} bytes")
+    except Exception as e:
+        job.status = models.BackupStatus.failed
+        job.notes = f"備份失敗：{e}"
+        job.finished_at = __import__("datetime").datetime.utcnow()
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"備份失敗：{e}")
+
+    from app import schemas
+    return schemas.BackupJobOut.model_validate(job)
+
+
+@router.get("/backup-database/{job_id}/download", summary="（後台）下載指定的加密備份檔案到本機")
+def download_backup(job_id: str, db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
+    job = db.query(models.BackupJob).filter(models.BackupJob.id == job_id).first()
+    if not job or not job.file_path:
+        raise HTTPException(status_code=404, detail="找不到備份紀錄，或這筆紀錄還沒有實際備份檔案")
+
+    from app.backup_service import read_backup_file
+    try:
+        content = read_backup_file(job.file_path)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="備份檔案在伺服器上已經不存在（可能已被清除）")
+
+    write_audit_log(db, admin, "download_backup", "backup_job", job.id, "下載加密備份檔案到本機")
+
+    filename = job.file_path.split("/")[-1]
+    return Response(
+        content=content,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ---------------------------------------------------------------------------
+# 唯讀模式（「連線本機端資料庫」設定）：勾選後全站禁止任何 CRUD 異動操作
+# ---------------------------------------------------------------------------
+
+@router.get("/read-only-mode", summary="查詢目前是否為唯讀模式（登入即可查詢，前端需要據此提示使用者）")
+def get_read_only_mode(db: Session = Depends(get_db)):
+    value = _get_setting_value(db, "read_only_mode")
+    return {"enabled": value == "true"}
+
+
+@router.put("/read-only-mode", summary="（後台）設定唯讀模式：啟用後全站無法執行任何新增/編輯/刪除操作，僅能瀏覽查詢")
+def set_read_only_mode(payload: dict, db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
+    enabled = bool(payload.get("enabled"))
+    _set_setting_value(db, "read_only_mode", "true" if enabled else "false")
+    write_audit_log(db, admin, "set_read_only_mode", "system_setting", "read_only_mode",
+                     f"{'啟用' if enabled else '關閉'}唯讀模式")
+    return {"enabled": enabled}

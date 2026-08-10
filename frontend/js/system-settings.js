@@ -226,6 +226,102 @@ document.getElementById("saveGraphLimitsBtn").addEventListener("click", async ()
 
 loadGraphLimits();
 
+// ---------- 資料庫備份到本機 ----------
+function formatBytes(bytes) {
+  if (bytes == null) return "-";
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / 1024 / 1024).toFixed(1) + " MB";
+}
+
+async function loadBackupJobs() {
+  const tbody = document.getElementById("backupJobsBody");
+  try {
+    const jobs = await api("/backup-jobs");
+    tbody.innerHTML = jobs.map(j => `
+      <tr>
+        <td>${new Date(j.started_at).toLocaleString("zh-Hant")}</td>
+        <td>${j.status === 'success' ? '✓ 成功' : j.status === 'failed' ? '✗ 失敗' : '進行中'}</td>
+        <td>${formatBytes(j.size_bytes)}</td>
+        <td>${j.notes || ""}</td>
+        <td>${j.status === 'success' ? `<a href="#" onclick="downloadBackup('${j.id}'); return false;">下載</a>` : ""}</td>
+      </tr>
+    `).join("") || '<tr><td colspan="5" class="hint-msg">尚無備份紀錄</td></tr>';
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="hint-msg">載入失敗：${err.message}</td></tr>`;
+  }
+}
+
+window.downloadBackup = async (jobId) => {
+  try {
+    const token = getToken();
+    const res = await fetch((API_BASE || "") + `/system-settings/backup-database/${jobId}/download`, {
+      headers: { "Authorization": "Bearer " + token },
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || `HTTP ${res.status}`); }
+    const blob = await res.blob();
+    const disposition = res.headers.get("Content-Disposition") || "";
+    const match = disposition.match(/filename="(.+?)"/);
+    const filename = match ? match[1] : "backup.enc";
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+  } catch (err) {
+    alert("下載失敗：" + err.message);
+  }
+};
+
+document.getElementById("createBackupBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("createBackupBtn");
+  const msg = document.getElementById("backupMsg");
+  btn.disabled = true;
+  msg.textContent = "備份中，可能需要幾秒鐘...";
+  try {
+    const job = await api("/system-settings/backup-database", { method: "POST" });
+    msg.textContent = "備份完成 ✓ 正在自動下載...";
+    await loadBackupJobs();
+    await window.downloadBackup(job.id);
+    setTimeout(() => { msg.textContent = ""; }, 3000);
+  } catch (err) {
+    msg.textContent = "備份失敗：" + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+loadBackupJobs();
+
+// ---------- 唯讀模式（連線本機端資料庫） ----------
+async function loadReadOnlyMode() {
+  try {
+    const data = await api("/system-settings/read-only-mode");
+    document.getElementById("readOnlyModeCheckbox").checked = data.enabled;
+  } catch (err) { /* 載入失敗就維持預設不勾選 */ }
+}
+
+document.getElementById("readOnlyModeCheckbox").addEventListener("change", async (e) => {
+  const enabled = e.target.checked;
+  const msg = document.getElementById("readOnlyModeMsg");
+  const confirmText = enabled
+    ? "啟用後，全站（前台+後台，所有登入使用者）都無法執行任何新增/編輯/刪除操作，確定要啟用嗎？"
+    : "確定要關閉唯讀模式，恢復正常的新增/編輯/刪除功能嗎？";
+  if (!confirm(confirmText)) {
+    e.target.checked = !enabled; // 使用者取消，checkbox 狀態要復原
+    return;
+  }
+  try {
+    await api("/system-settings/read-only-mode", { method: "PUT", body: JSON.stringify({ enabled }) });
+    msg.textContent = enabled ? "已啟用唯讀模式 ✓" : "已關閉唯讀模式 ✓";
+    setTimeout(() => { msg.textContent = ""; }, 3000);
+  } catch (err) {
+    msg.textContent = "設定失敗：" + err.message;
+    e.target.checked = !enabled;
+  }
+});
+
+loadReadOnlyMode();
+
 // ---------- 統計欄位重算 ----------
 document.getElementById("recomputeStatsBtn").addEventListener("click", async () => {
   const btn = document.getElementById("recomputeStatsBtn");

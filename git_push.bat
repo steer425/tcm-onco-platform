@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.30.0 move query station stats from live computation to precomputed DB columns"
+set "DEFAULT_MSG=v1.31.0 add database backup download and read-only mode to system settings"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%
