@@ -127,6 +127,10 @@ def import_data(json_path: str):
         ])
         db.commit()
         print("匯入完成！")
+
+        print("\n開始重算統計欄位（藥材/疾病靶點數、暗黑基因比對結果）...")
+        from app.recompute_stats import recompute_all_stats
+        recompute_all_stats(db)
     finally:
         db.close()
 

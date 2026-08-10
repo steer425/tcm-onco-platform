@@ -80,6 +80,21 @@ Dashboard 頁面的四張卡片（主機資訊／版本資訊／專案文件／2
 
 對應 API：`GET/PUT /system-settings/graph-limits`（沿用 `SystemSetting` 通用 key-value 機制，PUT 僅限管理者，數值需介於 1~9999）。**這幾個數字不應該再寫死在任何前端程式碼裡**——之前寫死「3」導致 BRCA1 的 12 種藥材被裁到只剩 3 個顯示，這是真實發生過的 bug（v1.21.1），所以才改成這樣可設定的架構。
 
+### 統計欄位一律預先算好存資料庫，不要在查詢端點裡即時運算（v1.30.0 起）
+
+以下四個統計數字**不是**每次 API 請求即時運算，而是預先計算好存在資料庫欄位裡，查詢時直接讀欄位：
+
+| 統計項目 | 欄位 | 說明 |
+|---|---|---|
+| 疾病關聯查詢站的靶點統計 | `TcmspDisease.target_count` | 這個疾病連結到幾個不重複的 TCMSP 靶點 |
+| 藥材關聯查詢站的靶點統計 | `TcmspHerb.target_count` | 這個藥材（透過成分）連結到幾個不重複的 TCMSP 靶點 |
+| 暗黑基因關聯查詢站的中藥靶點統計 | `DarkGene.has_tcmsp_target` | 這個基因是否比對到任何 TCMSP 靶點 |
+| 藥材與暗黑基因關聯的基因關聯統計 | `TcmspHerb.dark_gene_count` | 這個藥材連結到幾個不重複的暗黑基因 |
+
+- 統一由 `app/recompute_stats.py` 的 `recompute_all_stats()` 重新計算，**匯入 TCMSP 資料或暗黑基因資料時會自動觸發**（見 `import_tcmsp_data.py`／`import_dark_genes.py` 結尾），`migrate_schema.py` 的最後一步也會自動觸發一次（正式環境的舊資料庫欄位剛被 `ALTER TABLE` 新增時，值會停留在預設的 0/False，一定要跑一次重算才會變成正確數字）
+- 後台「系統設定」頁面有手動觸發按鈕（`POST /system-settings/recompute-stats`），供只是透過後台介面手動編輯了少量資料、不想重新匯入整批檔案時使用
+- **之後如果又要新增一個「查詢站清單要顯示的統計數字」，一律照這個模式做**：加資料庫欄位 → 寫進 `recompute_stats.py` → 兩個匯入腳本與 `migrate_schema.py` 都要記得觸發 → 端點直接讀欄位回傳。不要為了圖方便，又寫一段「每次請求都重新掃一次全部關聯資料」的即時運算邏輯，那樣會讓查詢站的清單載入變慢（這正是這次改版要解決的問題本身）
+
 ## 五之二、全站語系機制（繁中/簡中/英文/韓文）
 
 `site_language` 個人化設定支援四種值：`tw`（繁體中文，原文，不轉換）／`cn`（簡體中文，OpenCC 字形轉換）／`en`（English，字典比對翻譯）／`ko`（한국어，字典比對翻譯）。

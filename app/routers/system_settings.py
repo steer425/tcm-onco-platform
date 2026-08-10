@@ -120,3 +120,11 @@ def set_graph_limits(payload: dict, db: Session = Depends(get_db), admin: models
             updated[key] = value
     write_audit_log(db, admin, "update_graph_limits", "system_setting", "graph_limits", f"設定網絡圖節點數量上限預設值：{updated}")
     return {"message": "已更新", **updated}
+
+
+@router.post("/recompute-stats", summary="（後台）手動觸發重算統計欄位（藥材/疾病靶點數、暗黑基因比對結果），供只是手動編輯少量資料、不想重跑整個匯入流程時使用")
+def trigger_recompute_stats(db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
+    from app.recompute_stats import recompute_all_stats
+    recompute_all_stats(db)
+    write_audit_log(db, admin, "recompute_stats", "system", "stats", "手動觸發重算統計欄位")
+    return {"message": "統計欄位已重算完成"}

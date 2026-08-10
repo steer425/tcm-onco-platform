@@ -33,6 +33,10 @@ ALTER_STATEMENTS = [
     "ALTER TABLE pharmacies ADD COLUMN discount_percent INTEGER",
     "ALTER TABLE pharmacies ADD COLUMN discount_description VARCHAR",
     "ALTER TABLE pharmacies ADD COLUMN discount_valid_until VARCHAR",
+    "ALTER TABLE tcmsp_herbs ADD COLUMN target_count INTEGER DEFAULT 0 NOT NULL",
+    "ALTER TABLE tcmsp_herbs ADD COLUMN dark_gene_count INTEGER DEFAULT 0 NOT NULL",
+    "ALTER TABLE tcmsp_diseases ADD COLUMN target_count INTEGER DEFAULT 0 NOT NULL",
+    "ALTER TABLE dark_genes ADD COLUMN has_tcmsp_target BOOLEAN DEFAULT FALSE NOT NULL",
 ]
 
 
@@ -112,6 +116,12 @@ def run():
             print(f"  已回填 {filled} 筆疾病中文名稱")
         else:
             print("  找不到種子檔案，略過（正常情況：尚未執行過 TCMSP 資料匯入）")
+
+        print("步驟 4/4：重算統計欄位（藥材/疾病靶點數、暗黑基因比對結果）...")
+        print("  這一步很重要：上面的 ALTER TABLE 新增了統計欄位，正式環境的舊資料如果不重算，")
+        print("  這幾個欄位的值會停留在預設的 0/False，不會自動變成正確數字。")
+        from app.recompute_stats import recompute_all_stats
+        recompute_all_stats(db)
     finally:
         db.close()
 

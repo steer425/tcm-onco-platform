@@ -225,3 +225,20 @@ document.getElementById("saveGraphLimitsBtn").addEventListener("click", async ()
 });
 
 loadGraphLimits();
+
+// ---------- 統計欄位重算 ----------
+document.getElementById("recomputeStatsBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("recomputeStatsBtn");
+  const msg = document.getElementById("recomputeStatsMsg");
+  btn.disabled = true;
+  msg.textContent = "重算中，可能需要幾秒鐘...";
+  try {
+    await api("/system-settings/recompute-stats", { method: "POST" });
+    msg.textContent = "已完成 ✓";
+    setTimeout(() => { msg.textContent = ""; }, 3000);
+  } catch (err) {
+    msg.textContent = "重算失敗：" + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});

@@ -1,5 +1,60 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.30.0 — 2026-08-06（四項統計數字改為預先存入資料庫，不再即時運算）
+
+### 背景
+
+以下四個地方原本是**每次 API 請求都重新掃一次關聯資料算出來的**，改成預先計算好存入資料庫欄位，查詢時直接讀欄位：
+
+1. 疾病關聯查詢站：靶點統計
+2. 藥材關聯查詢站：靶點統計
+3. 暗黑基因關聯查詢站：有中藥靶點統計
+4. 藥材與暗黑基因關聯：有基因關聯統計
+
+### 資料庫變更
+
+新增 4 個統計欄位：`TcmspHerb.target_count`、`TcmspHerb.dark_gene_count`、`TcmspDisease.target_count`、`DarkGene.has_tcmsp_target`。
+
+### 新增 `app/recompute_stats.py`
+
+統一的重算腳本，把原本分散在四個端點裡的即時運算邏輯集中起來，一次算完寫入資料庫：
+- `python -m app.recompute_stats` 可以獨立執行
+- **匯入 TCMSP 資料或暗黑基因資料時自動觸發**（`import_tcmsp_data.py`／`import_dark_genes.py` 結尾都加了呼叫）
+- `migrate_schema.py` 最後一步也會自動觸發（正式環境的舊資料庫剛被 ALTER TABLE 新增這幾個欄位時，值會是預設的 0/False，一定要跑一次重算）
+- 後台「系統設定」頁面新增「統計欄位重算」卡片，手動觸發按鈕，供只是透過後台介面手動編輯少量資料時使用（`POST /system-settings/recompute-stats`）
+
+### API 端點變更
+
+- `GET /tcmsp/diseases/public/list` 新增回傳 `target_count`
+- `GET /tcmsp/herbs/public/list` 新增回傳 `target_count`、`dark_gene_count`
+- `GET /dark-genes/public/list` 的 `has_tcmsp_target` 改讀資料庫欄位，`has_tcmsp_target` 篩選參數現在可以直接下推到 SQL 層（`WHERE`），不用先抓全部再用 Python 篩選
+- `GET /dark-genes/public/herb-stats` 的 `dark_gene_count` 改讀資料庫欄位做排序/篩選；`gene_symbols`（比對到的基因清單，用於畫面標籤）因為沒有另外存成關聯表，還是需要現算，但範圍已經限縮在資料庫欄位篩選過的藥材，比全部 502 種藥材下去掃快很多
+
+### 前端變更
+
+- 疾病查詢站、藥材查詢站的左側清單，靶點數 badge 現在**一載入就會顯示**（讀伺服器回傳的統計欄位），不用等「載入全部」或個別項目的詳情資料合併進來才看得到數字
+- 藥材查詢站清單新增獨立的「靶點」badge（藍色），跟原本的「成分」badge（綠色）並排顯示
+- 暗黑基因查詢站不用改前端，本來就是直接讀 API 回傳的 `has_tcmsp_target` 欄位，後端從即時運算換成讀資料庫欄位對前端完全透明
+
+### 已測試驗證
+
+- 重算腳本本身：本機測試結果跟改版前的即時運算結果完全一致（49 個基因比對到中藥靶點、葛花覆蓋 32 個暗黑基因不重複基因，皆與先前多次驗證過的數字吻合）
+- 完整遷移流程測試：模擬正式環境情境（先有舊資料、缺新欄位），執行 `migrate_schema.py` 後確認自動觸發的重算步驟正確執行、統計欄位有被正確填入
+- 四個 API 端點與三個相關頁面（藥材站、疾病站、系統設定）伺服器端測試全部通過
+
+### `rules.md` 更新
+
+新增規範：之後任何「查詢站清單要顯示的統計數字」，一律要走「資料庫欄位 + `recompute_stats.py` + 匯入腳本/遷移腳本自動觸發」這套架構，不要再寫「每次請求都即時運算」的邏輯。
+
+### 部署注意事項
+
+**這次一定要跑遷移腳本**，而且順序有意義（遷移腳本本身最後一步就會自動重算，不需要額外手動再跑一次）：
+
+```bash
+$env:DATABASE_URL="你的 Neon 連線字串"
+python -m app.migrate_schema
+```
+
 ## v1.29.3 — 2026-08-06（修正藥材查詢站：切換藥材後點「顯示 Selected」關聯圖沒有顯示）
 
 ### 問題

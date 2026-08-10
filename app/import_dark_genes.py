@@ -62,6 +62,10 @@ def import_data(tsv_path: str):
                     created += 1
             db.commit()
         print(f"完成！新增 {created} 筆、更新 {updated} 筆、略過 {skipped} 筆（無基因符號的空白列）。")
+
+        print("\n開始重算統計欄位（暗黑基因比對結果、藥材靶點/基因統計）...")
+        from app.recompute_stats import recompute_all_stats
+        recompute_all_stats(db)
     finally:
         db.close()
 

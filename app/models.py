@@ -276,6 +276,12 @@ class TcmspHerb(Base):
     child_en_name = Column(String, nullable=True)
     status = Column(String, default="active", nullable=False)  # active / inactive（軟刪除）
     notes = Column(Text, nullable=True)
+    # 以下兩個欄位是預先計算好存起來的統計數字，不是每次查詢站列表載入時即時運算：
+    # target_count：這個藥材（透過成分）連結到幾個不重複的 TCMSP 靶點
+    # dark_gene_count：這個藥材（透過成分-靶點）連結到幾個不重複的暗黑基因
+    # 由 app/recompute_stats.py 統一重算，資料匯入後跑一次即可，查詢時直接讀欄位、不用現場算
+    target_count = Column(Integer, default=0, nullable=False)
+    dark_gene_count = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -323,6 +329,9 @@ class TcmspDisease(Base):
     icd9 = Column(String, nullable=True)
     icd10 = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
+    # 預先計算好的統計數字：這個疾病連結到幾個不重複的 TCMSP 靶點，
+    # 由 app/recompute_stats.py 統一重算，查詢站列表不用現場運算
+    target_count = Column(Integer, default=0, nullable=False)
 
 
 class TcmspHerbIngredient(Base):
@@ -486,6 +495,10 @@ class DarkGene(Base):
     vogelstein = Column(Boolean, default=False, nullable=False)
     cosmic_cgc = Column(Boolean, default=False, nullable=False)
     gene_aliases = Column(Text, nullable=True)
+    # 預先計算好的比對結果：這個基因是否比對到 TCMSP 靶點資料，
+    # 由 app/recompute_stats.py 統一重算（用基因符號/別名比對靶點名稱），
+    # 查詢站列表直接讀這個欄位，不用每次請求都重新掃一次全部靶點
+    has_tcmsp_target = Column(Boolean, default=False, nullable=False)
     status = Column(String, default="active", nullable=False)  # active / inactive（軟刪除）
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

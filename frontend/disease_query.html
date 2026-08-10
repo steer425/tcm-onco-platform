@@ -411,7 +411,9 @@ function renderDiseaseList(filter) {
 }
 
 function buildDiseaseRowHtml(d) {
-  const cnt = (targetsByDisease.get(d.dis_id) || new Set()).size;
+  // target_count 是伺服器預先計算好、隨清單一起回傳的統計欄位（不是即時運算），
+  // 所以清單一載入就能看到正確靶點數，不用等「載入全部」或個別項目的詳情資料合併進來
+  const cnt = d.target_count || 0;
   const cnName = d.disease_cn_name ? escapeHtml(zhConv(d.disease_cn_name)) : '';
   return `<div class="disRow" data-id="${d.dis_id}">
     <div class="name">${cnName ? cnName + ' ' : ''}${escapeHtml(d.disease_name || "(未命名)")} ${cnt ? `<span class="badge">${cnt} 個靶點</span>` : ""}</div>

@@ -23,6 +23,7 @@ html,body{margin:0;padding:0;background:var(--bg);color:#eee;font-family:"Noto S
 .herbRow .cn{font-weight:600;}
 .herbRow .en{color:var(--muted);font-size:11.5px;}
 .badge{display:inline-block;background:#204a33;color:#8be0af;border-radius:4px;padding:0 5px;font-size:10.5px;margin-left:6px;}
+.badge-target{background:#2f3a5c;color:#9db3e8;}
 #main{flex:1;display:flex;flex-direction:column;min-width:0;overflow-y:auto;}
 #herbHeader{padding:14px 20px;border-bottom:1px solid var(--line);}
 #herbHeader h2{margin:0 0 4px;font-size:17px;}
@@ -122,6 +123,7 @@ body[data-page-theme="light"] .disRow.active{background:#e2ede6;}
 body[data-page-theme="light"] .herbRow .en,
 body[data-page-theme="light"] .disRow .meta{color:#6b7a70;}
 body[data-page-theme="light"] .badge{background:#e8f3ec;color:#1f4f37;}
+body[data-page-theme="light"] .badge-target{background:#e3ecf5;color:#1c4d78;}
 body[data-page-theme="light"] #herbHeader,
 body[data-page-theme="light"] #disHeader{border-color:#dfe5e0;}
 body[data-page-theme="light"] #herbHeader .meta,
@@ -836,7 +838,11 @@ function appendHerbRow(list, h){
       const row = document.createElement('div');
       row.className = 'herbRow' + (h.herb_id === currentHerbId ? ' active' : '');
       const hasData = herbsWithData.has(h.herb_id);
-      row.innerHTML = `<div class="cn">${escapeHtml(zhConv(h.herb_cn_name))} ${hasData ? `<span class="badge">${molsByHerb.get(h.herb_id).length} 成分</span>` : ''}</div>
+      // h.target_count 是伺服器預先計算好、隨清單一起回傳的統計欄位（不是即時運算），
+      // 所以清單一載入就能看到正確靶點數，不用等這個藥材的詳情資料被載入/合併進來
+      const targetBadge = h.target_count ? `<span class="badge badge-target">${h.target_count} 個靶點</span>` : '';
+      const ingBadge = hasData ? `<span class="badge">${molsByHerb.get(h.herb_id).length} 成分</span>` : '';
+      row.innerHTML = `<div class="cn">${escapeHtml(zhConv(h.herb_cn_name))} ${targetBadge} ${ingBadge}</div>
         <div class="en">${escapeHtml(h.herb_pinyin||'')} · ${escapeHtml(h.herb_en_name||'')}</div>`;
       row.onclick = () => selectHerb(h.herb_id);
       list.appendChild(row);

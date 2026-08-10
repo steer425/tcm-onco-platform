@@ -65,6 +65,17 @@
     </div>
 
     <div class="card">
+      <h3 style="margin-top:0;">統計欄位重算</h3>
+      <p class="hint-msg" style="margin-top:0;">
+        藥材/疾病的靶點統計、暗黑基因的中藥靶點比對結果、藥材的暗黑基因關聯統計，這幾個數字都是預先計算好存在資料庫欄位裡（不是查詢站每次載入即時運算），
+        每次匯入 TCMSP 或暗黑基因資料時系統會自動重算一次。如果你只是透過後台介面手動編輯了少量資料（不是重新匯入整批檔案），
+        可以按這裡手動觸發重算，確保統計數字是最新的。
+      </p>
+      <button id="recomputeStatsBtn">重新計算統計欄位</button>
+      <span id="recomputeStatsMsg" class="hint-msg"></span>
+    </div>
+
+    <div class="card">
       <h3 style="margin-top:0;">查詢站預設項目</h3>
       <p class="hint-msg" style="margin-top:0;">
         TCMSP 藥材／疾病關聯查詢站首次載入時，只會顯示這裡設定的項目（其餘項目使用者可以自行搜尋，或按「載入全部」看全部資料），藉此加快首次載入速度。

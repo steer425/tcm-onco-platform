@@ -584,7 +584,7 @@ class DarkGeneOut(BaseModel):
     gene_aliases: Optional[str]
     status: str
     notes: Optional[str]
-    has_tcmsp_target: bool = False  # 是否比對到 TCMSP 靶點資料，於 router 內計算覆寫
+    has_tcmsp_target: bool = False  # 是否比對到 TCMSP 靶點資料，預先計算好存在資料庫欄位（app/recompute_stats.py），不是即時運算
     created_at: datetime
 
     class Config:

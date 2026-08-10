@@ -113,70 +113,65 @@ def public_get_gene_stats(only_with_target: bool = True, current_user: models.Us
     return {"total": len(results), "genes": results}
 
 
-@router.get("/public/herb-stats", summary="（前台）中藥暗黑基因覆蓋統計：以藥材為主，列出每種藥材連結到幾個不重複的暗黑基因")
+@router.get("/public/herb-stats", summary="（前台）中藥暗黑基因覆蓋統計：以藥材為主，列出每種藥材連結到幾個不重複的暗黑基因（統計數字為預先計算好的資料庫欄位）")
 def public_get_herb_stats(only_with_gene: bool = True, current_user: models.User = Depends(get_current_user),
                            db: Session = Depends(get_db)):
+    # dark_gene_count 直接讀資料庫欄位（app/recompute_stats.py 預先算好），
+    # 不用每次請求都重新掃一次全部靶點/成分/藥材關聯，篩選跟排序也都能直接在 SQL 層做
+    q = db.query(models.TcmspHerb).filter(models.TcmspHerb.status == "active")
+    if only_with_gene:
+        q = q.filter(models.TcmspHerb.dark_gene_count > 0)
+    herbs = q.order_by(models.TcmspHerb.dark_gene_count.desc(), models.TcmspHerb.herb_cn_name).all()
+
+    if not herbs:
+        return {"total": 0, "herbs": []}
+
+    # gene_symbols（比對到的基因清單，用於畫面上顯示標籤）沒有另外存成資料表，
+    # 只針對「這次真的要回傳的藥材」現算，範圍已經被上面的資料庫欄位篩選過，比全藥材下去掃快很多
+    herb_ids = [h.id for h in herbs]
     genes = db.query(models.DarkGene).filter(models.DarkGene.status == "active").all()
+    genes_by_id = {g.id: g for g in genes}
     all_targets = db.query(models.TcmspTarget).all()
 
-    # 步驟 1：算出「單詞 -> 符合的靶點 tar_id 集合」，再反推「靶點 -> 命中的暗黑基因集合」
     word_to_target_ids = {}
     for t in all_targets:
         words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
         for w in words:
             word_to_target_ids.setdefault(w, set()).add(t.tar_id)
 
-    target_to_gene_ids = {}  # 只會有跟暗黑基因有關的靶點才會出現在這裡（約 50~100 個）
+    target_to_gene_ids = {}
     for g in genes:
         for sym in _gene_symbols_for_match(g):
             for tar_id in word_to_target_ids.get(sym, set()):
                 target_to_gene_ids.setdefault(tar_id, set()).add(g.id)
 
-    if not target_to_gene_ids:
-        return {"total": 0, "herbs": []}
-
-    # 步驟 2：掃一次「成分-靶點」關聯，只留跟上面那些靶點有關的，換算成「成分 -> 命中的暗黑基因集合」
     relevant_tar_ids = set(target_to_gene_ids.keys())
     mol_to_gene_ids = {}
-    ingredient_target_rows = db.query(models.TcmspIngredientTarget).filter(
-        models.TcmspIngredientTarget.tar_id.in_(relevant_tar_ids)
-    ).all()
-    for r in ingredient_target_rows:
-        mol_to_gene_ids.setdefault(r.mol_id, set()).update(target_to_gene_ids.get(r.tar_id, set()))
+    if relevant_tar_ids:
+        for r in db.query(models.TcmspIngredientTarget).filter(models.TcmspIngredientTarget.tar_id.in_(relevant_tar_ids)).all():
+            mol_to_gene_ids.setdefault(r.mol_id, set()).update(target_to_gene_ids.get(r.tar_id, set()))
 
-    # 步驟 3：掃一次「藥材-成分」關聯，把成分對應到的暗黑基因歸到藥材身上（用集合自動去重）
-    relevant_mol_ids = set(mol_to_gene_ids.keys())
     herb_to_gene_ids = {}
-    herb_ingredient_rows = db.query(models.TcmspHerbIngredient).filter(
-        models.TcmspHerbIngredient.mol_id.in_(relevant_mol_ids)
-    ).all() if relevant_mol_ids else []
-    for r in herb_ingredient_rows:
-        herb_to_gene_ids.setdefault(r.herb_id, set()).update(mol_to_gene_ids.get(r.mol_id, set()))
-
-    herb_ids = list(herb_to_gene_ids.keys())
-    herbs = db.query(models.TcmspHerb).filter(
-        models.TcmspHerb.id.in_(herb_ids), models.TcmspHerb.status == "active"
-    ).all() if herb_ids else []
-    genes_by_id = {g.id: g for g in genes}
+    relevant_mol_ids = set(mol_to_gene_ids.keys())
+    if relevant_mol_ids:
+        for r in db.query(models.TcmspHerbIngredient).filter(
+            models.TcmspHerbIngredient.herb_id.in_(herb_ids), models.TcmspHerbIngredient.mol_id.in_(relevant_mol_ids)
+        ).all():
+            herb_to_gene_ids.setdefault(r.herb_id, set()).update(mol_to_gene_ids.get(r.mol_id, set()))
 
     results = []
-    all_herbs_with_data = herbs if only_with_gene else db.query(models.TcmspHerb).filter(models.TcmspHerb.status == "active").all()
-    for h in all_herbs_with_data:
+    for h in herbs:
         gene_ids = herb_to_gene_ids.get(h.id, set())
-        if only_with_gene and not gene_ids:
-            continue
         results.append({
             "herb_id": h.id, "herb_cn_name": h.herb_cn_name, "herb_pinyin": h.herb_pinyin,
             "herb_en_name": h.herb_en_name,
-            "dark_gene_count": len(gene_ids),
+            "dark_gene_count": h.dark_gene_count,  # 資料庫欄位，非現算
             "gene_symbols": sorted([genes_by_id[gid].hugo_symbol for gid in gene_ids if gid in genes_by_id]),
         })
-
-    results.sort(key=lambda r: (-r["dark_gene_count"], r["herb_cn_name"] or ""))
     return {"total": len(results), "herbs": results}
 
 
-@router.get("/public/list", response_model=List[schemas.DarkGeneOut], summary="（前台）查詢暗黑基因清單（含是否有中藥靶點標記，供查詢站使用）")
+@router.get("/public/list", response_model=List[schemas.DarkGeneOut], summary="（前台）查詢暗黑基因清單（含是否有中藥靶點標記，為預先計算好的統計欄位，供查詢站使用）")
 def public_list_genes(keyword: Optional[str] = None, gene_type: Optional[str] = None,
                        has_tcmsp_target: Optional[bool] = None,
                        current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -188,16 +183,10 @@ def public_list_genes(keyword: Optional[str] = None, gene_type: Optional[str] = 
         )
     if gene_type:
         q = q.filter(models.DarkGene.gene_type == gene_type)
+    if has_tcmsp_target is not None:
+        q = q.filter(models.DarkGene.has_tcmsp_target == has_tcmsp_target)
     genes = q.order_by(models.DarkGene.hugo_symbol).all()
-
-    target_word_set = _build_target_word_index(db)
-    results = []
-    for g in genes:
-        out = schemas.DarkGeneOut.model_validate(g)
-        out.has_tcmsp_target = _gene_has_tcmsp_target(g, target_word_set)
-        if has_tcmsp_target is None or out.has_tcmsp_target == has_tcmsp_target:
-            results.append(out)
-    return results
+    return [schemas.DarkGeneOut.model_validate(g) for g in genes]
 
 
 # ---------------------------------------------------------------------------

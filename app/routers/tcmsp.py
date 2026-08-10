@@ -41,13 +41,14 @@ def _val(v):
 # 前台／一般登入使用者：查詢用（供 tcmsp_query.html 使用）
 # ---------------------------------------------------------------------------
 
-@router.get("/herbs/public/list", summary="（前台）取得藥材清單（輕量，不含關聯資料，供左側清單快速載入）")
+@router.get("/herbs/public/list", summary="（前台）取得藥材清單（輕量，不含關聯資料，供左側清單快速載入；靶點數為預先計算好的統計欄位）")
 def public_list_herbs(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     herbs = db.query(models.TcmspHerb).filter(models.TcmspHerb.status == "active").all()
     return [
         {
             "herb_id": h.id, "herb_cn_name": h.herb_cn_name, "herb_pinyin": h.herb_pinyin,
             "herb_en_name": h.herb_en_name, "child_cn_name": h.child_cn_name, "child_en_name": h.child_en_name,
+            "target_count": h.target_count, "dark_gene_count": h.dark_gene_count,
         }
         for h in herbs
     ]
@@ -239,13 +240,14 @@ def admin_delete_herb(herb_id: int, db: Session = Depends(get_db), admin: models
 # 供管理者逐步補齊、修正翻譯。
 # ---------------------------------------------------------------------------
 
-@router.get("/diseases/public/list", summary="（前台）取得疾病清單（輕量，不含關聯資料，供左側清單快速載入）")
+@router.get("/diseases/public/list", summary="（前台）取得疾病清單（輕量，不含關聯資料，供左側清單快速載入；靶點數為預先計算好的統計欄位）")
 def public_list_diseases(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     diseases = db.query(models.TcmspDisease).all()
     return [
         {
             "dis_id": d.dis_id, "disease_id": d.disease_id, "disease_name": d.disease_name,
             "disease_cn_name": d.disease_cn_name, "icd9": d.icd9, "icd10": d.icd10,
+            "target_count": d.target_count,
         }
         for d in diseases
     ]
