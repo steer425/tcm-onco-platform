@@ -57,12 +57,26 @@
     const nodes = [];
     let n;
     while ((n = walker.nextNode())) nodes.push(n);
-    nodes.forEach((node) => { node.nodeValue = convertText(node.nodeValue); });
+    // 重要：只在轉換後的文字「真的不一樣」才賦值。
+    // MutationObserver 監看 characterData 變化的同時，這個函式也會修改 node.nodeValue，
+    // 如果不管值有沒有變都賦值，瀏覽器會把「賦值」本身視為一次新的異動，
+    // 又觸發同一個 observer 的回呼，回呼又再賦值一次……形成無窮迴圈，把主執行緒卡死
+    // （這是真實發生過的 bug：使用者切換到韓文/英文後整個系統當機、跳出「網頁無回應」）。
+    nodes.forEach((node) => {
+      const converted = convertText(node.nodeValue);
+      if (converted !== node.nodeValue) node.nodeValue = converted;
+    });
 
     // 常見會放中文的屬性也一併轉換（placeholder、title、value 按鈕文字等）
     root.querySelectorAll("[placeholder], [title]").forEach((el) => {
-      if (el.placeholder && /[\u4e00-\u9fff]/.test(el.placeholder)) el.placeholder = convertText(el.placeholder);
-      if (el.title && /[\u4e00-\u9fff]/.test(el.title)) el.title = convertText(el.title);
+      if (el.placeholder && /[\u4e00-\u9fff]/.test(el.placeholder)) {
+        const converted = convertText(el.placeholder);
+        if (converted !== el.placeholder) el.placeholder = converted;
+      }
+      if (el.title && /[\u4e00-\u9fff]/.test(el.title)) {
+        const converted = convertText(el.title);
+        if (converted !== el.title) el.title = converted;
+      }
     });
   }
 
@@ -74,11 +88,14 @@
         m.addedNodes.forEach((node) => {
           if (node.nodeType === 1) walkAndConvert(node);
           else if (node.nodeType === 3 && node.nodeValue && /[\u4e00-\u9fff]/.test(node.nodeValue)) {
-            node.nodeValue = convertText(node.nodeValue);
+            const converted = convertText(node.nodeValue);
+            if (converted !== node.nodeValue) node.nodeValue = converted;
           }
         });
-        if (m.type === "characterData" && m.target.nodeValue) {
-          m.target.nodeValue = convertText(m.target.nodeValue);
+        // 同樣要「有中文才轉、轉了才賦值」，避免無窮迴圈，理由同上
+        if (m.type === "characterData" && m.target.nodeValue && /[\u4e00-\u9fff]/.test(m.target.nodeValue)) {
+          const converted = convertText(m.target.nodeValue);
+          if (converted !== m.target.nodeValue) m.target.nodeValue = converted;
         }
       });
     });
