@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.29.2 add rules.md requirement: check backend admin pages for all 4 languages too"
+set "DEFAULT_MSG=v1.29.3 fix herb query station: network graph not updating after switching herbs"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

@@ -852,6 +852,14 @@ async function selectHerb(herbId){
   const herb = herbsById.get(herbId);
   const main = document.getElementById('main');
 
+  // 切換藥材前一定要先清掉舊的 vis-network 實例：main.innerHTML 等一下會被整個換掉，
+  // 舊的 #network 容器連帶被拿掉，但 network 這個全域變數如果沒有跟著重置，
+  // 之後呼叫 renderNetwork() 判斷 if(network) 會誤以為圖表還在，
+  // 去更新一個已經不在畫面上、使用者看不到的舊畫布，導致「明明按了顯示 Selected，
+  // 畫面卻還停在最一開始的提示文字」——這是真實發生過的 bug（v1.29.x）。
+  if (network) { network.destroy(); network = null; }
+  lastNodes = null; lastEdges = null; lastOptions = null;
+
   // 這個藥材還沒被載入過詳情資料，且還沒按過「載入全部」→ 隨選載入這一個藥材就好，速度很快
   if (!loadedHerbIds.has(herbId) && !allDataLoaded) {
     main.innerHTML = `<div id="emptyState">載入 ${escapeHtml(zhConv(herb.herb_cn_name) || herb.herb_en_name)} 的關聯資料中...</div>`;
