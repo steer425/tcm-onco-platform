@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.28.5 fix batch file quoting bug and add temp-folder safety check"
+set "DEFAULT_MSG=v1.28.6 add missing translation entries for personal settings page"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

@@ -96,6 +96,23 @@ window.I18N_DICT = {
 
     // ---- Dashboard ----
     "歡迎回來": "Welcome back",
+
+    // ---- 個人化設定 ----
+    "全站語系": "Site-wide Language",
+    "套用於": "Applies to",
+    "整個後台系統": "the entire admin system",
+    "（所有頁面，不只查詢站）。這是你個人的偏好設定，只影響你自己看到的畫面，切換後下次登入會自動套用。":
+      "(all pages, not just query stations). This is your personal preference and only affects what you see; it will be applied automatically the next time you log in.",
+    "繁體中文（預設）": "Traditional Chinese (Default)",
+    "關聯查詢站 CSS 設定": "Query Station Theme Settings",
+    "套用於「TCMSP 藥材關聯查詢站」與「TCMSP 疾病關聯查詢站」兩個頁面。這是":
+      "Applies to both the \"TCMSP Herb Association Explorer\" and \"TCMSP Disease Association Explorer\" pages. This is",
+    "你個人的偏好設定": "your personal preference",
+    "，只影響你自己看到的畫面，不會影響其他使用者；設定後會記住，下次登入直接套用。":
+      ", it only affects what you see and does not affect other users; the setting is remembered and applied automatically on your next login.",
+    "深色（預設）": "Dark (Default)",
+    "淺色": "Light",
+    "目前使用中": "Currently active",
   },
   ko: {
     // ---- 導覽選單 ----
@@ -184,5 +201,22 @@ window.I18N_DICT = {
 
     // ---- Dashboard ----
     "歡迎回來": "다시 오신 것을 환영합니다",
+
+    // ---- 個人化設定 ----
+    "全站語系": "전체 사이트 언어",
+    "套用於": "적용 대상",
+    "整個後台系統": "전체 관리 시스템",
+    "（所有頁面，不只查詢站）。這是你個人的偏好設定，只影響你自己看到的畫面，切換後下次登入會自動套用。":
+      "(모든 페이지, 탐색기뿐만 아니라). 이것은 개인 환경설정이며 본인이 보는 화면에만 영향을 미치고, 다음 로그인 시 자동으로 적용됩니다.",
+    "繁體中文（預設）": "繁體中文（기본값）",
+    "關聯查詢站 CSS 設定": "탐색기 테마 설정",
+    "套用於「TCMSP 藥材關聯查詢站」與「TCMSP 疾病關聯查詢站」兩個頁面。這是":
+      "\"TCMSP 약재 연관성 탐색기\"와 \"TCMSP 질병 연관성 탐색기\" 두 페이지에 적용됩니다. 이것은",
+    "你個人的偏好設定": "개인 환경설정",
+    "，只影響你自己看到的畫面，不會影響其他使用者；設定後會記住，下次登入直接套用。":
+      "이며, 본인이 보는 화면에만 영향을 미치고 다른 사용자에게는 영향을 주지 않습니다. 설정은 저장되어 다음 로그인 시 바로 적용됩니다.",
+    "深色（預設）": "다크 (기본값)",
+    "淺色": "라이트",
+    "目前使用中": "현재 사용 중",
   },
 };
