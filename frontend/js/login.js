@@ -1,3 +1,53 @@
+// ---------- 登入頁語系切換（預設英文） ----------
+const LOGIN_LANG_STORAGE_KEY = "tcm_login_lang";
+let loginConvToTw = null, loginConvToCn = null;
+function initLoginOpenCC() {
+  try {
+    loginConvToTw = OpenCC.Converter({ from: "cn", to: "tw" });
+    loginConvToCn = OpenCC.Converter({ from: "tw", to: "cn" });
+  } catch (e) { /* CDN 載入失敗就不轉換 */ }
+}
+function convertLoginText(text, lang) {
+  if (!text || !text.trim()) return text;
+  try {
+    if (lang === "cn") return loginConvToCn ? loginConvToCn(text) : text;
+    if (lang === "en" || lang === "ko") {
+      const dict = window.I18N_DICT && window.I18N_DICT[lang];
+      if (!dict) return text;
+      const trimmed = text.trim();
+      const leading = text.slice(0, text.indexOf(trimmed));
+      const trailing = text.slice(text.indexOf(trimmed) + trimmed.length);
+      return dict[trimmed] ? leading + dict[trimmed] + trailing : text;
+    }
+    return text; // tw：原文
+  } catch (e) { return text; }
+}
+function applyLoginLanguage(lang) {
+  if (lang === "tw") return; // 原文就是繁體中文，不用轉換，重新整理頁面即可還原
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) => {
+      const tag = node.parentElement && node.parentElement.tagName;
+      if (tag === "SCRIPT" || tag === "STYLE") return NodeFilter.FILTER_REJECT;
+      if (!node.nodeValue || !/[\u4e00-\u9fff]/.test(node.nodeValue)) return NodeFilter.FILTER_SKIP;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  const nodes = [];
+  let n;
+  while ((n = walker.nextNode())) nodes.push(n);
+  nodes.forEach((node) => { node.nodeValue = convertLoginText(node.nodeValue, lang); });
+}
+
+initLoginOpenCC();
+const langSelect = document.getElementById("langSelect");
+const savedLoginLang = localStorage.getItem(LOGIN_LANG_STORAGE_KEY) || "en"; // 預設英文
+langSelect.value = savedLoginLang;
+applyLoginLanguage(savedLoginLang);
+langSelect.addEventListener("change", (e) => {
+  localStorage.setItem(LOGIN_LANG_STORAGE_KEY, e.target.value);
+  window.location.reload(); // 重新載入頁面確保原文（繁體中文）狀態一致，再套用新語系，避免重複轉換疊加
+});
+
 document.getElementById("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const account = document.getElementById("account").value.trim();
@@ -10,6 +60,13 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
       body: JSON.stringify({ account, password, device_id: getDeviceFingerprint() }),
     });
     setSession(data.access_token, data.login_log_id);
+    // 登入成功後，把登入頁選定的語系存回這個帳號的個人化設定，之後登入系統其他頁面都會沿用這個語系
+    try {
+      await api("/user-preferences/site_language", {
+        method: "PUT",
+        body: JSON.stringify({ value: langSelect.value }),
+      });
+    } catch (prefErr) { /* 存語系偏好失敗不影響登入本身 */ }
     window.location.href = "dashboard.html";
   } catch (err) {
     errorMsg.textContent = err.message;

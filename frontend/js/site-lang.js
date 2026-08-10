@@ -1,15 +1,17 @@
-// 全站語系切換（繁體中文／简体中文）。
+// 全站語系切換（繁體中文／简体中文／English／한국어）。
 //
-// 做法：不是逐頁維護一份翻譯字串對照表（全站頁面很多，維護成本太高，也容易漏掉新增的文字），
-// 而是用 OpenCC 對整個頁面「已經渲染出來的文字節點」做即時繁簡轉換。
-// 這樣不管是靜態 HTML 裡寫死的文字，還是 JS 動態產生的內容，都會被轉換到，
-// 且新增頁面/新增文字完全不需要額外處理。
+// 兩種不同的技術手法，因為繁簡轉換跟真正的翻譯是完全不同的問題：
+//   - 繁體 tw／簡體 cn：用 OpenCC 對文字節點做「字形轉換」，不管什麼句子都能轉，不需要維護字典。
+//   - 英文 en／韓文 ko：需要「真正翻譯」，OpenCC 完全幫不上忙。做法是拿 window.I18N_DICT
+//     （frontend/js/i18n-dict.js）裡的翻譯字典，逐一比對頁面上的文字節點，
+//     如果整段文字剛好完全對應字典裡的某個詞條，就換成翻譯後的文字；比對不到的文字
+//     （尤其是「共 502 種藥材」這種文字裡混著動態資料的句子）會維持原本的繁體中文，
+//     這是字典比對法本身的限制，不是 bug——要完整覆蓋所有頁面所有句子，
+//     需要持續往 i18n-dict.js 擴充詞條，不需要更動這支檔案的邏輯。
 //
-// 使用 MutationObserver 持續監看 DOM 變化（例如表格重新渲染、Modal 開啟等動態內容），
-// 確保切換語系後，之後任何時間點新增進頁面的文字也會被套用。
+// 使用 MutationObserver 持續監看 DOM 變化，確保切換語系後，之後任何時間點新增進頁面的文字也會被套用。
 
 (function () {
-  const STORAGE_KEY = "tcm_site_lang_cache"; // 短暫快取最後一次成功查到的設定，避免每個頁面都要重新打一次 API 才能決定要不要轉換
   let siteLang = "tw";
   let convToTw = null, convToCn = null;
   let observer = null;
@@ -24,12 +26,26 @@
   function convertText(text) {
     if (!text || !text.trim()) return text;
     try {
-      return siteLang === "cn" ? (convToCn ? convToCn(text) : text) : text; // 預設繁體（tw）不需要轉換，只有切成簡體時才轉
+      if (siteLang === "cn") return convToCn ? convToCn(text) : text;
+      if (siteLang === "en" || siteLang === "ko") {
+        const dict = window.I18N_DICT && window.I18N_DICT[siteLang];
+        if (!dict) return text;
+        const trimmed = text.trim();
+        const leading = text.slice(0, text.indexOf(trimmed));
+        const trailing = text.slice(text.indexOf(trimmed) + trimmed.length);
+        if (dict[trimmed]) return leading + dict[trimmed] + trailing; // 保留原本前後的空白/換行，避免排版跑掉
+        return text; // 字典裡沒有這個詞條，維持原文（繁體中文）
+      }
+      return text; // tw：原始語言，不用轉
     } catch (e) { return text; }
   }
 
+  function needsConversion() {
+    return siteLang === "cn" || siteLang === "en" || siteLang === "ko";
+  }
+
   function walkAndConvert(root) {
-    if (siteLang !== "cn") return; // 繁體是我們原始撰寫的語言，不需要轉換
+    if (!needsConversion()) return;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: (node) => {
         const tag = node.parentElement && node.parentElement.tagName;
@@ -52,7 +68,7 @@
 
   function startObserving() {
     if (observer) observer.disconnect();
-    if (siteLang !== "cn") return;
+    if (!needsConversion()) return;
     observer = new MutationObserver((mutations) => {
       mutations.forEach((m) => {
         m.addedNodes.forEach((node) => {
@@ -61,7 +77,6 @@
             node.nodeValue = convertText(node.nodeValue);
           }
         });
-        // characterData 變動（例如 el.textContent = '...' 直接改變既有文字節點）也要處理
         if (m.type === "characterData" && m.target.nodeValue) {
           m.target.nodeValue = convertText(m.target.nodeValue);
         }
@@ -73,7 +88,7 @@
   window.applySiteLanguage = async function (lang) {
     siteLang = lang;
     if (siteLang === "cn" && (!convToTw || !convToCn)) initOpenCCForSiteLang();
-    if (siteLang === "cn") {
+    if (needsConversion()) {
       walkAndConvert(document.body);
       startObserving();
     } else if (observer) {

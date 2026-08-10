@@ -42,6 +42,8 @@ window.applyQueryStationTheme = async (themeId) => {
 const LANG_OPTIONS = [
   { id: "tw", name: "繁體中文（預設）" },
   { id: "cn", name: "简体中文" },
+  { id: "en", name: "English" },
+  { id: "ko", name: "한국어" },
 ];
 
 async function loadSiteLanguage() {

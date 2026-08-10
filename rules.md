@@ -80,6 +80,17 @@ Dashboard 頁面的四張卡片（主機資訊／版本資訊／專案文件／2
 
 對應 API：`GET/PUT /system-settings/graph-limits`（沿用 `SystemSetting` 通用 key-value 機制，PUT 僅限管理者，數值需介於 1~9999）。**這幾個數字不應該再寫死在任何前端程式碼裡**——之前寫死「3」導致 BRCA1 的 12 種藥材被裁到只剩 3 個顯示，這是真實發生過的 bug（v1.21.1），所以才改成這樣可設定的架構。
 
+## 五之二、全站語系機制（繁中/簡中/英文/韓文）
+
+`site_language` 個人化設定支援四種值：`tw`（繁體中文，原文，不轉換）／`cn`（簡體中文，OpenCC 字形轉換）／`en`（English，字典比對翻譯）／`ko`（한국어，字典比對翻譯）。
+
+- **tw/cn 用 OpenCC**：不管什麼句子都能轉，不需要維護字典（`frontend/js/site-lang.js`）
+- **en/ko 用字典比對**：`frontend/js/i18n-dict.js` 裡維護 `window.I18N_DICT.en` / `window.I18N_DICT.ko`，用「整段文字完全比對」的方式查表替換，**文字裡混著動態資料的句子（例如「共 502 種藥材」）字典比對不到，會維持繁體中文原文**，這是設計限制不是 bug
+- 新增頁面要支援全站語系，記得在 `<script src="js/site-lang.js">` 前面加上 `<script src="js/i18n-dict.js">`
+- 要擴充英文/韓文覆蓋率，直接往 `i18n-dict.js` 加詞條即可，不用動 `site-lang.js` 的邏輯
+- 登入頁（`index.html`）有自己獨立一份精簡版轉換邏輯（`login.js`），因為登入頁在使用者登入前，不能呼叫需要驗證的 `/user-preferences` API，語系選擇先存在 `localStorage`（`tcm_login_lang`），登入成功後才會呼叫 `PUT /user-preferences/site_language` 存回帳號的個人化設定
+- **目前字典覆蓋範圍**：導覽選單全部項目、登入頁、常用操作按鈕（新增/編輯/刪除/儲存等）、Dashboard 少量文字。**不是每個頁面每個欄位都已翻譯**，例如「客戶資料管理」表單裡「病患識別碼」「證件類型」這類細節欄位目前還是繁體中文，需要之後持續往字典擴充覆蓋率
+
 ## 五之一、查詢站類頁面（左側清單／右側詳情）的結構規範
 
 TCMSP 藥材查詢站、疾病查詢站、暗黑基因查詢站都用「左側清單、右側詳情」版面。這種頁面裡任何**需要跨次渲染持續存在的元素**（空白提示 `#emptyState`、載入進度條、統計文字等）**絕對不能巢狀放在會被整段覆寫的容器裡**（例如 `#xxxHeader`、`#main`）。

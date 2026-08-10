@@ -1,14 +1,24 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>TCM 中藥腫瘤篩選平台 - 登入</title>
+<title>TCM Oncology Herb Screening Platform - Login</title>
 <link rel="stylesheet" href="css/style.css">
 <script src="js/theme.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+<script src="js/i18n-dict.js"></script>
 </head>
 <body>
 <div class="login-wrap">
   <div class="login-card">
+    <div style="display:flex; justify-content:flex-end; margin-bottom:6px;">
+      <select id="langSelect" style="width:140px; margin:0; font-size:12.5px;">
+        <option value="en">English</option>
+        <option value="tw">繁體中文</option>
+        <option value="cn">简体中文</option>
+        <option value="ko">한국어</option>
+      </select>
+    </div>
     <h2>TCM 中藥腫瘤篩選平台</h2>
     <p style="color:#6b7a70;font-size:13px;margin:0;">後台管理系統登入</p>
 
