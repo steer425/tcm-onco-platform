@@ -193,6 +193,12 @@ body[data-page-theme="light"] .versionEntry ul{color:#3a4a42;}
     </div>
     <div style="padding:6px 12px 0;">
       <button id="loadAllBtn" class="primary" style="width:100%;">⬇ 載入全部 502 種藥材資料（目前僅載入人參）</button>
+      <div id="loadProgressWrap" style="display:none; max-width:100%; margin:10px 0 0;">
+        <div style="height:6px; background:#1c1f26; border-radius:4px; overflow:hidden; border:1px solid #2a2d34;">
+          <div id="loadProgressBar" style="height:100%; width:0%; background:#2f5c8a; transition:width .15s ease;"></div>
+        </div>
+        <div id="loadProgressText" class="small" style="margin-top:6px;"></div>
+      </div>
     </div>
     <div id="herbStats"></div>
     <div id="herbList"></div>
@@ -200,12 +206,6 @@ body[data-page-theme="light"] .versionEntry ul{color:#3a4a42;}
   <div id="main">
     <div id="emptyState">
       ← 請從左側選擇一個藥材
-      <div id="loadProgressWrap" style="display:none; max-width:360px; margin:16px auto 0;">
-        <div style="height:6px; background:#1c1f26; border-radius:4px; overflow:hidden; border:1px solid #2a2d34;">
-          <div id="loadProgressBar" style="height:100%; width:0%; background:#2f5c8a; transition:width .15s ease;"></div>
-        </div>
-        <div id="loadProgressText" class="small" style="margin-top:6px;"></div>
-      </div>
     </div>
   </div>
 </div>
