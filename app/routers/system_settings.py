@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -135,30 +135,49 @@ def trigger_recompute_stats(db: Session = Depends(get_db), admin: models.User = 
 # 資料庫備份到本機端（下載）
 # ---------------------------------------------------------------------------
 
-@router.post("/backup-database", response_model=None, summary="（後台）建立一份加密的資料庫備份，路徑由系統自動決定")
-def create_backup(db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
-    from app.backup_service import create_encrypted_backup
-
-    job = models.BackupJob(status=models.BackupStatus.running, notes="手動觸發，透過系統設定頁面下載到本機")
+@router.post("/backup-database", response_model=None, summary="（後台）建立一份加密的資料庫備份，路徑由系統自動決定，在背景執行避免大量資料時逾時")
+def create_backup(background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
+    # 備份是在同一次 HTTP 請求裡「同步」處理完才回應的話，正式環境資料量大時
+    # （逐一掃過幾十張資料表、幾萬筆關聯資料再加密）容易超過 Render/瀏覽器的逾時限制，
+    # 導致前端看到「Failed to fetch」——這是真實發生過的 bug（v1.31.1）。
+    # 改成：這裡只負責建立一筆 running 狀態的紀錄就立刻回應，實際的匯出/加密工作丟到背景執行，
+    # 前端改成輪詢 GET /backup-jobs 直到狀態變成 success/failed 為止。
+    job = models.BackupJob(status=models.BackupStatus.running, notes="手動觸發，透過系統設定頁面下載到本機（背景處理中）")
     db.add(job)
     db.commit()
     db.refresh(job)
+    job_id = job.id
 
-    try:
-        file_path, size_bytes = create_encrypted_backup(db)
-        job.status = models.BackupStatus.success
-        job.file_path = file_path
-        job.size_bytes = size_bytes
-        job.finished_at = __import__("datetime").datetime.utcnow()
-        db.commit()
-        db.refresh(job)
-        write_audit_log(db, admin, "create_backup", "backup_job", job.id, f"建立資料庫備份，檔案大小 {size_bytes} bytes")
-    except Exception as e:
-        job.status = models.BackupStatus.failed
-        job.notes = f"備份失敗：{e}"
-        job.finished_at = __import__("datetime").datetime.utcnow()
-        db.commit()
-        raise HTTPException(status_code=500, detail=f"備份失敗：{e}")
+    def _run_backup_in_background(job_id: str, admin_id: str):
+        from app.database import SessionLocal
+        from app.backup_service import create_encrypted_backup
+        import datetime as _dt
+
+        bg_db = SessionLocal()
+        try:
+            bg_job = bg_db.query(models.BackupJob).filter(models.BackupJob.id == job_id).first()
+            if not bg_job:
+                return
+            try:
+                file_path, size_bytes = create_encrypted_backup(bg_db)
+                bg_job.status = models.BackupStatus.success
+                bg_job.file_path = file_path
+                bg_job.size_bytes = size_bytes
+                bg_job.notes = "手動觸發，透過系統設定頁面下載到本機"
+                bg_job.finished_at = _dt.datetime.utcnow()
+                bg_db.commit()
+                admin_user = bg_db.query(models.User).filter(models.User.id == admin_id).first()
+                if admin_user:
+                    write_audit_log(bg_db, admin_user, "create_backup", "backup_job", job_id, f"建立資料庫備份，檔案大小 {size_bytes} bytes")
+            except Exception as e:
+                bg_job.status = models.BackupStatus.failed
+                bg_job.notes = f"備份失敗：{e}"
+                bg_job.finished_at = _dt.datetime.utcnow()
+                bg_db.commit()
+        finally:
+            bg_db.close()
+
+    background_tasks.add_task(_run_backup_in_background, job_id, admin.id)
 
     from app import schemas
     return schemas.BackupJobOut.model_validate(job)
@@ -196,9 +215,22 @@ def get_read_only_mode(db: Session = Depends(get_db)):
     return {"enabled": value == "true"}
 
 
-@router.put("/read-only-mode", summary="（後台）設定唯讀模式：啟用後全站無法執行任何新增/編輯/刪除操作，僅能瀏覽查詢")
+@router.put("/read-only-mode", summary="（後台）設定唯讀模式：啟用後全站無法執行任何新增/編輯/刪除操作，僅能瀏覽查詢；啟用前必須先有至少一次成功的資料庫備份")
 def set_read_only_mode(payload: dict, db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
     enabled = bool(payload.get("enabled"))
+
+    if enabled:
+        # 「連線本機端資料庫」的前提是本機端要先有資料庫可以連——也就是至少要有一次成功完成的備份，
+        # 不然啟用唯讀模式時，本機端根本沒有任何資料庫內容，這個設定形同虛設。
+        has_successful_backup = db.query(models.BackupJob).filter(
+            models.BackupJob.status == models.BackupStatus.success
+        ).first() is not None
+        if not has_successful_backup:
+            raise HTTPException(
+                status_code=400,
+                detail="尚未完成過任何資料庫備份，無法啟用唯讀模式（連線本機端資料庫）。請先到上方「資料庫備份到本機」建立至少一次成功的備份。",
+            )
+
     _set_setting_value(db, "read_only_mode", "true" if enabled else "false")
     write_audit_log(db, admin, "set_read_only_mode", "system_setting", "read_only_mode",
                      f"{'啟用' if enabled else '關閉'}唯讀模式")

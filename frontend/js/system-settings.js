@@ -276,13 +276,36 @@ document.getElementById("createBackupBtn").addEventListener("click", async () =>
   const btn = document.getElementById("createBackupBtn");
   const msg = document.getElementById("backupMsg");
   btn.disabled = true;
-  msg.textContent = "備份中，可能需要幾秒鐘...";
+  msg.textContent = "已送出備份請求，正在背景處理中...";
   try {
     const job = await api("/system-settings/backup-database", { method: "POST" });
-    msg.textContent = "備份完成 ✓ 正在自動下載...";
     await loadBackupJobs();
-    await window.downloadBackup(job.id);
-    setTimeout(() => { msg.textContent = ""; }, 3000);
+
+    // 備份是在背景執行的（避免正式環境資料量大時，同步等待整個HTTP請求逾時），
+    // 這裡改成輪詢查詢這筆紀錄的狀態，最多等 2 分鐘，每 2 秒查一次
+    const jobId = job.id;
+    let finalStatus = null;
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      const jobs = await api("/backup-jobs");
+      const current = jobs.find(j => j.id === jobId);
+      if (current && current.status !== "running") {
+        finalStatus = current;
+        break;
+      }
+      msg.textContent = `背景處理中，已等待 ${(i + 1) * 2} 秒...`;
+    }
+    await loadBackupJobs();
+
+    if (!finalStatus) {
+      msg.textContent = "備份仍在處理中，請稍後重新整理頁面查看結果（背景作業會持續執行，不受這個頁面影響）";
+    } else if (finalStatus.status === "success") {
+      msg.textContent = "備份完成 ✓ 正在自動下載...";
+      await window.downloadBackup(finalStatus.id);
+      setTimeout(() => { msg.textContent = ""; }, 3000);
+    } else {
+      msg.textContent = "備份失敗：" + (finalStatus.notes || "未知錯誤");
+    }
   } catch (err) {
     msg.textContent = "備份失敗：" + err.message;
   } finally {
@@ -298,6 +321,16 @@ async function loadReadOnlyMode() {
     const data = await api("/system-settings/read-only-mode");
     document.getElementById("readOnlyModeCheckbox").checked = data.enabled;
   } catch (err) { /* 載入失敗就維持預設不勾選 */ }
+
+  // 主動檢查是否已經有成功的備份，沒有的話先在畫面上提示，
+  // 不用等使用者按了勾選框、被後端擋下來才知道要先備份
+  try {
+    const jobs = await api("/backup-jobs");
+    const hasSuccess = jobs.some(j => j.status === "success");
+    if (!hasSuccess) {
+      document.getElementById("readOnlyModeMsg").textContent = "尚未完成過任何資料庫備份，請先在上方建立備份，才能啟用唯讀模式。";
+    }
+  } catch (err) { /* 忽略，交給實際勾選時的錯誤訊息處理 */ }
 }
 
 document.getElementById("readOnlyModeCheckbox").addEventListener("change", async (e) => {
