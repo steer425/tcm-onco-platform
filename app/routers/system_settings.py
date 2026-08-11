@@ -209,29 +209,42 @@ def download_backup(job_id: str, db: Session = Depends(get_db), admin: models.Us
 # 唯讀模式（「連線本機端資料庫」設定）：勾選後全站禁止任何 CRUD 異動操作
 # ---------------------------------------------------------------------------
 
-@router.get("/read-only-mode", summary="查詢目前是否為唯讀模式（登入即可查詢，前端需要據此提示使用者）")
+@router.get("/read-only-mode", summary="查詢目前是否為唯讀模式（登入即可查詢，前端需要據此提示使用者），並附帶本機端查詢快取的狀態")
 def get_read_only_mode(db: Session = Depends(get_db)):
     value = _get_setting_value(db, "read_only_mode")
-    return {"enabled": value == "true"}
+    from app.local_cache import get_local_cache_info
+    return {"enabled": value == "true", "local_cache": get_local_cache_info()}
 
 
-@router.put("/read-only-mode", summary="（後台）設定唯讀模式：啟用後全站無法執行任何新增/編輯/刪除操作，僅能瀏覽查詢；啟用前必須先有至少一次成功的資料庫備份")
+@router.put("/read-only-mode", summary="（後台）設定唯讀模式：啟用後全站無法執行任何新增/編輯/刪除操作，僅能瀏覽查詢；啟用前必須先有至少一次成功的資料庫備份，啟用時會用該備份重建本機端查詢快取")
 def set_read_only_mode(payload: dict, db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
     enabled = bool(payload.get("enabled"))
 
     if enabled:
         # 「連線本機端資料庫」的前提是本機端要先有資料庫可以連——也就是至少要有一次成功完成的備份，
         # 不然啟用唯讀模式時，本機端根本沒有任何資料庫內容，這個設定形同虛設。
-        has_successful_backup = db.query(models.BackupJob).filter(
+        latest_backup = db.query(models.BackupJob).filter(
             models.BackupJob.status == models.BackupStatus.success
-        ).first() is not None
-        if not has_successful_backup:
+        ).order_by(models.BackupJob.finished_at.desc()).first()
+        if not latest_backup:
             raise HTTPException(
                 status_code=400,
                 detail="尚未完成過任何資料庫備份，無法啟用唯讀模式（連線本機端資料庫）。請先到上方「資料庫備份到本機」建立至少一次成功的備份。",
             )
 
-    _set_setting_value(db, "read_only_mode", "true" if enabled else "false")
-    write_audit_log(db, admin, "set_read_only_mode", "system_setting", "read_only_mode",
-                     f"{'啟用' if enabled else '關閉'}唯讀模式")
-    return {"enabled": enabled}
+        # 用「最新一次成功備份」的內容，重新建立本機端查詢快取（TCMSP + 暗黑基因資料），
+        # 之後藥材/疾病/暗黑基因查詢站的關聯查詢，就會改讀這份本機端檔案，不用連去遠端資料庫，藉此加速。
+        from app.local_cache import rebuild_local_cache
+        try:
+            row_count = rebuild_local_cache(latest_backup)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"建立本機端查詢快取失敗：{e}")
+
+        _set_setting_value(db, "read_only_mode", "true")
+        write_audit_log(db, admin, "set_read_only_mode", "system_setting", "read_only_mode",
+                         f"啟用唯讀模式，用備份 {latest_backup.id} 重建本機端查詢快取（{row_count} 筆資料）")
+        return {"enabled": True, "local_cache_row_count": row_count, "backup_used": latest_backup.id}
+
+    _set_setting_value(db, "read_only_mode", "false")
+    write_audit_log(db, admin, "set_read_only_mode", "system_setting", "read_only_mode", "關閉唯讀模式")
+    return {"enabled": False}

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app import models, schemas
-from app.database import get_db
+from app.database import get_db, get_query_db
 from app.deps import get_current_user, require_admin, write_audit_log
 
 router = APIRouter(prefix="/dark-genes", tags=["暗黑基因管理（癌症基因參考資料，目標三）"])
@@ -38,7 +38,7 @@ def _gene_has_tcmsp_target(gene: models.DarkGene, target_word_set) -> bool:
 
 
 @router.get("/public/stats", summary="（前台）暗黑基因統計：依 Gene Type 分組，統計有/沒有比對到 TCMSP 靶點的基因數")
-def public_get_stats(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def public_get_stats(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_query_db)):
     genes = db.query(models.DarkGene).filter(models.DarkGene.status == "active").all()
     target_word_set = _build_target_word_index(db)
 
@@ -70,7 +70,7 @@ def public_get_stats(current_user: models.User = Depends(get_current_user), db: 
 
 @router.get("/public/gene-stats", summary="（前台）逐基因統計：以 Hugo Symbol 為主，列出每個基因比對到的靶點數與候選中藥數")
 def public_get_gene_stats(only_with_target: bool = True, current_user: models.User = Depends(get_current_user),
-                           db: Session = Depends(get_db)):
+                           db: Session = Depends(get_query_db)):
     genes = db.query(models.DarkGene).filter(models.DarkGene.status == "active").all()
     all_targets = db.query(models.TcmspTarget).all()
 
@@ -115,7 +115,7 @@ def public_get_gene_stats(only_with_target: bool = True, current_user: models.Us
 
 @router.get("/public/herb-stats", summary="（前台）中藥暗黑基因覆蓋統計：以藥材為主，列出每種藥材連結到幾個不重複的暗黑基因（統計數字為預先計算好的資料庫欄位）")
 def public_get_herb_stats(only_with_gene: bool = True, current_user: models.User = Depends(get_current_user),
-                           db: Session = Depends(get_db)):
+                           db: Session = Depends(get_query_db)):
     # dark_gene_count 直接讀資料庫欄位（app/recompute_stats.py 預先算好），
     # 不用每次請求都重新掃一次全部靶點/成分/藥材關聯，篩選跟排序也都能直接在 SQL 層做
     q = db.query(models.TcmspHerb).filter(models.TcmspHerb.status == "active")
@@ -174,7 +174,7 @@ def public_get_herb_stats(only_with_gene: bool = True, current_user: models.User
 @router.get("/public/list", response_model=List[schemas.DarkGeneOut], summary="（前台）查詢暗黑基因清單（含是否有中藥靶點標記，為預先計算好的統計欄位，供查詢站使用）")
 def public_list_genes(keyword: Optional[str] = None, gene_type: Optional[str] = None,
                        has_tcmsp_target: Optional[bool] = None,
-                       current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+                       current_user: models.User = Depends(get_current_user), db: Session = Depends(get_query_db)):
     q = db.query(models.DarkGene).filter(models.DarkGene.status == "active")
     if keyword:
         q = q.filter(
@@ -316,7 +316,7 @@ def _gene_symbols_for_match(gene: models.DarkGene) -> List[str]:
 
 @router.get("/{gene_id}/tcmsp-links", summary="查詢暗黑基因-靶點關聯：比對 TCMSP 靶點名稱，列出候選藥材")
 def get_gene_tcmsp_links(gene_id: str, current_user: models.User = Depends(get_current_user),
-                          db: Session = Depends(get_db)):
+                          db: Session = Depends(get_query_db)):
     gene = db.query(models.DarkGene).filter(models.DarkGene.id == gene_id).first()
     if not gene:
         raise HTTPException(status_code=404, detail="找不到基因資料")
@@ -390,7 +390,7 @@ def get_gene_tcmsp_links(gene_id: str, current_user: models.User = Depends(get_c
 
 @router.get("/herb-links/{herb_id}", summary="查詢藥材-暗黑基因關聯：這個藥材的成分連結到哪些靶點，再比對出哪些暗黑基因")
 def get_herb_dark_gene_links(herb_id: int, current_user: models.User = Depends(get_current_user),
-                              db: Session = Depends(get_db)):
+                              db: Session = Depends(get_query_db)):
     herb = db.query(models.TcmspHerb).filter(models.TcmspHerb.id == herb_id, models.TcmspHerb.status == "active").first()
     if not herb:
         raise HTTPException(status_code=404, detail="找不到藥材資料")

@@ -27,3 +27,29 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def get_query_db():
+    """給查詢站關聯查詢用的 DB session。唯讀模式啟用且本機端快取存在時，
+    直接讀本機端的 SQLite 快取檔案，不用連去遠端雲端資料庫，加快關聯查詢速度；
+    其餘情況（唯讀模式關閉、或還沒建立過快取）就跟平常一樣連遠端資料庫，行為不變。"""
+    db = SessionLocal()
+    try:
+        from app.routers.system_settings import _get_setting_value
+        read_only = _get_setting_value(db, "read_only_mode") == "true"
+        if read_only:
+            from app.local_cache import get_local_cache_session, is_local_cache_available
+            if is_local_cache_available():
+                db.close()
+                local_db = get_local_cache_session()
+                try:
+                    yield local_db
+                finally:
+                    local_db.close()
+                return
+        yield db
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass

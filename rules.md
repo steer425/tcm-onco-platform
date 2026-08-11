@@ -164,8 +164,21 @@ TCMSP 藥材查詢站、疾病查詢站、暗黑基因查詢站都用「左側�
 
 - 用**全站 middleware 攔截**（`app/main.py` 的 `enforce_read_only_mode`），而不是去每一個 CRUD 端點各自加檢查——這個系統的 CRUD 端點很多，逐一加檢查很容易漏掉，用 middleware 可以確保「不管以後新增多少個端點都一定會被擋到」
 - 攔截條件：`method in (POST, PUT, PATCH, DELETE)` 且路徑不在白名單裡，一律回傳 423
-- **白名單一定要包含 `/auth/login`、`/auth/logout`、`PUT /system-settings/read-only-mode` 這三個路徑**，不然唯讀模式一啟用，管理者連登入或關掉這個設定本身都做不到，會把整個系統鎖死——這是這個功能的核心安全設計，之後如果要修改白名單邏輯，這三個例外絕對不能拿掉
+- **白名單一定要包含 `/auth/login`、`/auth/logout`、`PUT /system-settings/read-only-mode`、`POST /system-settings/backup-database` 這四個路徑**，不然唯讀模式一啟用，管理者連登入或關掉這個設定本身都做不到，會把整個系統鎖死——這是這個功能的核心安全設計，之後如果要修改白名單邏輯，這幾個例外絕對不能拿掉
+- **真實踩過的死結 bug（v1.31.2）**：一開始只排除了登入/登出/關閉唯讀模式這三個路徑，忘了排除「建立備份」——結果變成：啟用唯讀模式要求「必須先有成功的備份」，但備份端點本身是 POST，會被唯讀模式攔截，一旦唯讀模式被啟用，就再也無法建立新的備份了。**規則**：任何「唯讀模式底下仍然必須能做的操作」（登入/登出、關閉唯讀模式本身、建立備份），都要在設計白名單的當下就一次想清楚列出來，不要只想到「開關本身」，還要想「這個開關啟用之後，還有哪些操作是系統健康運作/自救所必須的」
 - 設定值存在通用的 `SystemSetting` key-value 表（`read_only_mode`），不需要額外的資料庫欄位/遷移
+
+### 唯讀模式的真正核心：查詢站真的改讀本機端資料（v1.31.3）
+
+**這是唯讀模式最初被要求的目的，不是附加選項**：啟用唯讀模式不是只鎖住寫入操作，藥材/疾病/暗黑基因查詢站的關聯查詢也要真的切換成讀取「伺服器本機端」的資料快取，藉此加快查詢速度（不用每次都連去雲端資料庫來回）。
+
+- `app/local_cache.py`：只快取查詢站相關、變動很少的資料表（`tcmsp_herbs`／`tcmsp_diseases`／`tcmsp_ingredients`／`tcmsp_targets`／`tcmsp_herb_ingredient`／`tcmsp_ingredient_target`／`tcmsp_target_disease`／`dark_genes`），**不快取病患資料、帳號、DNA 資料**這類會頻繁異動或高度敏感的資料——唯讀模式底下這些資料本來就不可寫入，也沒有加速查詢的急迫性，縮小快取範圍能讓重建更快、佔用空間更小
+- 啟用唯讀模式時（`PUT /system-settings/read-only-mode`，`enabled=true`），會自動用**最新一次成功的備份**內容重建這份本機端快取（`rebuild_local_cache()`），不需要另外手動觸發
+- 新增 `app/database.py` 的 `get_query_db()` 依賴：唯讀模式啟用且本機快取存在時，回傳指向本機 SQLite 快取的 session；其餘情況（唯讀模式關閉、或還沒建立過快取）維持原本連遠端資料庫的行為不變
+- **只有前台查詢站的「讀取」端點要換成 `Depends(get_query_db)`**，後台 CRUD 端點（新增/編輯/刪除）維持 `Depends(get_db)` 連遠端資料庫不變（反正唯讀模式底下這些端點本來就會被 middleware 擋掉，換不換都一樣，但保持語意清楚：`get_db` = 會寫入的操作，`get_query_db` = 純查詢）
+- 目前已切換的端點：`tcmsp.py` 的藥材/疾病清單、詳情、`/data/full`；`dark_genes.py` 的統計、清單、`tcmsp-links`、`herb-links`。**`patient-herb-suggestions`（病患暗黑基因彙總建議）沒有切換**，因為它需要查詢 `Patient`／`Variant`（DNA 資料），不在快取範圍內，維持連遠端資料庫
+- **真實踩過的技術陷阱（v1.31.3）**：備份 JSON 裡的日期時間欄位是用 `.isoformat()` 存成字串，還原寫入本機端 SQLite（有正式 `DateTime` 欄位型別）時，SQLite 只接受真正的 Python `datetime` 物件、不接受字串，插入前要用 `datetime.fromisoformat()` 轉換回來，不然會直接噴 `TypeError`
+- 之後如果要擴充快取範圍（例如新增其他查詢站），記得同步更新 `CACHED_TABLES` 清單，並確認新端點只查得到快取範圍內的資料表，不要漏接需要即時/敏感資料的端點進來用 `get_query_db`
 
 ## 六、配色主題系統
 

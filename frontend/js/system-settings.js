@@ -316,10 +316,16 @@ document.getElementById("createBackupBtn").addEventListener("click", async () =>
 loadBackupJobs();
 
 // ---------- 唯讀模式（連線本機端資料庫） ----------
+function formatLocalCacheInfo(cache) {
+  if (!cache) return "目前還沒有本機端查詢快取。";
+  return `本機端查詢快取建立於：${new Date(cache.built_at).toLocaleString("zh-Hant")}，大小 ${formatBytes(cache.size_bytes)}`;
+}
+
 async function loadReadOnlyMode() {
   try {
     const data = await api("/system-settings/read-only-mode");
     document.getElementById("readOnlyModeCheckbox").checked = data.enabled;
+    document.getElementById("localCacheInfo").textContent = formatLocalCacheInfo(data.local_cache);
   } catch (err) { /* 載入失敗就維持預設不勾選 */ }
 
   // 主動檢查是否已經有成功的備份，沒有的話先在畫面上提示，
@@ -337,16 +343,22 @@ document.getElementById("readOnlyModeCheckbox").addEventListener("change", async
   const enabled = e.target.checked;
   const msg = document.getElementById("readOnlyModeMsg");
   const confirmText = enabled
-    ? "啟用後，全站（前台+後台，所有登入使用者）都無法執行任何新增/編輯/刪除操作，確定要啟用嗎？"
-    : "確定要關閉唯讀模式，恢復正常的新增/編輯/刪除功能嗎？";
+    ? "啟用後，藥材/疾病/暗黑基因查詢站會改讀本機端快取（用最新一次成功的備份重建），並且全站（前台+後台，所有登入使用者）都無法執行任何新增/編輯/刪除操作，確定要啟用嗎？"
+    : "確定要關閉唯讀模式，恢復正常的新增/編輯/刪除功能、查詢站改回讀取即時的雲端資料庫嗎？";
   if (!confirm(confirmText)) {
     e.target.checked = !enabled; // 使用者取消，checkbox 狀態要復原
     return;
   }
+  msg.textContent = enabled ? "啟用中，正在用最新備份重建本機端查詢快取，可能需要幾秒鐘..." : "關閉中...";
   try {
-    await api("/system-settings/read-only-mode", { method: "PUT", body: JSON.stringify({ enabled }) });
-    msg.textContent = enabled ? "已啟用唯讀模式 ✓" : "已關閉唯讀模式 ✓";
-    setTimeout(() => { msg.textContent = ""; }, 3000);
+    const result = await api("/system-settings/read-only-mode", { method: "PUT", body: JSON.stringify({ enabled }) });
+    if (enabled) {
+      msg.textContent = `已啟用唯讀模式 ✓ 本機端查詢快取已重建（${result.local_cache_row_count} 筆資料）`;
+    } else {
+      msg.textContent = "已關閉唯讀模式 ✓";
+    }
+    await loadReadOnlyMode();
+    setTimeout(() => { msg.textContent = ""; }, 5000);
   } catch (err) {
     msg.textContent = "設定失敗：" + err.message;
     e.target.checked = !enabled;

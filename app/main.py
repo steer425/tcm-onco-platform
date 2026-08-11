@@ -18,7 +18,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="TCM 中藥腫瘤篩選平台 - 後台系統 API（目標零）",
     description="帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄",
-    version="1.31.1",
+    version="1.31.3",
 )
 
 ALLOWED_ORIGINS = [
@@ -51,11 +51,16 @@ app.add_middleware(
 #     連能夠把它關掉的管理者都無法登入，會造成整個系統被鎖死
 #   - PUT /system-settings/read-only-mode：關閉唯讀模式本身這個操作一定要放行，
 #     不然啟用之後就永遠無法再關閉
+#   - POST /system-settings/backup-database：建立備份這個操作也一定要放行——
+#     不然會造成一個自相矛盾的死結：啟用唯讀模式要求「必須先有成功的備份」，
+#     但如果備份端點本身被唯讀模式擋住，一旦唯讀模式被啟用，就永遠無法再建立新的備份
+#     （這是真實發生過的 bug，v1.31.2）
 # ---------------------------------------------------------------------------
 _READ_ONLY_EXEMPT_PATHS = {
     "/auth/login",
     "/auth/logout",
     "/system-settings/read-only-mode",
+    "/system-settings/backup-database",
 }
 
 

@@ -7,7 +7,7 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app import models, schemas
-from app.database import get_db
+from app.database import get_db, get_query_db
 from app.deps import get_current_user, require_admin, write_audit_log
 
 router = APIRouter(prefix="/tcmsp", tags=["目標一/二：TCMSP 藥材關聯資料庫"])
@@ -42,7 +42,7 @@ def _val(v):
 # ---------------------------------------------------------------------------
 
 @router.get("/herbs/public/list", summary="（前台）取得藥材清單（輕量，不含關聯資料，供左側清單快速載入；靶點數為預先計算好的統計欄位）")
-def public_list_herbs(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def public_list_herbs(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_query_db)):
     herbs = db.query(models.TcmspHerb).filter(models.TcmspHerb.status == "active").all()
     return [
         {
@@ -55,7 +55,7 @@ def public_list_herbs(current_user: models.User = Depends(get_current_user), db:
 
 
 @router.get("/herbs/public/{herb_id}/detail", summary="（前台）取得單一藥材的完整關聯資料（成分/靶點/疾病，範圍限定在這個藥材）")
-def public_get_herb_detail(herb_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def public_get_herb_detail(herb_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_query_db)):
     herb = db.query(models.TcmspHerb).filter(models.TcmspHerb.id == herb_id, models.TcmspHerb.status == "active").first()
     if not herb:
         raise HTTPException(status_code=404, detail="找不到藥材資料")
@@ -112,7 +112,7 @@ def public_get_herb_detail(herb_id: int, current_user: models.User = Depends(get
 
 
 @router.get("/data/full", summary="取得完整 TCMSP 關聯資料（前台查詢站使用，內建快取）")
-def get_full_data(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_full_data(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_query_db)):
     now = time.time()
     if _full_data_cache["json_bytes"] is not None and _full_data_cache["expires_at"] > now:
         return Response(content=_full_data_cache["json_bytes"], media_type="application/json")
@@ -241,7 +241,7 @@ def admin_delete_herb(herb_id: int, db: Session = Depends(get_db), admin: models
 # ---------------------------------------------------------------------------
 
 @router.get("/diseases/public/list", summary="（前台）取得疾病清單（輕量，不含關聯資料，供左側清單快速載入；靶點數為預先計算好的統計欄位）")
-def public_list_diseases(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def public_list_diseases(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_query_db)):
     diseases = db.query(models.TcmspDisease).all()
     return [
         {
@@ -254,7 +254,7 @@ def public_list_diseases(current_user: models.User = Depends(get_current_user), 
 
 
 @router.get("/diseases/public/{dis_id}/detail", summary="（前台）取得單一疾病的完整關聯資料（靶點/成分/藥材，範圍限定在這個疾病）")
-def public_get_disease_detail(dis_id: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def public_get_disease_detail(dis_id: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_query_db)):
     disease = db.query(models.TcmspDisease).filter(models.TcmspDisease.dis_id == dis_id).first()
     if not disease:
         raise HTTPException(status_code=404, detail="找不到疾病資料")

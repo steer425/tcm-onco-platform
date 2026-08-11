@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.31.1 fix backup timeout via background task; require backup before enabling read-only mode"
+set "DEFAULT_MSG=v1.31.3 implement local cache for query stations in read-only mode (the actual core feature)"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%
