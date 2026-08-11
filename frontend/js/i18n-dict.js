@@ -642,10 +642,10 @@ window.I18N_DICT = {
     "西洋參（Panax quinquefolius）": "American Ginseng (Panax quinquefolius)",
     "韓國紅參": "Korean Red Ginseng",
     "種藥材資料": " herbs' data",
-    // ---- GenCC 可編碼蛋白區疾病與中藥關聯 ----
-    "TCM 中藥腫瘤篩選平台 — 目標三/四　可編碼蛋白區疾病與中藥關聯": "TCM Oncology Herb Screening Platform — Goal 3/4  Protein-Coding Region Disease & Herb Association",
+    // ---- GenCC 可編碼蛋白區中藥與疾病關聯 ----
+    "TCM 中藥腫瘤篩選平台 — 目標三/四　可編碼蛋白區中藥與疾病關聯": "TCM Oncology Herb Screening Platform — Goal 3/4  Protein-Coding Region Disease & Herb Association",
     "← 請從左側選擇一個藥材（可用搜尋框查找）": "← Select a herb from the list on the left (or use the search box)",
-    "可編碼蛋白區疾病與中藥關聯": "Protein-Coding Region Disease & Herb Association",
+    "可編碼蛋白區中藥與疾病關聯": "Protein-Coding Region Disease & Herb Association",
     "左側選一個藥材（也可搜尋），右側顯示這個藥材的成分連結到哪些 TCMSP 靶點、這些靶點又比對到哪些 GenCC 可編碼蛋白區疾病（Herb → Ingredients → Targets → GenCC Diseases），呈現「這個藥材的成分可能與哪些遺傳性疾病的致病基因有關」。資料來源：GenCC（Gene Curation Coalition，thegencc.org），彙整多個專家審查小組對基因-疾病因果關係的評估結果。": "Select a herb on the left (or search), and the right side shows which TCMSP targets this herb's ingredients are linked to, and which GenCC protein-coding region diseases those targets match (Herb → Ingredients → Targets → GenCC Diseases), showing \"which hereditary disease-causing genes this herb's ingredients could be related to\". Data source: GenCC (Gene Curation Coalition, thegencc.org), aggregating gene-disease causality assessments from multiple expert curation groups.",
     "不是臨床診斷依據": "not a clinical diagnostic basis",
     "信心等級": "Confidence Level",
@@ -675,7 +675,7 @@ window.I18N_DICT = {
     "疾病名稱（原文）": "Disease Name (Original)",
     "編輯疾病資料": "Edit Disease Data",
     "資料來源：GenCC（Gene Curation Coalition，": "Data source: GenCC (Gene Curation Coalition, ",
-    "），\n        彙整多個專家審查小組（ClinGen、PanelApp 等）對「基因-疾病因果關係」的評估結果。\n        資料量遠大於暗黑基因（完整資料集約 4.6 萬筆），這個頁面主要用途是搜尋/補充中文疾病名稱、軟刪除個別資料，\n        不適合用來瀏覽全部資料——請到「可編碼蛋白區疾病與中藥關聯」查詢站瀏覽關聯圖與完整清單。": "), aggregating gene-disease causality assessments from multiple expert curation groups (ClinGen, PanelApp, etc.).\n        The data volume is far larger than the cancer gene list (the full dataset has about 46,000 entries); this page is mainly for searching/adding Chinese disease names and soft-deleting individual entries,\n        and is not suited for browsing all the data — please use the \"Protein-Coding Region Disease & Herb Association\" query station to browse the association graph and full list.",
+    "），\n        彙整多個專家審查小組（ClinGen、PanelApp 等）對「基因-疾病因果關係」的評估結果。\n        資料量遠大於暗黑基因（完整資料集約 4.6 萬筆），這個頁面主要用途是搜尋/補充中文疾病名稱、軟刪除個別資料，\n        不適合用來瀏覽全部資料——請到「可編碼蛋白區疾病關聯查詢站」（以疾病為主）或「可編碼蛋白區中藥與疾病關聯」（以藥材為主）查詢站瀏覽關聯圖與完整清單。": "), aggregating gene-disease causality assessments from multiple expert curation groups (ClinGen, PanelApp, etc.).\n        The data volume is far larger than the cancer gene list (the full dataset has about 46,000 entries); this page is mainly for searching/adding Chinese disease names and soft-deleting individual entries,\n        and is not suited for browsing all the data — please use the \"Protein-Coding Region Disease Explorer\" (disease-centric) or \"Protein-Coding Region Herb & Disease Association\" (herb-centric) query stations to browse the association graph and full list.",
     // ---- GenCC 疾病關聯查詢站（疾病為主）----
     "TCM 中藥腫瘤篩選平台 — 目標三/四　可編碼蛋白區疾病關聯查詢站": "TCM Oncology Herb Screening Platform — Goal 3/4  Protein-Coding Region Disease Explorer",
     "TCM 中藥腫瘤篩選平台 — 目標三/四　可編碼蛋白區中藥與疾病關聯": "TCM Oncology Herb Screening Platform — Goal 3/4  Protein-Coding Region Herb & Disease Association",
@@ -1326,10 +1326,10 @@ window.I18N_DICT = {
     "西洋參（Panax quinquefolius）": "화기삼(Panax quinquefolius)",
     "韓國紅參": "한국 홍삼",
     "種藥材資料": "개 약재 데이터",
-    // ---- GenCC 可編碼蛋白區疾病與中藥關聯 ----
-    "TCM 中藥腫瘤篩選平台 — 目標三/四　可編碼蛋白區疾病與中藥關聯": "TCM 종양 한약 스크리닝 플랫폼 — 목표 3/4  단백질 코딩 영역 질환-약재 연관성",
+    // ---- GenCC 可編碼蛋白區中藥與疾病關聯 ----
+    "TCM 中藥腫瘤篩選平台 — 目標三/四　可編碼蛋白區中藥與疾病關聯": "TCM 종양 한약 스크리닝 플랫폼 — 목표 3/4  단백질 코딩 영역 질환-약재 연관성",
     "← 請從左側選擇一個藥材（可用搜尋框查找）": "← 왼쪽에서 약재를 선택하세요(검색창 이용 가능)",
-    "可編碼蛋白區疾病與中藥關聯": "단백질 코딩 영역 질환-약재 연관성",
+    "可編碼蛋白區中藥與疾病關聯": "단백질 코딩 영역 질환-약재 연관성",
     "左側選一個藥材（也可搜尋），右側顯示這個藥材的成分連結到哪些 TCMSP 靶點、這些靶點又比對到哪些 GenCC 可編碼蛋白區疾病（Herb → Ingredients → Targets → GenCC Diseases），呈現「這個藥材的成分可能與哪些遺傳性疾病的致病基因有關」。資料來源：GenCC（Gene Curation Coalition，thegencc.org），彙整多個專家審查小組對基因-疾病因果關係的評估結果。": "왼쪽에서 약재를 선택하면(검색 가능) 오른쪽에 이 약재의 성분이 연결된 TCMSP 타겟과, 그 타겟이 매칭되는 GenCC 단백질 코딩 영역 질환이 표시됩니다(약재 → 성분 → 타겟 → GenCC 질환), \"이 약재의 성분이 어떤 유전 질환의 원인 유전자와 관련될 수 있는지\"를 보여줍니다. 데이터 출처: GenCC(Gene Curation Coalition, thegencc.org), 여러 전문가 큐레이션 그룹의 유전자-질환 인과관계 평가를 종합합니다.",
     "不是臨床診斷依據": "임상 진단 근거가 아닙니다",
     "信心等級": "신뢰도 등급",
@@ -1359,7 +1359,7 @@ window.I18N_DICT = {
     "疾病名稱（原文）": "질환명(원문)",
     "編輯疾病資料": "질환 데이터 편집",
     "資料來源：GenCC（Gene Curation Coalition，": "데이터 출처: GenCC(Gene Curation Coalition, ",
-    "），\n        彙整多個專家審查小組（ClinGen、PanelApp 等）對「基因-疾病因果關係」的評估結果。\n        資料量遠大於暗黑基因（完整資料集約 4.6 萬筆），這個頁面主要用途是搜尋/補充中文疾病名稱、軟刪除個別資料，\n        不適合用來瀏覽全部資料——請到「可編碼蛋白區疾病與中藥關聯」查詢站瀏覽關聯圖與完整清單。": "), 여러 전문가 큐레이션 그룹(ClinGen, PanelApp 등)의 유전자-질환 인과관계 평가를 종합합니다.\n        데이터 양이 암 유전자 목록보다 훨씬 많습니다(전체 데이터셋 약 4만 6천 건). 이 페이지는 주로 중국어 질환명 검색/추가, 개별 데이터 소프트 삭제에 사용되며,\n        전체 데이터를 탐색하는 데는 적합하지 않습니다 — 연관성 그래프와 전체 목록은 \"단백질 코딩 영역 질환-약재 연관성\" 탐색기를 이용하세요.",
+    "），\n        彙整多個專家審查小組（ClinGen、PanelApp 等）對「基因-疾病因果關係」的評估結果。\n        資料量遠大於暗黑基因（完整資料集約 4.6 萬筆），這個頁面主要用途是搜尋/補充中文疾病名稱、軟刪除個別資料，\n        不適合用來瀏覽全部資料——請到「可編碼蛋白區疾病關聯查詢站」（以疾病為主）或「可編碼蛋白區中藥與疾病關聯」（以藥材為主）查詢站瀏覽關聯圖與完整清單。": "), 여러 전문가 큐레이션 그룹(ClinGen, PanelApp 등)의 유전자-질환 인과관계 평가를 종합합니다.\n        데이터 양이 암 유전자 목록보다 훨씬 많습니다(전체 데이터셋 약 4만 6천 건). 이 페이지는 주로 중국어 질환명 검색/추가, 개별 데이터 소프트 삭제에 사용되며,\n        전체 데이터를 탐색하는 데는 적합하지 않습니다 — 연관성 그래프와 전체 목록은 \"단백질 코딩 영역 질환 탐색기\"(질환 중심) 또는 \"단백질 코딩 영역 약재-질환 연관성\"(약재 중심) 탐색기를 이용하세요.",
     // ---- GenCC 疾病關聯查詢站（疾病為主）----
     "TCM 中藥腫瘤篩選平台 — 目標三/四　可編碼蛋白區疾病關聯查詢站": "TCM 종양 한약 스크리닝 플랫폼 — 목표 3/4  단백질 코딩 영역 질환 탐색기",
     "TCM 中藥腫瘤篩選平台 — 目標三/四　可編碼蛋白區中藥與疾病關聯": "TCM 종양 한약 스크리닝 플랫폼 — 목표 3/4  단백질 코딩 영역 약재-질환 연관성",

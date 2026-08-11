@@ -508,7 +508,7 @@ class DarkGene(Base):
 
 
 class GenccDisease(Base):
-    """可編碼蛋白區疾病與中藥關聯：資料來源 GenCC（Gene Curation Coalition，https://thegencc.org/download）。
+    """可編碼蛋白區中藥與疾病關聯：資料來源 GenCC（Gene Curation Coalition，https://thegencc.org/download）。
     GenCC 彙整多個專家審查小組（ClinGen、PanelApp 等）對「基因-疾病因果關係」的評估結果，
     每筆是一個「基因 → 疾病」的斷言（assertion），附帶信心等級（classification）與遺傳模式（mode of inheritance）。
 

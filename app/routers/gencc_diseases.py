@@ -8,7 +8,7 @@ from app import models, schemas
 from app.database import get_db, get_query_db
 from app.deps import get_current_user, require_admin, write_audit_log
 
-router = APIRouter(prefix="/gencc-diseases", tags=["可編碼蛋白區疾病與中藥關聯（GenCC 基因-疾病關聯資料）"])
+router = APIRouter(prefix="/gencc-diseases", tags=["可編碼蛋白區中藥與疾病關聯（GenCC 基因-疾病關聯資料）"])
 
 
 # ---------------------------------------------------------------------------
