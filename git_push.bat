@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.31.6 fix missing Korean translations for query station buttons hidden in JS templates"
+set "DEFAULT_MSG=v1.32.0 add GenCC protein-coding region disease and herb association feature"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

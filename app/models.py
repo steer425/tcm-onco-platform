@@ -282,6 +282,8 @@ class TcmspHerb(Base):
     # 由 app/recompute_stats.py 統一重算，資料匯入後跑一次即可，查詢時直接讀欄位、不用現場算
     target_count = Column(Integer, default=0, nullable=False)
     dark_gene_count = Column(Integer, default=0, nullable=False)
+    # 這個藥材（透過成分-靶點）連結到幾個不重複的 GenCC 可編碼蛋白區疾病（見 GenccDisease）
+    gencc_disease_count = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -498,6 +500,50 @@ class DarkGene(Base):
     # 預先計算好的比對結果：這個基因是否比對到 TCMSP 靶點資料，
     # 由 app/recompute_stats.py 統一重算（用基因符號/別名比對靶點名稱），
     # 查詢站列表直接讀這個欄位，不用每次請求都重新掃一次全部靶點
+    has_tcmsp_target = Column(Boolean, default=False, nullable=False)
+    status = Column(String, default="active", nullable=False)  # active / inactive（軟刪除）
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class GenccDisease(Base):
+    """可編碼蛋白區疾病與中藥關聯：資料來源 GenCC（Gene Curation Coalition，https://thegencc.org/download）。
+    GenCC 彙整多個專家審查小組（ClinGen、PanelApp 等）對「基因-疾病因果關係」的評估結果，
+    每筆是一個「基因 → 疾病」的斷言（assertion），附帶信心等級（classification）與遺傳模式（mode of inheritance）。
+
+    跟暗黑基因（DarkGene / OncoKB）不同的地方：暗黑基因是「癌症相關基因清單」（沒有對應到特定疾病），
+    這裡的每一筆資料本身就同時包含基因跟疾病兩個維度，比對邏輯是拿 gene_symbol 去比對 TCMSP 靶點名稱
+    （跟暗黑基因用同一套字詞比對演算法），藉此建立「基因 → 靶點 → 成分 → 藥材」的機制層級關聯鏈，
+    畫面設計比照暗黑基因查詢站。
+
+    資料量遠大於暗黑基因（GenCC 完整資料集通常有 1.5~2 萬筆斷言，暗黑基因只有 1245 筆），
+    所以 has_tcmsp_target 統計一律走 app/recompute_stats.py 預先計算好存欄位的模式，
+    不能像早期查詢端點那樣即時運算（會直接拖垮回應速度，這是這個系統踩過好幾次的教訓，見 rules.md）。
+
+    這是研究層級的基因-疾病關聯參考資料，不是臨床診斷依據；跟暗黑基因一樣，正式提供醫療建議前
+    仍需要專業人員/醫師審核機制。
+    """
+    __tablename__ = "gencc_diseases"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    sgc_id = Column(String, unique=True, nullable=False, index=True)  # GenCC 新格式的唯一識別碼，例如 SGC-100001
+    version_number = Column(String, nullable=True)
+    gene_curie = Column(String, nullable=True, index=True)  # HGNC:XXXXX
+    gene_symbol = Column(String, nullable=False, index=True)  # 基因符號，例如 SKI（用這個欄位比對 TCMSP 靶點）
+    disease_curie = Column(String, nullable=True)  # MONDO:XXXXXXX
+    disease_title = Column(String, nullable=True)  # 疾病名稱（小寫可讀格式）
+    disease_original_curie = Column(String, nullable=True)  # OMIM:XXXXXX（原始提交來源編號）
+    disease_original_title = Column(String, nullable=True)  # 原始提交的疾病名稱（通常是 OMIM 大寫格式）
+    disease_cn_name = Column(String, nullable=True)  # 中文名稱，可於後台補充/修正（比照 TcmspDisease 的做法）
+    classification_curie = Column(String, nullable=True)  # GENCC:XXXXXX
+    classification_title = Column(String, nullable=True, index=True)  # Definitive / Strong / Moderate / Limited / Disputed Evidence / Refuted Evidence / No Known Disease Relationship / Supportive
+    moi_curie = Column(String, nullable=True)  # HP:XXXXXXX
+    moi_title = Column(String, nullable=True)  # 遺傳模式，例如 Autosomal dominant
+    submitter_title = Column(String, nullable=True)  # 提交的專家審查小組名稱，例如 ClinGen
+    submitted_as_pmids = Column(Text, nullable=True)  # 文獻佐證（PMID 或連結）
+    # 預先計算好的比對結果：這個基因是否比對到 TCMSP 靶點資料，
+    # 由 app/recompute_stats.py 統一重算，查詢站列表直接讀這個欄位，不用每次請求都即時運算
     has_tcmsp_target = Column(Boolean, default=False, nullable=False)
     status = Column(String, default="active", nullable=False)  # active / inactive（軟刪除）
     notes = Column(Text, nullable=True)

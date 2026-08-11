@@ -591,6 +591,49 @@ class DarkGeneOut(BaseModel):
         from_attributes = True
 
 
+class GenccDiseaseOut(BaseModel):
+    id: str
+    sgc_id: str
+    version_number: Optional[str]
+    gene_curie: Optional[str]
+    gene_symbol: str
+    disease_curie: Optional[str]
+    disease_title: Optional[str]
+    disease_original_curie: Optional[str]
+    disease_original_title: Optional[str]
+    disease_cn_name: Optional[str]
+    classification_curie: Optional[str]
+    classification_title: Optional[str]
+    moi_curie: Optional[str]
+    moi_title: Optional[str]
+    submitter_title: Optional[str]
+    submitted_as_pmids: Optional[str]
+    has_tcmsp_target: bool = False
+    status: str
+    notes: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+
+class GenccDiseaseCreate(BaseModel):
+    sgc_id: str
+    gene_symbol: str
+    disease_title: Optional[str] = None
+    disease_cn_name: Optional[str] = None
+    classification_title: Optional[str] = None
+    moi_title: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class GenccDiseaseUpdate(BaseModel):
+    disease_cn_name: Optional[str] = None
+    classification_title: Optional[str] = None
+    moi_title: Optional[str] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
+
 # ---------- DNA 資料（檢體／匯入批次／變異） ----------
 
 class SpecimenCreate(BaseModel):

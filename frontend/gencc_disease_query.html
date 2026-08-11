@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>可編碼蛋白區疾病與中藥關聯</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/standalone/umd/vis-network.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+<script src="js/i18n-dict.js"></script>
+<script src="js/site-lang.js"></script>
+<style>
+:root{--bg:#0f1115;--panel:#171a20;--line:#2a2d34;--muted:#8a8f98;--herb:#c99a3d;--mol:#3b82c4;--tgt:#3a9d63;--gene:#8b5fbf;}
+html,body{margin:0;padding:0;background:var(--bg);color:#eee;font-family:"Noto Sans TC","Helvetica Neue",Arial,sans-serif;}
+#platformNav{display:flex;align-items:center;gap:16px;padding:8px 22px;background:#20303f;border-bottom:1px solid var(--line);font-size:12.5px;}
+#platformNav a{color:#8fc3ea;text-decoration:none;}
+#platformNav a:hover{text-decoration:underline;}
+#platformNav span{color:var(--muted);}
+#header{padding:14px 22px 10px;border-bottom:1px solid var(--line);}
+#header h1{margin:0 0 4px;font-size:18px;font-weight:600;}
+#header p{margin:0;font-size:12px;color:var(--muted);line-height:1.6;}
+#layout{display:flex;height:calc(100vh - 116px);min-height:600px;}
+#herbPanel{width:320px;flex-shrink:0;border-right:1px solid var(--line);display:flex;flex-direction:column;}
+#herbSearch{margin:10px;padding:8px 10px;background:#1c1f26;border:1px solid #3a3d44;color:#eee;border-radius:6px;font-size:13px;}
+#herbStats{padding:0 12px 6px;font-size:11.5px;color:var(--muted);}
+#herbList{flex:1;overflow-y:auto;border-top:1px solid var(--line);}
+.herbRow{padding:8px 12px;border-bottom:1px solid #1e2128;cursor:pointer;font-size:12.5px;}
+.herbRow:hover{background:#1a1d23;}
+.herbRow.active{background:#20303f;}
+.herbRow .name{font-weight:600;}
+.herbRow .meta{color:var(--muted);font-size:11px;}
+.badge{display:inline-block;background:#4a2a6a;color:#d8b8f5;border-radius:4px;padding:0 5px;font-size:10.5px;margin-left:6px;}
+#main{flex:1;display:flex;flex-direction:column;min-width:0;overflow-y:auto;}
+#herbHeader{padding:14px 20px;border-bottom:1px solid var(--line);}
+#herbHeader h2{margin:0 0 4px;font-size:17px;}
+#herbHeader .meta{color:var(--muted);font-size:12.5px;}
+#emptyState{padding:60px 20px;text-align:center;color:var(--muted);font-size:14px;}
+.kpi{display:flex;gap:12px;padding:12px 20px;flex-wrap:wrap;}
+.kpi div{background:#1c1f26;border:1px solid #2a2d34;border-radius:10px;padding:10px 16px;min-width:110px;}
+.kpi b{display:block;font-size:20px;}
+.kpi span{font-size:11px;color:var(--muted);}
+#toolbar2{display:flex;gap:8px;padding:8px 20px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line);}
+button{background:#26292f;border:1px solid #3a3d44;color:#eee;padding:6px 11px;border-radius:6px;font-size:12px;cursor:pointer;}
+button:hover{background:#31353c;}
+button.primary{background:#2f5c8a;border-color:#3d70a3;}
+button.primary:hover{background:#396d9e;}
+select{background:#1c1f26;color:#eee;border:1px solid #3a3d44;border-radius:6px;padding:5px 8px;font-size:12px;}
+#network{height:340px;border-bottom:1px solid var(--line);position:relative;flex-shrink:0;}
+#network .placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:20px;}
+.tabs{display:flex;gap:6px;padding:8px 16px 0;}
+.tabs button{background:#1c1f26;}
+.tabs button.active{background:#2f5c8a;border-color:#3d70a3;}
+#tableWrap{flex:1;overflow:auto;padding:8px 16px 16px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{position:sticky;top:0;background:#1c1f26;text-align:left;padding:7px 8px;color:#bcd;border-bottom:1px solid var(--line);white-space:nowrap;}
+td{padding:6px 8px;border-bottom:1px solid #23262c;vertical-align:top;}
+tr:hover td{background:#171a20;}
+.na{color:#666;font-style:italic;}
+.small{font-size:11px;color:var(--muted);}
+.disclaimer{background:#1c1f26;border:1px solid #3a3d44;border-radius:8px;padding:10px 14px;margin:12px 20px 0;font-size:11.5px;color:var(--muted);line-height:1.6;}
+.gene-type-pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:600;}
+.type-oncogene{background:#fdecea;color:#a83232;}
+.type-tsg{background:#e3ecf5;color:#1c4d78;}
+.type-both{background:#f5ecdc;color:#7a5420;}
+.type-neither,.type-insufficient{background:#333;color:#999;}
+a.link{color:#8fc3ea;text-decoration:none;}
+a.link:hover{text-decoration:underline;}
+.col-resizer{position:absolute;right:0;top:0;bottom:0;width:6px;cursor:col-resize;user-select:none;}
+.col-resizer:hover{background:rgba(125,184,232,.4);}
+#netResizeHandle{height:7px;cursor:row-resize;background:#1c1f26;border-bottom:1px solid var(--line);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#555;font-size:10px;letter-spacing:2px;}
+#networkModal{display:none;position:fixed;inset:0;z-index:9999;flex-direction:column;background:#0b0d11;}
+#networkModalBar{display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);flex-shrink:0;flex-wrap:wrap;}
+#networkModalBar b{color:#eee;font-size:14px;flex:1;}
+#networkModalLayerBar{display:flex;gap:10px;align-items:center;padding:6px 16px;border-bottom:1px solid var(--line);flex-shrink:0;flex-wrap:wrap;background:#10131a;}
+#networkModalMain{flex:1;display:flex;min-height:0;}
+#networkModalCanvas{flex:1;min-height:0;}
+#networkNodeDetail{display:none;width:300px;flex-shrink:0;border-left:1px solid var(--line);overflow:auto;padding:14px;background:#12151b;color:#eee;}
+#networkNodeDetail table td{border-bottom:1px solid #23262c;}
+
+/* 淺色主題（個人化設定：關聯查詢站 CSS 設定） */
+body[data-page-theme="light"]{background:#f5f7f5;color:#24312a;}
+body[data-page-theme="light"] #header{border-color:#dfe5e0;}
+body[data-page-theme="light"] #header p{color:#6b7a70;}
+body[data-page-theme="light"] #herbPanel{border-color:#dfe5e0;}
+body[data-page-theme="light"] #herbSearch,
+body[data-page-theme="light"] input,
+body[data-page-theme="light"] select{background:#fff;border-color:#c8d0cb;color:#24312a;}
+body[data-page-theme="light"] #herbStats,
+body[data-page-theme="light"] .small{color:#6b7a70;}
+body[data-page-theme="light"] #herbList{border-color:#dfe5e0;}
+body[data-page-theme="light"] .herbRow{border-bottom-color:#e8ece8;}
+body[data-page-theme="light"] .herbRow:hover{background:#f0f3f1;}
+body[data-page-theme="light"] .herbRow.active{background:#e2ede6;}
+body[data-page-theme="light"] .herbRow .meta{color:#6b7a70;}
+body[data-page-theme="light"] .badge{background:#f0e3fa;color:#6a3a9a;}
+body[data-page-theme="light"] #herbHeader{border-color:#dfe5e0;}
+body[data-page-theme="light"] #herbHeader .meta{color:#6b7a70;}
+body[data-page-theme="light"] .kpi div{background:#fff;border-color:#dfe5e0;}
+body[data-page-theme="light"] #toolbar2{border-color:#dfe5e0;}
+body[data-page-theme="light"] button{background:#eef1ee;border-color:#c8d0cb;color:#24312a;}
+body[data-page-theme="light"] button:hover{background:#e0e5e0;}
+body[data-page-theme="light"] button.primary{background:#2f6f4f;border-color:#1f4f37;color:#fff;}
+body[data-page-theme="light"] #network{border-color:#dfe5e0;background:#fafcfa;}
+body[data-page-theme="light"] .tabs button{background:#eef1ee;color:#24312a;}
+body[data-page-theme="light"] .tabs button.active{background:#2f6f4f;border-color:#1f4f37;color:#fff;}
+body[data-page-theme="light"] th{background:#f0f3f1;color:#3a4a42;border-bottom-color:#dfe5e0;}
+body[data-page-theme="light"] td{border-bottom-color:#e8ece8;}
+body[data-page-theme="light"] tr:hover td{background:#f7f9f7;}
+body[data-page-theme="light"] .na{color:#9aa5a0;}
+body[data-page-theme="light"] .disclaimer{background:#fdf3e0;border-color:#e8d5a8;color:#7a5a20;}
+body[data-page-theme="light"] #networkModalBar{border-color:#dfe5e0;background:#f7f9f7;}
+body[data-page-theme="light"] #layerBar,
+body[data-page-theme="light"] #networkModalLayerBar{border-color:#dfe5e0;background:#fafcfa;}
+body[data-page-theme="light"] #networkNodeDetail{border-color:#dfe5e0;background:#fafcfa;color:#24312a;}
+</style>
+</head>
+<body>
+<div id="platformNav">
+  <a href="dashboard.html">← 返回 Dashboard</a>
+  <span>|</span>
+  <span>TCM 中藥腫瘤篩選平台 — 目標三/四　可編碼蛋白區疾病與中藥關聯</span>
+  <span style="flex:1"></span>
+  <a href="darkgene_query.html">暗黑基因關聯查詢站</a>
+  <span>|</span>
+  <a href="tcmsp_query.html">藥材關聯查詢站</a>
+  <span>|</span>
+  <a href="#" id="themeToggleLink">🌗 切換淺色/深色</a>
+  <span>|</span>
+  <a href="personal-settings.html">個人化設定</a>
+  <span>|</span>
+  <a href="#" id="platformLogout">登出</a>
+</div>
+<div id="header">
+  <h1>可編碼蛋白區疾病與中藥關聯</h1>
+  <p>左側選一個藥材（也可搜尋），右側顯示這個藥材的成分連結到哪些 TCMSP 靶點、這些靶點又比對到哪些 GenCC 可編碼蛋白區疾病（Herb → Ingredients → Targets → GenCC Diseases），呈現「這個藥材的成分可能與哪些遺傳性疾病的致病基因有關」。資料來源：GenCC（Gene Curation Coalition，thegencc.org），彙整多個專家審查小組對基因-疾病因果關係的評估結果。</p>
+</div>
+<div id="layout">
+  <div id="herbPanel">
+    <div style="display:flex; gap:6px; padding:10px 10px 0;">
+      <input id="herbSearch" placeholder="搜尋藥材（中文/拼音/英文學名）..." style="flex:1; margin:0;" />
+      <select id="uiLangSelect" title="介面語系" style="width:90px;">
+        <option value="tw">繁體中文</option>
+        <option value="cn">简体中文</option>
+        <option value="ko">한국어</option>
+      </select>
+    </div>
+    <div id="herbStats" class="small"></div>
+    <div id="herbList"></div>
+  </div>
+  <div id="main">
+    <div id="herbHeader"></div>
+    <div id="emptyState">← 請從左側選擇一個藥材（可用搜尋框查找）</div>
+    <div id="bodyWrap" style="display:none; flex:1; min-height:0; flex-direction:column;">
+      <div class="kpi">
+        <div><b id="kpiIngredients">0</b><span>Related Ingredients</span></div>
+        <div><b id="kpiTargets">0</b><span>Related Targets</span></div>
+        <div><b id="kpiGenes">0</b><span>Matched Diseases</span></div>
+      </div>
+      <div class="disclaimer">⚠️ 這是機制層級的資料關聯（TCMSP 成分-靶點預測資料 + 靶點名稱比對 GenCC 基因-疾病斷言），<b>不是臨床診斷依據</b>，僅供研究篩選參考。GenCC 的信心等級（Definitive/Strong/Moderate/Limited/Disputed 等）代表基因-疾病因果關係的證據強度，不代表這個藥材對這個疾病有療效；正式提供醫療建議前仍需要醫師/專業人員審核。</div>
+      <div id="toolbar2">
+        <button id="fsNet">⛶ 放大檢視關聯圖</button>
+        <span style="flex:1"></span>
+        <span class="small">網絡圖每層最多顯示：</span>
+        <select id="maxIngSel"><option value="5">5個成分</option><option value="8" selected>8個成分</option><option value="15">15個成分</option><option value="9999">全部</option></select>
+        <select id="maxTargetsSel"><option value="3">3個靶點</option><option value="5" selected>5個靶點</option><option value="10">10個靶點</option><option value="9999">全部</option></select>
+        <button id="downloadJsonBtn">⬇ JSON</button>
+        <button id="downloadCsvBtn">⬇ CSV</button>
+      </div>
+      <div id="layerBar" style="display:flex; gap:10px; align-items:center; padding:6px 20px; border-bottom:1px solid var(--line); flex-wrap:wrap; background:#12151b;">
+        <span class="small">顯示層級：</span>
+        <label class="small"><input type="checkbox" id="layerIngredients" checked> Related Ingredients</label>
+        <label class="small"><input type="checkbox" id="layerTargets" checked> Related Targets</label>
+        <label class="small"><input type="checkbox" id="layerGenes" checked> Matched Diseases</label>
+        <span class="small">規則：Herb → Ingredients → Targets → GenCC Diseases 是逐層關係，關掉上層會自動一併關閉並鎖定下層</span>
+      </div>
+      <div id="network"><div class="placeholder">選擇藥材後顯示關聯網絡圖</div></div>
+      <div id="netResizeHandle" title="拖曳調整關聯圖／表格的高度比例">⋯</div>
+      <div class="tabs">
+        <button data-tab="ingredients" class="active">Related Ingredients</button>
+        <button data-tab="targets">Related Targets</button>
+        <button data-tab="genes">Matched Diseases</button>
+        <span style="flex:1"></span>
+        <span class="small">版面：</span>
+        <select id="layoutPresetSelect" style="font-size:11px;"></select>
+        <button id="applyLayoutBtn">套用</button>
+        <input id="layoutNameInput" placeholder="版面名稱" style="width:100px;font-size:11px;background:#1c1f26;color:#eee;border:1px solid #3a3d44;border-radius:6px;padding:4px 6px;">
+        <button id="saveLayoutBtn">儲存目前版面</button>
+        <button id="deleteLayoutBtn">刪除</button>
+      </div>
+      <div id="tableWrap"></div>
+    </div>
+  </div>
+</div>
+
+<div id="networkModal">
+  <div id="networkModalBar">
+    <b id="networkModalTitle"></b>
+    <button id="networkModalClose">✕ 關閉</button>
+  </div>
+  <div id="networkModalLayerBar">
+    <span class="small">顯示層級：</span>
+    <label class="small"><input type="checkbox" id="modalLayerIngredients" checked> Related Ingredients</label>
+    <label class="small"><input type="checkbox" id="modalLayerTargets" checked> Related Targets</label>
+    <label class="small"><input type="checkbox" id="modalLayerGenes" checked> Matched Diseases</label>
+  </div>
+  <div id="networkModalMain">
+    <div id="networkModalCanvas"></div>
+    <div id="networkNodeDetail"></div>
+  </div>
+</div>
+
+<script>
+if (!localStorage.getItem("tcm_token")) { window.location.href = "index.html"; }
+</script>
+<script src="js/api.js"></script>
+<script>
+let uiLang = localStorage.getItem('tcm_ui_lang') || 'tw';
+let convToTw = null, convToCn = null;
+function initOpenCC(){
+  try { convToTw = OpenCC.Converter({from:'cn',to:'tw'}); convToCn = OpenCC.Converter({from:'tw',to:'cn'}); } catch(e){}
+}
+function zhConv(text){
+  if(!text) return text;
+  try {
+    if (uiLang === 'tw') return convToTw ? convToTw(text) : text;
+    if (uiLang === 'cn') return convToCn ? convToCn(text) : text;
+    // 韓語：藥材這類動態中藥資料沒有機器翻譯資源可用，維持原文不轉換；
+    // 頁面上固定的介面文字另外交給 site-lang.js 的字典比對機制處理
+    return text;
+  }
+  catch(e){ return text; }
+}
+function ensureOptionAndSelect(selectEl, value){
+  if (!selectEl || value == null) return;
+  const strVal = String(value);
+  if (![...selectEl.options].some(o => o.value === strVal)) {
+    const opt = document.createElement('option');
+    opt.value = strVal; opt.textContent = strVal + '（管理者設定）';
+    selectEl.insertBefore(opt, selectEl.firstChild);
+  }
+  selectEl.value = strVal;
+}
+async function applyGraphLimitDefaults(){
+  try {
+    const limits = await api('/system-settings/graph-limits');
+    ensureOptionAndSelect(document.getElementById('maxIngSel'), limits.graph_limit_level1);
+    ensureOptionAndSelect(document.getElementById('maxTargetsSel'), limits.graph_limit_level2);
+  } catch(e) { /* 拿不到就沿用畫面上寫好的預設選項 */ }
+}
+
+function escapeHtml(s){
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+
+let allHerbs = [];
+let currentHerb = null;
+let currentDetail = null;
+let currentRelated = { ingredients: [], targets: [], genes: [] };
+let activeTab = "ingredients";
+let network = null, modalNetwork = null;
+let modalOpen = false;
+let layerVisibility = { ingredients: true, targets: true, genes: true };
+
+// 讓瀏覽器有機會重繪畫面，再繼續執行下一段耗時的同步運算，避免看起來卡住不動
+function yieldToUI(){
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+
+async function bootstrap(){
+  const listEl = document.getElementById("herbList");
+  listEl.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:12.5px;">資料載入中，請稍候...</div>';
+  try {
+    allHerbs = await api("/tcmsp/herbs/public/list");
+  } catch(e) {
+    listEl.innerHTML = '<div style="padding:20px;color:#e08080;font-size:12.5px;">資料載入失敗：' + e.message + '</div>';
+    return;
+  }
+
+  listEl.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:12.5px;">正在建立藥材清單...</div>';
+  await yieldToUI();
+
+  renderStats();
+  renderList();
+  // 不像「藥材與暗黑基因關聯」預設鎖定人參——GenCC 資料沒有類似的指標藥材，
+  // 讓使用者自己搜尋想查的藥材，或者之後可以考慮從後台系統設定讀取管理者指定的預設藥材
+}
+
+function renderStats(){
+  document.getElementById("herbStats").textContent = `共 ${allHerbs.length} 種藥材`;
+}
+
+function renderList(filter){
+  const kw = (filter || document.getElementById("herbSearch").value || "").trim().toLowerCase();
+  let list = allHerbs;
+  if (kw) {
+    list = list.filter(h => [h.herb_cn_name, h.herb_pinyin, h.herb_en_name].some(v => (v||'').toLowerCase().includes(kw)));
+  }
+  const listEl = document.getElementById("herbList");
+  listEl.innerHTML = list.map(h => `
+    <div class="herbRow" data-id="${h.herb_id}">
+      <div class="name">${escapeHtml(zhConv(h.herb_cn_name))} ${h.herb_id === currentHerbId() ? '' : ''}</div>
+      <div class="meta">${escapeHtml(h.herb_pinyin||'')} · ${escapeHtml(h.herb_en_name||'')}</div>
+    </div>
+  `).join("") || '<div style="padding:20px;color:var(--muted);font-size:12.5px;">沒有符合的藥材</div>';
+  listEl.querySelectorAll(".herbRow").forEach(row => {
+    row.addEventListener("click", () => selectHerb(parseInt(row.dataset.id, 10)));
+  });
+}
+function currentHerbId(){ return currentHerb ? currentHerb.herb_id : null; }
+
+document.getElementById("herbSearch").addEventListener("input", () => renderList());
+
+async function selectHerb(herbId){
+  currentHerb = allHerbs.find(h => h.herb_id === herbId);
+  if (!currentHerb) return;
+  document.querySelectorAll(".herbRow").forEach(r => r.classList.toggle("active", parseInt(r.dataset.id,10) === herbId));
+
+  document.getElementById("emptyState").style.display = "none";
+  document.getElementById("bodyWrap").style.display = "flex";
+
+  document.getElementById("herbHeader").innerHTML = `
+    <h2>${escapeHtml(zhConv(currentHerb.herb_cn_name))}（${escapeHtml(currentHerb.herb_pinyin||'')}）</h2>
+    <div class="meta">${escapeHtml(currentHerb.herb_en_name||'')} ${currentHerb.child_cn_name ? '· ' + escapeHtml(zhConv(currentHerb.child_cn_name)) : ''}</div>
+  `;
+
+  document.getElementById("tableWrap").innerHTML = '<p class="small">載入關聯資料中...</p>';
+  try {
+    currentDetail = await api(`/gencc-diseases/herb-links/${herbId}`);
+  } catch(e) {
+    document.getElementById("tableWrap").innerHTML = '<p class="small">載入失敗：' + escapeHtml(e.message) + '</p>';
+    return;
+  }
+  if (currentHerbId() !== herbId) return;
+
+  layerVisibility = { ingredients: true, targets: true, genes: true };
+  syncLayerCheckboxes(document.getElementById('layerIngredients'), document.getElementById('layerTargets'), document.getElementById('layerGenes'));
+  syncLayerCheckboxes(document.getElementById('modalLayerIngredients'), document.getElementById('modalLayerTargets'), document.getElementById('modalLayerGenes'));
+
+  recomputeRelated();
+  renderTable();
+  renderNetwork("network", false);
+  if (modalOpen) renderNetwork("networkModalCanvas", true);
+}
+
+function recomputeRelated(){
+  if (!currentDetail) { currentRelated = { ingredients: [], targets: [], genes: [] }; return; }
+  currentRelated = {
+    ingredients: layerVisibility.ingredients ? currentDetail.ingredients : [],
+    targets: layerVisibility.targets ? currentDetail.targets : [],
+    genes: layerVisibility.genes ? currentDetail.matched_diseases : [],
+  };
+  document.getElementById("kpiIngredients").textContent = currentRelated.ingredients.length;
+  document.getElementById("kpiTargets").textContent = currentRelated.targets.length;
+  document.getElementById("kpiGenes").textContent = currentRelated.genes.length;
+}
+
+function syncLayerCheckboxes(ingCb, tgtCb, geneCb){
+  ingCb.checked = layerVisibility.ingredients;
+  tgtCb.checked = layerVisibility.targets;
+  tgtCb.disabled = !layerVisibility.ingredients;
+  geneCb.checked = layerVisibility.genes;
+  geneCb.disabled = !layerVisibility.targets || !layerVisibility.ingredients;
+}
+function onLayerChange(key, value){
+  if (key === 'ingredients') layerVisibility.ingredients = value;
+  if (key === 'targets') layerVisibility.targets = value;
+  if (key === 'genes') layerVisibility.genes = value;
+  if (!layerVisibility.ingredients) { layerVisibility.targets = false; layerVisibility.genes = false; }
+  else if (!layerVisibility.targets) { layerVisibility.genes = false; }
+  syncLayerCheckboxes(document.getElementById('layerIngredients'), document.getElementById('layerTargets'), document.getElementById('layerGenes'));
+  syncLayerCheckboxes(document.getElementById('modalLayerIngredients'), document.getElementById('modalLayerTargets'), document.getElementById('modalLayerGenes'));
+  recomputeRelated();
+  renderTable();
+  renderNetwork('network', false);
+  if (modalOpen) renderNetwork('networkModalCanvas', true);
+}
+['layerIngredients','layerTargets','layerGenes'].forEach((id, idx) => {
+  const key = ['ingredients','targets','genes'][idx];
+  document.getElementById(id).addEventListener('change', (e) => onLayerChange(key, e.target.checked));
+});
+['modalLayerIngredients','modalLayerTargets','modalLayerGenes'].forEach((id, idx) => {
+  const key = ['ingredients','targets','genes'][idx];
+  document.getElementById(id).addEventListener('change', (e) => onLayerChange(key, e.target.checked));
+});
+
+document.querySelectorAll(".tabs button[data-tab]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tabs button[data-tab]").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeTab = btn.dataset.tab;
+    renderTable();
+  });
+});
+
+function renderTable(){
+  const wrap = document.getElementById("tableWrap");
+  if (!currentDetail) { wrap.innerHTML = ""; return; }
+  if (activeTab === "ingredients") {
+    wrap.innerHTML = `<table><thead><tr><th>Mol ID</th><th>Molecule Name</th><th>OB%</th><th>DL</th></tr></thead><tbody>
+      ${currentRelated.ingredients.map(i => `<tr><td>${i.mol_id}</td><td>${escapeHtml(i.molecule_name)}</td><td>${i.ob ?? '<span class="na">-</span>'}</td><td>${i.dl ?? '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="4" class="small">無資料（可能已被顯示層級篩掉）</td></tr>'}
+    </tbody></table>`;
+  } else if (activeTab === "targets") {
+    wrap.innerHTML = `<table><thead><tr><th>Tar ID</th><th>Target Name</th><th>DrugBank ID</th><th>比對到的疾病</th></tr></thead><tbody>
+      ${currentRelated.targets.map(t => `<tr><td>${t.tar_id}</td><td>${escapeHtml(t.target_name)}</td><td>${t.drugbank_id || '<span class="na">-</span>'}</td><td>${(t.matched_diseases||[]).map(d => escapeHtml(d.gene_symbol)).join('、') || '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="4" class="small">無資料（可能已被顯示層級篩掉）</td></tr>'}
+    </tbody></table>`;
+  } else {
+    wrap.innerHTML = `<table><thead><tr><th>Gene Symbol</th><th>疾病名稱</th><th>信心等級</th><th>遺傳模式</th><th>關聯靶點數</th></tr></thead><tbody>
+      ${currentRelated.genes.map(d => {
+        const clsClass = d.classification_title === 'Definitive' ? 'type-oncogene' : d.classification_title === 'Strong' ? 'type-tsg' : 'type-neither';
+        return `<tr><td><b>${escapeHtml(d.gene_symbol)}</b></td><td>${escapeHtml(d.disease_cn_name ? zhConv(d.disease_cn_name) + '（' + (d.disease_title||'') + '）' : (d.disease_title||''))}</td><td>${d.classification_title ? `<span class="gene-type-pill ${clsClass}">${escapeHtml(d.classification_title)}</span>` : '<span class="na">-</span>'}</td><td>${escapeHtml(d.moi_title || '')||'<span class="na">-</span>'}</td><td>${d.matched_target_count}</td></tr>`;
+      }).join("") || '<tr><td colspan="5" class="small">此藥材目前沒有比對到任何 GenCC 疾病，或已被顯示層級篩掉</td></tr>'}
+    </tbody></table>`;
+  }
+  makeColumnsResizable();
+}
+
+function buildGraphData(){
+  const nodes = [];
+  const edges = [];
+  const MAX_ING = parseInt(document.getElementById("maxIngSel").value, 10);
+  const MAX_TGT_PER_ING = parseInt(document.getElementById("maxTargetsSel").value, 10);
+  const herbNodeId = "herb-" + currentHerb.herb_id;
+  nodes.push({ id: herbNodeId, label: zhConv(currentHerb.herb_cn_name), color: "#c99a3d", shape: "dot", size: 22, font: { color: "#111" } });
+
+  if (!layerVisibility.ingredients) return { nodes, edges };
+
+  const targetsById = new Map(currentRelated.targets.map(t => [t.tar_id, t]));
+  const genesById = new Map(currentRelated.genes.map(d => [d.id, d]));
+  const targetsByMol = new Map();
+  currentDetail.ingredient_target.forEach(r => {
+    if (!targetsByMol.has(r.mol_id)) targetsByMol.set(r.mol_id, []);
+    targetsByMol.get(r.mol_id).push(r.tar_id);
+  });
+  const genesByTarget = new Map();
+  (currentDetail.target_disease || []).forEach(r => {
+    if (!genesByTarget.has(r.tar_id)) genesByTarget.set(r.tar_id, []);
+    genesByTarget.get(r.tar_id).push(r.disease_id);
+  });
+
+  const shownTgt = new Set(), shownGene = new Set();
+  currentRelated.ingredients.slice(0, MAX_ING).forEach(ing => {
+    const iid = "mol-" + ing.mol_id;
+    nodes.push({ id: iid, label: ing.molecule_name, color: "#3b82c4", shape: "dot", size: 10 });
+    edges.push({ from: herbNodeId, to: iid });
+
+    if (!layerVisibility.targets) return;
+    (targetsByMol.get(ing.mol_id) || []).filter(tid => targetsById.has(tid)).slice(0, MAX_TGT_PER_ING).forEach(tid => {
+      const t = targetsById.get(tid);
+      const tnid = "tgt-" + tid;
+      if (!shownTgt.has(tid)) {
+        nodes.push({ id: tnid, label: t.target_name, color: "#3a9d63", shape: "dot", size: 12 });
+        shownTgt.add(tid);
+      }
+      edges.push({ from: iid, to: tnid });
+
+      if (!layerVisibility.genes) return;
+      (genesByTarget.get(tid) || []).filter(gid => genesById.has(gid)).forEach(gid => {
+        const g = genesById.get(gid);
+        const gnid = "gene-" + gid;
+        if (!shownGene.has(gid)) {
+          nodes.push({ id: gnid, label: g.gene_symbol, color: "#8b5fbf", shape: "dot", size: 16, font: { color: "#fff" } });
+          shownGene.add(gid);
+        }
+        edges.push({ from: tnid, to: gnid });
+      });
+    });
+  });
+
+  return { nodes, edges };
+}
+
+function renderNetwork(containerId, isModal){
+  const container = document.getElementById(containerId || "network");
+  if (!currentDetail || !currentDetail.ingredients.length) {
+    container.innerHTML = '<div class="placeholder">此藥材目前沒有可顯示的關聯資料</div>';
+    return;
+  }
+  if (!layerVisibility.ingredients) {
+    container.innerHTML = '<div class="placeholder">「Related Ingredients」層級目前被關閉，請至少勾選這一層才能顯示網絡圖</div>';
+    return;
+  }
+  const { nodes, edges } = buildGraphData();
+  const dataSet = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+  const net = new vis.Network(container, dataSet, {
+    physics: { stabilization: true, barnesHut: { gravitationalConstant: -3000, springLength: 90 } },
+    interaction: { hover: true },
+    edges: { color: "#3a3d44", width: 1 },
+    nodes: { borderWidth: 0, font: { color: "#ccc", size: 10 } },
+  });
+  net.on("click", (params) => {
+    if (params.nodes.length && isModal) showNodeDetail(params.nodes[0], dataSet.nodes);
+  });
+  if (isModal) { modalNetwork = net; } else { network = net; }
+}
+
+function showNodeDetail(nodeId, nodesDataSet){
+  const panel = document.getElementById("networkNodeDetail");
+  const node = nodesDataSet.get(nodeId);
+  if (!node) { panel.style.display = "none"; return; }
+  let rows = [];
+  if (nodeId.startsWith("herb-")) {
+    rows = [["中文名稱", zhConv(currentHerb.herb_cn_name)], ["拼音", currentHerb.herb_pinyin || "-"], ["英文學名", currentHerb.herb_en_name || "-"]];
+  } else if (nodeId.startsWith("mol-")) {
+    const i = currentDetail.ingredients.find(x => "mol-" + x.mol_id === nodeId);
+    rows = i ? [["Molecule Name", i.molecule_name], ["Mol ID", i.mol_id], ["OB%", i.ob ?? "-"], ["DL", i.dl ?? "-"]] : [];
+  } else if (nodeId.startsWith("tgt-")) {
+    const t = currentDetail.targets.find(x => "tgt-" + x.tar_id === nodeId);
+    rows = t ? [["Target Name", t.target_name], ["Tar ID", t.tar_id], ["DrugBank ID", t.drugbank_id || "-"]] : [];
+  } else if (nodeId.startsWith("gene-")) {
+    const g = currentDetail.matched_diseases.find(x => "gene-" + x.id === nodeId);
+    rows = g ? [["Gene Symbol", g.gene_symbol], ["疾病名稱", g.disease_title || "-"], ["中文名稱", g.disease_cn_name || "-"], ["信心等級", g.classification_title || "-"], ["遺傳模式", g.moi_title || "-"]] : [];
+  }
+  panel.innerHTML = `<h3 style="margin-top:0;">節點詳情</h3><table>${rows.map(([k,v]) => `<tr><td class="small" style="padding:4px 8px 4px 0;">${k}</td><td>${escapeHtml(v)}</td></tr>`).join("")}</table>`;
+  panel.style.display = "block";
+}
+
+[document.getElementById("maxIngSel"), document.getElementById("maxTargetsSel")].forEach(sel => {
+  sel.addEventListener("change", () => {
+    renderNetwork("network", false);
+    if (modalOpen) renderNetwork("networkModalCanvas", true);
+  });
+});
+
+document.getElementById("fsNet").addEventListener("click", () => {
+  if (!currentHerb) return;
+  document.getElementById("networkModalTitle").textContent = "藥材-可編碼蛋白區疾病關聯網絡圖：" + zhConv(currentHerb.herb_cn_name);
+  document.getElementById("networkNodeDetail").style.display = "none";
+  document.getElementById("networkModal").style.display = "flex";
+  modalOpen = true;
+  setTimeout(() => renderNetwork("networkModalCanvas", true), 50);
+});
+document.getElementById("networkModalClose").addEventListener("click", () => {
+  document.getElementById("networkModal").style.display = "none";
+  modalOpen = false;
+});
+
+document.getElementById("downloadJsonBtn").addEventListener("click", () => {
+  if (!currentHerb || !currentDetail) return;
+  downloadBlob(JSON.stringify({ herb: currentHerb, ...currentDetail }, null, 2), `herb_darkgenes_${currentHerb.herb_en_name}.json`, "application/json");
+});
+document.getElementById("downloadCsvBtn").addEventListener("click", () => {
+  if (!currentHerb || !currentDetail) return;
+  let csv = "type,id,name\n";
+  currentDetail.ingredients.forEach(i => csv += `ingredient,${i.mol_id},"${(i.molecule_name||"").replace(/"/g,'""')}"\n`);
+  currentDetail.targets.forEach(t => csv += `target,${t.tar_id},"${(t.target_name||"").replace(/"/g,'""')}"\n`);
+  currentDetail.matched_diseases.forEach(g => csv += `gencc_disease,${g.gene_symbol},"${(g.disease_title||'').replace(/"/g,'')}","${g.classification_title||''}"\n`);
+  downloadBlob(csv, `herb_darkgenes_${currentHerb.herb_en_name}.csv`, "text/csv");
+});
+function downloadBlob(content, filename, mime){
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+
+// ---------- 網絡圖／表格高度可拖曳調整 ----------
+let networkHeight = 340;
+function initNetworkResize(){
+  const handle = document.getElementById('netResizeHandle');
+  const netEl = document.getElementById('network');
+  if(!handle || !netEl) return;
+  netEl.style.height = networkHeight + 'px';
+  let dragging = false, startY = 0, startH = 0;
+  handle.onmousedown = (e) => {
+    dragging = true; startY = e.clientY; startH = netEl.getBoundingClientRect().height;
+    document.body.style.userSelect = 'none';
+  };
+  window.addEventListener('mousemove', (e) => {
+    if(!dragging) return;
+    let h = startH + (e.clientY - startY);
+    h = Math.max(120, Math.min(h, window.innerHeight - 220));
+    netEl.style.height = h + 'px';
+    networkHeight = h;
+    if(network){ network.redraw(); }
+  });
+  window.addEventListener('mouseup', () => { if(dragging){ dragging = false; document.body.style.userSelect = ''; } });
+}
+
+let colWidths = {};
+function makeColumnsResizable(){
+  const table = document.querySelector('#tableWrap table');
+  if(!table) return;
+  const ths = table.querySelectorAll('thead th');
+  const saved = colWidths[activeTab];
+  ths.forEach((th, idx) => {
+    th.style.position = 'relative';
+    if(saved && saved[idx]) th.style.width = saved[idx] + 'px';
+    const grip = document.createElement('span');
+    grip.className = 'col-resizer';
+    th.appendChild(grip);
+    grip.onmousedown = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const startX = e.clientX, startW = th.getBoundingClientRect().width;
+      function onMove(ev){
+        const w = Math.max(40, Math.round(startW + (ev.clientX - startX)));
+        th.style.width = w + 'px';
+        colWidths[activeTab] = colWidths[activeTab] || [];
+        colWidths[activeTab][idx] = w;
+      }
+      function onUp(){ window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); }
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    };
+  });
+}
+
+const LAYOUT_STORAGE_KEY = 'herb_darkgene_layout_presets_v1';
+function loadLayoutPresets(){ try{ return JSON.parse(localStorage.getItem(LAYOUT_STORAGE_KEY) || '{}'); }catch(e){ return {}; } }
+function saveLayoutPresets(p){ localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(p)); }
+function refreshLayoutPresetOptions(){
+  const sel = document.getElementById('layoutPresetSelect');
+  if(!sel) return;
+  const presets = loadLayoutPresets();
+  sel.innerHTML = '<option value="">-- 選擇已儲存版面 --</option>' + Object.keys(presets).map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+}
+function saveCurrentLayout(name){
+  if(!name){ alert('請先輸入版面名稱'); return; }
+  const presets = loadLayoutPresets();
+  presets[name] = { networkHeight, cols: colWidths };
+  saveLayoutPresets(presets);
+  refreshLayoutPresetOptions();
+  document.getElementById('layoutPresetSelect').value = name;
+}
+function applyLayoutPreset(name){
+  if(!name) return;
+  const p = loadLayoutPresets()[name];
+  if(!p) return;
+  if(p.networkHeight){
+    networkHeight = p.networkHeight;
+    const netEl = document.getElementById('network');
+    if(netEl){ netEl.style.height = networkHeight + 'px'; if(network) network.redraw(); }
+  }
+  if(p.cols){ colWidths = JSON.parse(JSON.stringify(p.cols)); makeColumnsResizable(); }
+}
+function deleteLayoutPreset(name){
+  if(!name) return;
+  const presets = loadLayoutPresets();
+  delete presets[name];
+  saveLayoutPresets(presets);
+  refreshLayoutPresetOptions();
+}
+document.getElementById('applyLayoutBtn').addEventListener('click', () => applyLayoutPreset(document.getElementById('layoutPresetSelect').value));
+document.getElementById('saveLayoutBtn').addEventListener('click', () => saveCurrentLayout(document.getElementById('layoutNameInput').value.trim()));
+document.getElementById('deleteLayoutBtn').addEventListener('click', () => {
+  const name = document.getElementById('layoutPresetSelect').value;
+  if(name && confirm(`確定刪除版面「${name}」？`)) deleteLayoutPreset(name);
+});
+refreshLayoutPresetOptions();
+initNetworkResize();
+
+document.getElementById('uiLangSelect').value = uiLang;
+document.getElementById('uiLangSelect').addEventListener('change', (e) => {
+  uiLang = e.target.value;
+  localStorage.setItem('tcm_ui_lang', uiLang);
+  renderList();
+  if (currentHerb) selectHerb(currentHerb.herb_id);
+  if (typeof applySiteLanguage === 'function') applySiteLanguage(uiLang);
+});
+if (typeof applySiteLanguage === 'function') applySiteLanguage(uiLang);
+
+document.getElementById("platformLogout").addEventListener("click", async (e) => {
+  e.preventDefault();
+  try { await api(`/auth/logout?login_log_id=${getLoginLogId()}`, { method: "POST" }); } catch(err) {}
+  clearSession();
+  window.location.href = "index.html";
+});
+
+let queryStationTheme = 'dark';
+async function loadQueryStationTheme(){
+  try {
+    const data = await api('/user-preferences/query_station_theme');
+    queryStationTheme = data.value || 'dark';
+  } catch(e) { queryStationTheme = 'dark'; }
+  document.body.setAttribute('data-page-theme', queryStationTheme);
+}
+document.getElementById('themeToggleLink').addEventListener('click', async (e) => {
+  e.preventDefault();
+  queryStationTheme = queryStationTheme === 'dark' ? 'light' : 'dark';
+  document.body.setAttribute('data-page-theme', queryStationTheme);
+  try {
+    await api('/user-preferences/query_station_theme', { method: 'PUT', body: JSON.stringify({ value: queryStationTheme }) });
+  } catch(err) {}
+});
+loadQueryStationTheme();
+
+initOpenCC();
+applyGraphLimitDefaults();
+bootstrap();
+</script>
+</body>
+</html>

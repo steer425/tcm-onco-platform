@@ -1,5 +1,65 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.32.0 — 2026-08-06（新功能：可編碼蛋白區疾病與中藥關聯，資料來源 GenCC）
+
+### 新功能
+
+新增「可編碼蛋白區疾病與中藥關聯」，資料來源 GenCC（Gene Curation Coalition，https://thegencc.org/download）——彙整多個專家審查小組（ClinGen、PanelApp 等）對「基因-疾病因果關係」的評估結果。比對邏輯比照暗黑基因（拿 gene_symbol 去比對 TCMSP 靶點名稱），建立「基因 → 靶點 → 成分 → 藥材」的機制層級關聯鏈，畫面設計比照「藥材與暗黑基因關聯」。
+
+### 資料庫
+
+新增 `GenccDisease` 資料表：sgc_id（唯一識別碼）、gene_symbol、disease_title、classification_title（信心等級：Definitive/Strong/Moderate/Limited/Disputed Evidence 等）、moi_title（遺傳模式）等 GenCC 核心欄位，以及預先計算好的 `has_tcmsp_target` 統計欄位。`TcmspHerb` 新增 `gencc_disease_count` 欄位。
+
+### 匯入腳本 `app/import_gencc_diseases.py`
+
+- 依 sgc_id 做 upsert，每 2000 筆分批 commit（資料量遠大於暗黑基因，不能全部讀完才 commit）
+- **實際用使用者提供的完整資料集測試**：檔案 `wc -l` 顯示 46,664 行，但 CSV 欄位內容含換行符號導致行數虛增，用 `csv.DictReader` 正確解析出 **30,410 筆邏輯資料**（0 筆缺漏 sgc_id/gene_symbol），匯入耗時 23.1 秒
+- 匯入完成自動觸發 `recompute_stats.py`：30,410 筆資料中 **279 筆比對到中藥靶點**；抽查知名癌症基因 BRCA1（11 筆疾病斷言，11 筆比對到）、BRCA2/TP53/APC（比對結果合理）
+- 涵蓋最多可編碼蛋白區疾病的藥材：葛花（158 個）、麻黄（128 個）、白果（115 個）——跟暗黑基因功能的排名模式一致（這些藥材本來就有較多 TCMSP 靶點紀錄）
+
+### 後端 API（`app/routers/gencc_diseases.py`）
+
+前台：`/gencc-diseases/public/list`（清單）、`/public/stats`（依信心等級分組統計）、`/herb-links/{herb_id}`（藥材反查，回應結構完全比照暗黑基因版本）、`/public/herb-stats`（中藥覆蓋排行）。後台：CRUD（新增/編輯/軟刪除），清單端點**故意不預設列出全部**（資料量太大），需要關鍵字或信心等級篩選才查詢，且限制 500 筆。
+
+### 前端
+
+- **查詢站**（`gencc_disease_query.html`）：複製「藥材與暗黑基因關聯」改造，UI/網絡圖/顯示層級/下載機制完全一致；跟暗黑基因版本不同的是**不預設鎖定特定藥材**（沒有類似人參的指標藥材）
+- **後台管理**（`gencc-diseases.html` + `gencc-diseases.js`）：比照暗黑基因管理頁面，但**沒有瀏覽器上傳功能**（資料量太大不適合），改成引導管理者在伺服器/本機執行匯入腳本
+- 兩個新頁面補齊英文/韓文翻譯（33 筆新詞條）
+
+### 統計/唯讀模式整合
+
+`recompute_stats.py` 新增兩個函式（GenCC 疾病的中藥靶點比對、藥材的 GenCC 疾病關聯統計），`app/local_cache.py` 的本機端查詢快取涵蓋範圍加入 `gencc_diseases` 資料表。
+
+### 功能項目
+
+新增 F3-11（可編碼蛋白區疾病管理，後台）、F3-12（可編碼蛋白區疾病與中藥關聯查詢站，前台），比照暗黑基因的 F3-2／F3-3 命名模式。
+
+### 已測試驗證
+
+模型/schema/router 語法檢查全過；用真實 GenCC 完整資料集（30,410 筆）測試匯入、統計重算、API 端點（清單/統計/藥材反查/覆蓋排行/CRUD）全部正確；遷移腳本測試（39 筆功能項目正確回填，統計欄位正確重算）；兩個新頁面伺服器端測試 200 OK。
+
+### `rules.md` 更新
+
+新增「五之四」章節，完整記錄這次的設計決策，特別是「`wc -l` 跟 `csv.DictReader` 算出來的列數可能不一致（欄位內容含換行符號）」這個認知陷阱，跟資料量是暗黑基因 20~30 倍所需要的架構考量（分批 commit、後台不預設列出全部）。
+
+### 部署注意事項
+
+**這次一定要跑遷移腳本**（新增 `gencc_diseases` 資料表跟 `TcmspHerb.gencc_disease_count` 欄位）：
+
+```bash
+$env:DATABASE_URL="你的 Neon 連線字串"
+python -m app.migrate_schema
+```
+
+**接著要匯入 GenCC 資料**（正式環境沒有這份資料，遷移腳本不會自動下載）：
+
+```bash
+python -m app.import_gencc_diseases data_import/gencc-submissions.csv
+```
+
+GenCC 官網下載連結：https://thegencc.org/download → 選「RECOMMENDED New Format」下的 CSV。
+
 ## v1.31.6 — 2026-08-06（補齊查詢站藏在 `<script>` 樣板字串裡的按鈕/UI文字韓文翻譯）
 
 ### 問題

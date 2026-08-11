@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>可編碼蛋白區疾病管理 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<style>
+  .cls-pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+  .cls-definitive { background:#e8f3ec; color:#1f4f37; }
+  .cls-strong { background:#e3ecf5; color:#1c4d78; }
+  .cls-moderate { background:#f5ecdc; color:#7a5420; }
+  .cls-limited, .cls-disputed, .cls-refuted { background:#fdecea; color:#a83232; }
+  .cls-other { background:#f0f0f0; color:#777; }
+  .status-pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:600; }
+  .status-active { background:#e8f3ec; color:#1f4f37; }
+  .status-inactive { background:#fdecea; color:#c0392b; }
+</style>
+</head>
+<body data-current-page="gencc-diseases.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">可編碼蛋白區疾病管理</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <p class="hint-msg" style="margin-top:0;">
+        資料來源：GenCC（Gene Curation Coalition，<a href="https://thegencc.org/download" target="_blank" rel="noopener">thegencc.org/download</a>），
+        彙整多個專家審查小組（ClinGen、PanelApp 等）對「基因-疾病因果關係」的評估結果。
+        資料量遠大於暗黑基因（完整資料集約 4.6 萬筆），這個頁面主要用途是搜尋/補充中文疾病名稱、軟刪除個別資料，
+        不適合用來瀏覽全部資料——請到「可編碼蛋白區疾病與中藥關聯」查詢站瀏覽關聯圖與完整清單。
+      </p>
+      <p class="hint-msg">
+        匯入方式：這個頁面沒有上傳按鈕，資料量太大不適合透過瀏覽器上傳。
+        請下載 <a href="https://thegencc.org/download/action/submissions-export-csv?format=new" target="_blank" rel="noopener">GenCC CSV（新格式）</a>
+        後，在伺服器/本機執行：<code>python -m app.import_gencc_diseases data_import/gencc-submissions.csv</code>
+      </p>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap;">
+        <input id="searchInput" placeholder="搜尋基因符號/疾病名稱" style="max-width:260px;" />
+        <select id="classificationFilter" style="max-width:200px;">
+          <option value="">全部信心等級</option>
+          <option value="Definitive">Definitive</option>
+          <option value="Strong">Strong</option>
+          <option value="Moderate">Moderate</option>
+          <option value="Limited">Limited</option>
+          <option value="Disputed Evidence">Disputed Evidence</option>
+          <option value="Refuted Evidence">Refuted Evidence</option>
+          <option value="No Known Disease Relationship">No Known Disease Relationship</option>
+          <option value="Supportive">Supportive</option>
+        </select>
+        <span class="hint-msg" id="countHint" style="margin-left:auto;"></span>
+        <button id="searchBtn">搜尋</button>
+      </div>
+      <p class="hint-msg" style="margin-top:0;">最多顯示 500 筆搜尋結果，資料量太大時請縮小搜尋範圍。</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Gene Symbol</th><th>疾病名稱</th><th>中文名稱</th><th>信心等級</th><th>遺傳模式</th>
+            <th>有中藥靶點</th><th>狀態</th><th style="width:110px;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<div id="diseaseModal" class="modal-backdrop" style="display:none;">
+  <div class="modal" style="max-width:600px;">
+    <h3 id="diseaseModalTitle">編輯疾病資料</h3>
+    <input type="hidden" id="diseaseId" />
+    <div><label>SGC ID</label><input id="diseaseSgcId" disabled /></div>
+    <div><label>Gene Symbol</label><input id="diseaseGeneSymbol" disabled /></div>
+    <div><label>疾病名稱（原文）</label><input id="diseaseTitle" disabled /></div>
+    <div><label>中文名稱</label><input id="diseaseCnName" placeholder="可補充/修正中文翻譯" /></div>
+    <div><label>信心等級</label><input id="diseaseClassification" /></div>
+    <div><label>遺傳模式</label><input id="diseaseMoi" /></div>
+    <div><label>狀態</label>
+      <select id="diseaseStatus">
+        <option value="active">使用中</option>
+        <option value="inactive">已刪除</option>
+      </select>
+    </div>
+    <label>備注</label>
+    <textarea id="diseaseNotes" rows="2"></textarea>
+
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="secondary" id="diseaseModalCancel">關閉</button>
+      <button id="diseaseModalSave">儲存</button>
+    </div>
+    <div id="diseaseModalMsg" class="hint-msg"></div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/i18n-dict.js"></script>
+<script src="js/site-lang.js"></script>
+<script src="js/gencc-diseases.js"></script>
+</body>
+</html>

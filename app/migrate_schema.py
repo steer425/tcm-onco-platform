@@ -35,6 +35,7 @@ ALTER_STATEMENTS = [
     "ALTER TABLE pharmacies ADD COLUMN discount_valid_until VARCHAR",
     "ALTER TABLE tcmsp_herbs ADD COLUMN target_count INTEGER DEFAULT 0 NOT NULL",
     "ALTER TABLE tcmsp_herbs ADD COLUMN dark_gene_count INTEGER DEFAULT 0 NOT NULL",
+    "ALTER TABLE tcmsp_herbs ADD COLUMN gencc_disease_count INTEGER DEFAULT 0 NOT NULL",
     "ALTER TABLE tcmsp_diseases ADD COLUMN target_count INTEGER DEFAULT 0 NOT NULL",
     "ALTER TABLE dark_genes ADD COLUMN has_tcmsp_target BOOLEAN DEFAULT FALSE NOT NULL",
 ]

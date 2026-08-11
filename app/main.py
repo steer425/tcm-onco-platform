@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.database import Base, SessionLocal, engine
 from app.routers import (
     account_applications, announcements, audit_logs, auth, backup_jobs,
-    dark_genes, dashboard, dna_data, login_logs, nav, oauth_accounts, patients, permissions, pharmacies, project_info, roles,
+    dark_genes, dashboard, dna_data, gencc_diseases, login_logs, nav, oauth_accounts, patients, permissions, pharmacies, project_info, roles,
     system_settings, tcmsp, user_preferences, users,
 )
 from app.seed import seed_default_data
@@ -18,7 +18,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="TCM 中藥腫瘤篩選平台 - 後台系統 API（目標零）",
     description="帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄",
-    version="1.31.6",
+    version="1.32.0",
 )
 
 ALLOWED_ORIGINS = [
@@ -100,6 +100,7 @@ app.include_router(announcements.router)
 app.include_router(user_preferences.router)
 app.include_router(patients.router)
 app.include_router(dark_genes.router)
+app.include_router(gencc_diseases.router)
 app.include_router(dna_data.router)
 
 

@@ -46,7 +46,7 @@ def _gene_symbols_for_match(gene: models.DarkGene):
 
 def recompute_herb_target_counts(db: Session):
     """藥材 -> 成分 -> 靶點，統計每個藥材連結到幾個不重複的靶點。"""
-    print("步驟 1/4：重算藥材的靶點統計（TcmspHerb.target_count）...")
+    print("步驟 1/6：重算藥材的靶點統計（TcmspHerb.target_count）...")
     herb_ingredient_rows = db.query(models.TcmspHerbIngredient).all()
     ingredient_target_rows = db.query(models.TcmspIngredientTarget).all()
 
@@ -67,7 +67,7 @@ def recompute_herb_target_counts(db: Session):
 
 def recompute_disease_target_counts(db: Session):
     """疾病 -> 靶點，統計每個疾病連結到幾個不重複的靶點（直接關聯，不用經過成分）。"""
-    print("步驟 2/4：重算疾病的靶點統計（TcmspDisease.target_count）...")
+    print("步驟 2/6：重算疾病的靶點統計（TcmspDisease.target_count）...")
     target_disease_rows = db.query(models.TcmspTargetDisease).all()
     disease_to_targets = {}
     for r in target_disease_rows:
@@ -82,7 +82,7 @@ def recompute_disease_target_counts(db: Session):
 
 def recompute_dark_gene_has_target(db: Session):
     """暗黑基因是否比對到任何 TCMSP 靶點（基因符號/別名 vs 靶點名稱的單詞比對）。"""
-    print("步驟 3/4：重算暗黑基因的中藥靶點比對結果（DarkGene.has_tcmsp_target）...")
+    print("步驟 3/6：重算暗黑基因的中藥靶點比對結果（DarkGene.has_tcmsp_target）...")
     target_word_set = _build_target_word_index(db)
     genes = db.query(models.DarkGene).all()
     matched_count = 0
@@ -98,7 +98,7 @@ def recompute_dark_gene_has_target(db: Session):
 
 def recompute_herb_dark_gene_counts(db: Session):
     """藥材 -> 成分 -> 靶點 -> 暗黑基因，統計每個藥材連結到幾個不重複的暗黑基因。"""
-    print("步驟 4/4：重算藥材的暗黑基因關聯統計（TcmspHerb.dark_gene_count）...")
+    print("步驟 4/6：重算藥材的暗黑基因關聯統計（TcmspHerb.dark_gene_count）...")
     genes = db.query(models.DarkGene).filter(models.DarkGene.status == "active").all()
     all_targets = db.query(models.TcmspTarget).all()
 
@@ -139,11 +139,75 @@ def recompute_herb_dark_gene_counts(db: Session):
     print(f"  完成，共更新 {len(herbs)} 筆藥材資料")
 
 
+def recompute_gencc_disease_has_target(db: Session):
+    """GenCC 可編碼蛋白區疾病是否比對到任何 TCMSP 靶點（gene_symbol vs 靶點名稱的單詞比對）。
+    跟暗黑基因用同一套比對演算法，差別是 GenCC 沒有別名欄位，只用 gene_symbol 單一欄位比對，
+    資料量遠大於暗黑基因（可能 1.5~2 萬筆），這裡的迴圈本身仍是 O(n) 的 set 查找，不會太慢，
+    但要注意如果之後資料量再往上一個量級，可能需要考慮批次處理或非同步背景任務。"""
+    print("步驟 5/6：重算 GenCC 可編碼蛋白區疾病的中藥靶點比對結果（GenccDisease.has_tcmsp_target）...")
+    target_word_set = _build_target_word_index(db)
+    diseases = db.query(models.GenccDisease).filter(models.GenccDisease.status == "active").all()
+    matched_count = 0
+    for d in diseases:
+        symbol = (d.gene_symbol or "").upper()
+        has_target = symbol in target_word_set
+        d.has_tcmsp_target = has_target
+        if has_target:
+            matched_count += 1
+    db.commit()
+    print(f"  完成，共更新 {len(diseases)} 筆資料，其中 {matched_count} 筆比對到中藥靶點")
+
+
+def recompute_herb_gencc_disease_counts(db: Session):
+    """藥材 -> 成分 -> 靶點 -> GenCC 疾病（透過 gene_symbol），統計每個藥材連結到幾個不重複的可編碼蛋白區疾病。"""
+    print("步驟 6/6：重算藥材的 GenCC 可編碼蛋白區疾病關聯統計（TcmspHerb.gencc_disease_count）...")
+    diseases = db.query(models.GenccDisease).filter(models.GenccDisease.status == "active").all()
+    all_targets = db.query(models.TcmspTarget).all()
+
+    word_to_target_ids = {}
+    for t in all_targets:
+        words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
+        for w in words:
+            word_to_target_ids.setdefault(w, set()).add(t.tar_id)
+
+    target_to_disease_ids = {}
+    for d in diseases:
+        symbol = (d.gene_symbol or "").upper()
+        for tar_id in word_to_target_ids.get(symbol, set()):
+            target_to_disease_ids.setdefault(tar_id, set()).add(d.id)
+
+    herbs = db.query(models.TcmspHerb).all()
+    if not target_to_disease_ids:
+        for h in herbs:
+            h.gencc_disease_count = 0
+        db.commit()
+        print("  完成（目前沒有任何靶點比對到 GenCC 疾病，全部藥材統計為 0）")
+        return
+
+    relevant_tar_ids = set(target_to_disease_ids.keys())
+    mol_to_disease_ids = {}
+    for r in db.query(models.TcmspIngredientTarget).filter(models.TcmspIngredientTarget.tar_id.in_(relevant_tar_ids)).all():
+        mol_to_disease_ids.setdefault(r.mol_id, set()).update(target_to_disease_ids.get(r.tar_id, set()))
+
+    relevant_mol_ids = set(mol_to_disease_ids.keys())
+    herb_to_disease_ids = {}
+    if relevant_mol_ids:
+        for r in db.query(models.TcmspHerbIngredient).filter(models.TcmspHerbIngredient.mol_id.in_(relevant_mol_ids)).all():
+            herb_to_disease_ids.setdefault(r.herb_id, set()).update(mol_to_disease_ids.get(r.mol_id, set()))
+
+    for h in herbs:
+        h.gencc_disease_count = len(herb_to_disease_ids.get(h.id, set()))
+    db.commit()
+    print(f"  完成，共更新 {len(herbs)} 筆藥材資料")
+
+
 def recompute_all_stats(db: Session):
     recompute_herb_target_counts(db)
     recompute_disease_target_counts(db)
     recompute_dark_gene_has_target(db)
     recompute_herb_dark_gene_counts(db)
+    recompute_gencc_disease_has_target(db)
+    recompute_herb_gencc_disease_counts(db)
 
 
 if __name__ == "__main__":

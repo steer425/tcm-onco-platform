@@ -35,6 +35,7 @@ CACHED_TABLES = [
     "tcmsp_ingredient_target",
     "tcmsp_target_disease",
     "dark_genes",
+    "gencc_diseases",
 ]
 
 _local_engine = None
