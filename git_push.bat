@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.31.4 add Korean support to all 4 query stations plus fix Simplified Chinese static text gap"
+set "DEFAULT_MSG=v1.31.5 fix site-lang.js: language switching gets stuck in intermediate state (site-wide)"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%
