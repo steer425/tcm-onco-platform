@@ -6,6 +6,8 @@
 <title>TCMSP 疾病關聯查詢站</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/standalone/umd/vis-network.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+<script src="js/i18n-dict.js"></script>
+<script src="js/site-lang.js"></script>
 <style>
 :root{--bg:#0f1115;--panel:#171a20;--line:#2a2d34;--muted:#8a8f98;--herb:#c99a3d;--mol:#3b82c4;--tgt:#3a9d63;--dis:#c0533e;}
 html,body{margin:0;padding:0;background:var(--bg);color:#eee;font-family:"Noto Sans TC","Helvetica Neue",Arial,sans-serif;}
@@ -138,6 +140,7 @@ tr:hover td{background:#171a20;}
       <select id="uiLangSelect" title="介面語系" style="width:90px;">
         <option value="tw">繁體中文</option>
         <option value="cn">简体中文</option>
+        <option value="ko">한국어</option>
       </select>
     </div>
     <div style="padding:6px 12px 0;">
@@ -248,7 +251,7 @@ let mainNetwork = null, modalNetwork = null;
 let modalOpen = false; // 全螢幕檢視是否開啟中，開啟時切換顯示層級/挑選器要同步重繪全螢幕那個畫布，不能只更新背景的小圖
 
 // ---------- 繁簡語系切換 ----------
-let uiLang = localStorage.getItem('tcm_ui_lang') || 'tw'; // 'tw'=繁體中文 / 'cn'=簡體中文
+let uiLang = localStorage.getItem('tcm_ui_lang') || 'tw'; // 'tw'=繁體中文 / 'cn'=簡體中文 / 'ko'=한국어
 let convToTw = null, convToCn = null;
 function initOpenCC(){
   try {
@@ -258,7 +261,13 @@ function initOpenCC(){
 }
 function zhConv(text){
   if(!text) return text;
-  try { return uiLang === 'tw' ? (convToTw ? convToTw(text) : text) : (convToCn ? convToCn(text) : text); }
+  try {
+    if (uiLang === 'tw') return convToTw ? convToTw(text) : text;
+    if (uiLang === 'cn') return convToCn ? convToCn(text) : text;
+    // 韓語：疾病/藥材這類動態中藥資料沒有機器翻譯資源可用，維持原文（繁體中文）不轉換；
+    // 頁面上固定的介面文字另外交給 site-lang.js 的字典比對機制處理
+    return text;
+  }
   catch(e) { return text; }
 }
 
@@ -759,8 +768,10 @@ document.getElementById('uiLangSelect').addEventListener('change', (e) => {
   localStorage.setItem('tcm_ui_lang', uiLang);
   renderDiseaseList(document.getElementById('disSearch').value);
   if (currentDisease) selectDisease(currentDisease.dis_id);
+  if (typeof applySiteLanguage === 'function') applySiteLanguage(uiLang);
 });
 initOpenCC();
+if (typeof applySiteLanguage === 'function') applySiteLanguage(uiLang);
 
 // ---------- 個人化設定：查詢站淺色/深色主題 ----------
 let queryStationTheme = 'dark';

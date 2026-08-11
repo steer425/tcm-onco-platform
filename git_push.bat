@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.31.3 implement local cache for query stations in read-only mode (the actual core feature)"
+set "DEFAULT_MSG=v1.31.4 add Korean support to all 4 query stations plus fix Simplified Chinese static text gap"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%
