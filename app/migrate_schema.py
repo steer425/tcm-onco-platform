@@ -91,11 +91,17 @@ def run():
                 ))
                 updated += 1
                 continue
+            feature.module = item["module"]
+            feature.name = item["name"]
             feature.nav_label = item.get("nav_label")
             feature.page_url = item.get("page_url")
-            feature.show_frontend = item.get("show_frontend", False)
-            feature.show_backend = item.get("show_backend", True)
             feature.sort_order = item.get("sort_order", 0)
+            # 注意：不覆蓋 show_frontend／show_backend／enabled 這幾個欄位！
+            # 這些欄位在「角色管理→權限矩陣」視窗裡是管理者可以自行調整的「全站共用設定」
+            # （見 app/routers/permissions.py 的 update_permission_matrix），如果每次遷移都
+            # 無條件用 FEATURE_CONFIG 的預設值覆蓋回去，管理者在後台做的調整會被悄悄洗掉，
+            # 而且不會有任何錯誤訊息——這是真實發現過的潛在風險（v1.32.4），不是理論疑慮。
+            # 只同步「開發者定義、管理者不會去改的」內容性欄位（名稱、連結、排序）。
             updated += 1
         db.commit()
         print(f"完成，共處理 {updated} 筆功能項目。")

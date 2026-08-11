@@ -54,7 +54,8 @@ def seed_default_data(db: Session):
     db.commit()
 
     for item in FEATURE_CONFIG:
-        if not db.query(models.Feature).filter(models.Feature.code == item["code"]).first():
+        existing = db.query(models.Feature).filter(models.Feature.code == item["code"]).first()
+        if not existing:
             db.add(models.Feature(
                 code=item["code"], module=item["module"], name=item["name"],
                 nav_label=item.get("nav_label"), page_url=item.get("page_url"),
@@ -63,6 +64,19 @@ def seed_default_data(db: Session):
                 sort_order=item.get("sort_order", 0),
                 enabled=True,
             ))
+        else:
+            # 重要：既有功能項目的 module/name/nav_label/page_url/排序也要跟著更新，
+            # 不能只在「代碼不存在」時才處理——不然像這次「F3-12 改名稱、改連結，但代碼沒變」
+            # 這種情況，重啟伺服器（每次部署都會重啟）完全不會把新內容寫進資料庫，
+            # 會卡在舊名稱/舊連結，兩個功能項目點進去變成同一個頁面，使用者以為是 bug，
+            # 其實是資料庫沒有真的更新到——這是真實發生過的問題（v1.32.4）。
+            # enabled／show_frontend／show_backend 這幾個「管理者可能已經在後台手動調整過」的欄位
+            # 不在這裡覆蓋，避免蓋掉管理者的個別設定；只同步「開發者定義的內容性欄位」。
+            existing.module = item["module"]
+            existing.name = item["name"]
+            existing.nav_label = item.get("nav_label")
+            existing.page_url = item.get("page_url")
+            existing.sort_order = item.get("sort_order", 0)
     db.commit()
 
     # 預設「一般使用者」角色對所有前台功能給予可見權限（可事後於角色管理頁面調整）

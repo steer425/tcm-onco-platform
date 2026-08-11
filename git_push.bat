@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.32.3 add favicon to all pages to eliminate the only real console 404"
+set "DEFAULT_MSG=v1.32.4 fix seed_default_data() missing update logic for existing feature items"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

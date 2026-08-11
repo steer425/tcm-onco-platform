@@ -26,11 +26,13 @@
 **新增一個功能項目的完整流程**：
 
 1. 在 `app/feature_config.py` 的 `FEATURE_CONFIG` 加一筆設定（code、module、name、nav_label、page_url、show_frontend、show_backend、sort_order）
-2. 重新啟動後端（`seed_default_data()` 會自動把新項目寫進資料庫），或針對已存在的資料庫執行 `python -m app.migrate_schema` 回填
+2. 重新啟動後端（`seed_default_data()` 會自動把新項目寫進資料庫，**也會自動更新既有項目的 module/name/nav_label/page_url/sort_order**，見下方 v1.32.4 教訓），或針對已存在的資料庫執行 `python -m app.migrate_schema` 回填
 3. 到「角色管理」頁面點任一角色的「權限矩陣」按鈕，會看到這個新功能項目出現在清單裡：左側「可見/可執行」設定該角色專屬權限，右側「啟用/前台/後台/導覽文字/排序」是全站共用設定（改了會影響所有角色，含管理者），**兩者在同一個視窗一次設定完成**，不需要另外開一個「功能項目管理」頁面
 4. 前端頁面記得在 `<body>` 加上 `data-current-page="xxx.html"`，並用 `<nav id="navContainer"></nav>` 取代寫死的選單——導覽選單會由 `js/nav.js` 呼叫 `GET /nav/menu` 動態渲染，不需要在每個頁面手動維護 `<a>` 清單
 
 > **歷史備註**：v1.9.0 曾經另外做了一個獨立的「功能項目管理」頁面（`features.html`），跟角色管理的「權限矩陣」功能重疊，v1.10.0 已經整併：全站共用設定（啟用/前台/後台/導覽文字/排序）現在直接在「權限矩陣」視窗編輯，`features.html` 已移除。後端 `/features` 系列 API 仍保留（GET/POST/PUT/DELETE），供未來需要程式化管理時使用，只是拿掉了對應的獨立管理頁面。
+
+> **重大教訓（v1.32.4）：`seed_default_data()` 只有「新增」邏輯、沒有「更新」邏輯，導致改名/改連結的既有功能項目卡在舊狀態**——這是真實發生過的 bug：把 GenCC 查詢站拆成兩頁時，只改了 `feature_config.py` 裡 F3-12 的 `name`/`nav_label`/`page_url`（代碼 `F3-12` 本身沒變），以為重新部署（伺服器重啟會跑 `seed_default_data()`）就會自動更新，結果因為 `seed_default_data()` 原本的邏輯是「代碼已存在就整個跳過，不會檢查內容有沒有變」，資料庫裡的 F3-12 卡在改名前的舊名稱/舊連結，導覽選單上同時出現「新舊兩個功能項目」但實際指向同一個頁面，使用者以為是內容顯示錯誤的 bug。**修正後 `seed_default_data()` 現在也會更新既有項目的 `module`/`name`/`nav_label`/`page_url`/`sort_order`**，不用每次改名都要記得手動跑 `migrate_schema.py` 才會生效（雖然還是建議照舊流程跑一次遷移腳本，這裡只是加一層自動修復的保險）。**但故意不覆蓋 `show_frontend`／`show_backend`／`enabled`**——這幾個欄位在「角色管理→權限矩陣」視窗是管理者可以自行調整的「全站共用設定」，如果連這幾個欄位都無條件覆蓋，管理者在後台做的調整會在每次伺服器重啟時被悄悄洗掉，且不會有任何錯誤訊息。`migrate_schema.py` 原本也有同樣「無條件覆蓋 show_frontend/show_backend」的問題，這次一併修正，兩邊邏輯現在一致。**之後如果要修改 `feature_config.py` 裡既有功能項目的內容，這兩支腳本都要記得同步邏輯，不要各自為政。**
 
 ## 三、前台／後台區隔
 
