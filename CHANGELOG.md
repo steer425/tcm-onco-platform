@@ -1,5 +1,39 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.32.3 — 2026-08-06（排查 Console 錯誤：確認幾乎全部來自瀏覽器加密貨幣錢包擴充功能，補上 favicon 消除唯一真正相關的 404）
+
+### 使用者回報
+
+Console 出現「許多錯誤」，附上完整截圖。
+
+### 排查結果
+
+截圖裡的錯誤訊息（`zilPay injected`、`TonAdapter`／`SolanaAdapter`／`TronAdapter`／`BitcoinAdapter`／`EthereumAdapter`／`BinanceInjectedProvider` 的 `Broadcast channel unavailable` 等）**全部來自瀏覽器裝的加密貨幣錢包擴充功能**（`inpage.js`／`content.js`／`content-script.js`／`record-api.js` 都是擴充功能自己的檔案名稱，不是這個平台的程式碼），這種擴充功能會被注入到使用者瀏覽的**每一個網站**，跟平台本身完全無關，不管開哪個網站都會出現這些訊息。
+
+截圖裡唯一真正跟這個平台有關的一行是：
+
+```
+GET https://t0.gstatic.com/faviconV2?...&url=https://fwc-tcmsp.pages.dev/gencc_disease_query&size=32  404
+```
+
+這是瀏覽器自動嘗試抓取網站圖示（favicon）沒抓到——純粹缺一個圖示檔案，**不影響任何功能**，但既然發現了就順手修掉。
+
+### 修正
+
+幫全部 32 個前端頁面補上 favicon（用內嵌 SVG data URI，不需要額外的圖片檔案，深藍色圓形配「藥」字，符合平台主題色），統一寫成一支批次腳本插入，確認沒有重複插入、沒有破壞既有 HTML 結構。
+
+### 已測試驗證
+
+HTML 結構檢查（`<head>` 標籤數量、有無重複插入 favicon）全部通過；32 個頁面 `<script>` 內容語法檢查全部通過；用 `TestClient` 測試全部 32 個頁面，確認 200 OK。
+
+### 給使用者的說明
+
+之後如果 Console 又跳出很多錯誤，麻煩先看一下錯誤訊息裡提到的**檔案名稱**——如果是 `inpage.js`、`content.js`、`content-script.js`、或提到 `wallet`／`blockchain`／`crypto`／`Adapter` 這類字眼，通常都是瀏覽器擴充功能（尤其是加密貨幣錢包）的訊息，跟這個平台無關，可以直接忽略；真正跟平台有關的錯誤訊息，檔案名稱通常會是我們自己的 `.js` 檔案（例如 `site-lang.js`、`api.js`、或頁面自己的 inline script）。
+
+### 部署注意事項
+
+不需要跑遷移腳本，這次是純前端靜態內容新增（favicon）。
+
 ## v1.32.2 — 2026-08-06（清理 v1.32.1 改名後殘留的舊頁面名稱引用；徹底排查簡繁混雜回報但無法重現）
 
 ### 使用者回報
