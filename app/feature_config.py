@@ -88,9 +88,12 @@ FEATURE_CONFIG = [
     {"code": "F3-11", "module": "目標三/四", "name": "可編碼蛋白區疾病管理（GenCC 基因-疾病關聯資料）",
      "nav_label": "可編碼蛋白區疾病管理", "page_url": "gencc-diseases.html",
      "show_frontend": False, "show_backend": True, "sort_order": 90},
-    {"code": "F3-12", "module": "目標三/四", "name": "可編碼蛋白區疾病與中藥關聯查詢站",
-     "nav_label": "可編碼蛋白區疾病與中藥關聯", "page_url": "gencc_disease_query.html",
+    {"code": "F3-12", "module": "目標三/四", "name": "可編碼蛋白區疾病關聯查詢站",
+     "nav_label": "可編碼蛋白區疾病關聯查詢站", "page_url": "gencc_disease_list_query.html",
      "show_frontend": True, "show_backend": False, "sort_order": 91},
+    {"code": "F3-13", "module": "目標三/四", "name": "可編碼蛋白區中藥與疾病關聯",
+     "nav_label": "可編碼蛋白區中藥與疾病關聯", "page_url": "gencc_disease_query.html",
+     "show_frontend": True, "show_backend": False, "sort_order": 92},
 
     # ---- 目標五：中藥行 ----
     {"code": "F5-1", "module": "目標五", "name": "中藥行資料管理（後台）",

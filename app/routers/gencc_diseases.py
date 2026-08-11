@@ -16,7 +16,7 @@ router = APIRouter(prefix="/gencc-diseases", tags=["可編碼蛋白區疾病與�
 # ---------------------------------------------------------------------------
 
 @router.get("/public/list", response_model=List[schemas.GenccDiseaseOut],
-            summary="（前台）查詢 GenCC 可編碼蛋白區疾病清單（含是否有中藥靶點標記，為預先計算好的統計欄位，供查詢站使用）")
+            summary="（前台）查詢 GenCC 可編碼蛋白區疾病清單（含是否有中藥靶點標記，為預先計算好的統計欄位，供查詢站使用）；資料量約3萬筆，沒有任何篩選條件時只回傳前100筆，避免整包資料一次回傳")
 def public_list_diseases(keyword: Optional[str] = None, classification: Optional[str] = None,
                           has_tcmsp_target: Optional[bool] = None,
                           current_user: models.User = Depends(get_current_user), db: Session = Depends(get_query_db)):
@@ -31,7 +31,13 @@ def public_list_diseases(keyword: Optional[str] = None, classification: Optional
         q = q.filter(models.GenccDisease.classification_title == classification)
     if has_tcmsp_target is not None:
         q = q.filter(models.GenccDisease.has_tcmsp_target == has_tcmsp_target)
-    diseases = q.order_by(models.GenccDisease.gene_symbol).all()
+    q = q.order_by(models.GenccDisease.gene_symbol)
+    # 資料量約 3 萬筆，遠大於暗黑基因（1245 筆）——暗黑基因查詢站可以直接把全部資料載入前端，
+    # 這裡不行，一定要限制筆數，不然單一請求就會把整包 3 萬筆傳給瀏覽器，拖垮載入速度。
+    # 有帶任何篩選條件（關鍵字/分類/靶點）時最多回傳 500 筆；完全沒有篩選條件時只回傳前 100 筆
+    # （通常是頁面剛載入、還沒輸入搜尋字串的情況，只是要讓畫面上先有內容可以看）。
+    limit = 500 if (keyword or classification or has_tcmsp_target is not None) else 100
+    diseases = q.limit(limit).all()
     return [schemas.GenccDiseaseOut.model_validate(d) for d in diseases]
 
 
@@ -48,6 +54,73 @@ def public_get_stats(current_user: models.User = Depends(get_current_user), db: 
     total = len(diseases)
     with_target = sum(1 for d in diseases if d.has_tcmsp_target)
     return {"total": total, "with_target": with_target, "groups": sorted(groups.values(), key=lambda x: -x["total"])}
+
+
+@router.get("/{disease_id}/tcmsp-links", summary="查詢 GenCC 疾病-靶點關聯：比對 TCMSP 靶點名稱，列出候選藥材（比照「暗黑基因-靶點關聯」）")
+def get_disease_tcmsp_links(disease_id: str, current_user: models.User = Depends(get_current_user),
+                             db: Session = Depends(get_query_db)):
+    disease = db.query(models.GenccDisease).filter(models.GenccDisease.id == disease_id).first()
+    if not disease:
+        raise HTTPException(status_code=404, detail="找不到疾病資料")
+
+    symbol = (disease.gene_symbol or "").upper()
+    all_targets = db.query(models.TcmspTarget).all()
+    matched_targets = []
+    for t in all_targets:
+        words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
+        if symbol in words:
+            matched_targets.append(t)
+
+    if not matched_targets:
+        return {
+            "disease": schemas.GenccDiseaseOut.model_validate(disease).model_dump(),
+            "matched_targets": [], "ingredients": [], "herbs": [],
+        }
+
+    tar_ids = [t.tar_id for t in matched_targets]
+    ingredient_target_rows = db.query(models.TcmspIngredientTarget).filter(
+        models.TcmspIngredientTarget.tar_id.in_(tar_ids)
+    ).all()
+    mol_ids = list({r.mol_id for r in ingredient_target_rows})
+
+    herb_ingredient_rows = db.query(models.TcmspHerbIngredient).filter(
+        models.TcmspHerbIngredient.mol_id.in_(mol_ids)
+    ).all() if mol_ids else []
+    herb_ids = list({r.herb_id for r in herb_ingredient_rows})
+
+    ingredients = db.query(models.TcmspIngredient).filter(models.TcmspIngredient.mol_id.in_(mol_ids)).all() if mol_ids else []
+    herbs = db.query(models.TcmspHerb).filter(
+        models.TcmspHerb.id.in_(herb_ids), models.TcmspHerb.status == "active"
+    ).all() if herb_ids else []
+
+    mol_to_herbs = {}
+    for r in herb_ingredient_rows:
+        mol_to_herbs.setdefault(r.mol_id, set()).add(r.herb_id)
+    herb_hit_count = {}
+    for mol_id in mol_ids:
+        for herb_id in mol_to_herbs.get(mol_id, set()):
+            herb_hit_count[herb_id] = herb_hit_count.get(herb_id, 0) + 1
+
+    return {
+        "disease": schemas.GenccDiseaseOut.model_validate(disease).model_dump(),
+        "matched_targets": [
+            {"tar_id": t.tar_id, "target_name": t.target_name, "drugbank_id": t.drugbank_id, "kegg": t.kegg}
+            for t in matched_targets
+        ],
+        "ingredients": [
+            {"mol_id": i.mol_id, "molecule_name": i.molecule_name, "ob": i.ob, "dl": i.dl}
+            for i in ingredients
+        ],
+        "ingredient_target": [{"mol_id": r.mol_id, "tar_id": r.tar_id} for r in ingredient_target_rows],
+        "herb_ingredient": [{"herb_id": r.herb_id, "mol_id": r.mol_id} for r in herb_ingredient_rows],
+        "herbs": sorted([
+            {
+                "herb_id": h.id, "herb_cn_name": h.herb_cn_name, "herb_pinyin": h.herb_pinyin,
+                "herb_en_name": h.herb_en_name, "matched_ingredient_count": herb_hit_count.get(h.id, 0),
+            }
+            for h in herbs
+        ], key=lambda x: -x["matched_ingredient_count"]),
+    }
 
 
 @router.get("/herb-links/{herb_id}", summary="查詢藥材-GenCC疾病關聯：這個藥材的成分連結到哪些靶點，再比對出哪些可編碼蛋白區疾病（畫面比照「藥材與暗黑基因關聯」）")

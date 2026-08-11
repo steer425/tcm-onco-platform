@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.32.0 add GenCC protein-coding region disease and herb association feature"
+set "DEFAULT_MSG=v1.32.1 add disease-centric GenCC query station, rename herb-centric page, fix unlimited list bug"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

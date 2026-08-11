@@ -162,26 +162,33 @@ TCMSP 藥材查詢站、疾病查詢站、暗黑基因查詢站都用「左側�
 - 資料庫備份（`app/backup_service.py`）目前只做「匯出/下載」，還沒有做「還原」功能——還原會覆蓋現有資料，風險層級比匯出高很多，之後如果要做，一定要有二次確認機制，且僅限最高權限管理者才能操作
 - **有兩套彼此獨立、沒有同步的語系設定**（v1.31.4 開發過程中被使用者發現並詢問）：「個人化設定」頁面的「全站語系」（`/user-preferences/site_language`，透過 `nav.js` 套用在所有有側邊選單的後台頁面）跟四個查詢站各自的 `uiLangSelect`（`localStorage.tcm_ui_lang`，只在查詢站頁面生效）完全是兩套機制，使用者在其中一邊切換語言，另一邊不會跟著變，容易造成困惑。之後如果要處理，選項包括：(a) 查詢站也改讀 `site_language` 帳號設定並拿掉自己的本地選單，(b) 或至少讓兩者初始值互相同步。這次沒有動這塊，因為牽涉的設計決策（例如查詢站需要的「動態中藥資料繁簡轉換」跟全站的「靜態介面文字字典翻譯」是不同性質的需求，硬併成一套可能顧此失彼）需要先想清楚，不是單純的程式碼改動
 
-## 五之四、可編碼蛋白區疾病與中藥關聯（GenCC，v1.31.6）
+## 五之四、可編碼蛋白區疾病與中藥關聯（GenCC，v1.31.6～v1.32.1）
 
 資料來源：GenCC（Gene Curation Coalition，https://thegencc.org/download），彙整多個專家審查小組（ClinGen、PanelApp 等）對「基因-疾病因果關係」的評估結果，每筆是一個「基因 → 疾病」斷言，附帶信心等級（classification）與遺傳模式（mode of inheritance）。
 
 **跟暗黑基因（DarkGene/OncoKB）的關鍵差異**：暗黑基因是純粹的「癌症相關基因清單」，沒有對應到特定疾病；GenCC 的每一筆資料本身就同時包含基因跟疾病兩個維度。比對邏輯完全比照暗黑基因（拿 `gene_symbol` 去比對 TCMSP 靶點名稱），但資料模型多了 `disease_title`／`classification_title`／`moi_title` 這些疾病層面的欄位。
 
+### 兩頁查詢站模式，完全比照暗黑基因
+
+- `gencc_disease_list_query.html`（**疾病為主**）：左側清單是可編碼蛋白區疾病，比照 `darkgene_query.html`
+- `gencc_disease_query.html`（**中藥為主**，命名「可編碼蛋白區中藥與疾病關聯」）：左側清單是藥材，比照 `ginseng_darkgene.html`
+- 對應後端端點：`GET /gencc-diseases/{disease_id}/tcmsp-links`（疾病反查靶點/藥材，比照 `get_gene_tcmsp_links`）跟 `GET /gencc-diseases/herb-links/{herb_id}`（藥材反查疾病，比照 `get_herb_dark_gene_links`）
+
 ### 資料量是暗黑基因的 20~30 倍，這是這個功能設計上最重要的考量
 
 - 暗黑基因 1245 筆，GenCC 完整資料集約 3 萬筆（`csv.DictReader` 解析出的正確邏輯列數，不是 `wc -l` 算出來的實體行數——**CSV 檔案裡有欄位內容含換行符號，`wc -l` 會把一筆資料算成好幾行，一律用 `csv.DictReader` 的解析結果為準**，這是這次踩過的認知陷阱，不是 bug，只是提醒之後遇到類似情況不要被 `wc -l` 誤導）
 - `app/import_gencc_diseases.py` 每 2000 筆分批 commit，不能像小型資料集一樣全部讀完才 commit 一次
-- 後台管理頁面（`gencc-diseases.html`）**故意不預設列出全部資料**，一定要輸入關鍵字或選信心等級篩選才會查詢，且限制最多回傳 500 筆——資料量太大，直接列出全部對資料庫跟瀏覽器都是負擔
-- `app/routers/gencc_diseases.py` 的 `herb-links/{herb_id}` 端點，每次請求都要建立一次「基因符號 → GenCC 疾病」的索引（掃過全部 3 萬筆），這個索引本身是 O(n) 的 dict 建構，不會太慢，但如果之後資料量再往上一個量級，要考慮改成預先建好索引存起來，不要每次請求都重建
+- **「疾病為主」查詢站（`gencc_disease_list_query.html`）不能像暗黑基因查詢站那樣把全部資料一次載入前端**——暗黑基因只有 1245 筆可以整包載入後在瀏覽器端做篩選，GenCC 3 萬筆這樣做會嚴重拖慢載入速度。改成**搜尋驅動**：左側清單初始為空（或只顯示前 100 筆當預覽），使用者輸入關鍵字才向 `/gencc-diseases/public/list?keyword=...` 查詢，前端用 350ms debounce 避免每個按鍵都送一次請求
+- `/gencc-diseases/public/list` 端點在**沒有任何篩選條件時只回傳前 100 筆，有篩選條件時最多 500 筆**——這是這次開發過程中發現的真實 bug（第一版忘了加限制，會整包 3 萬筆回傳），修正後才上線
+- 後台管理頁面（`gencc-diseases.html`）**故意不預設列出全部資料**，一定要輸入關鍵字或選信心等級篩選才會查詢
+- `herb-links/{herb_id}`／`{disease_id}/tcmsp-links` 端點每次請求都要建立一次「基因符號 → GenCC 疾病」的索引（掃過全部 3 萬筆），這個索引本身是 O(n) 的 dict 建構，實測反查耗時約 30~40ms，還算快，但如果之後資料量再往上一個量級，要考慮改成預先建好索引存起來
 
 ### 沿用既有架構，沒有另外發明新機制
 
 - 統計欄位（`GenccDisease.has_tcmsp_target`、`TcmspHerb.gencc_disease_count`）一律走 `app/recompute_stats.py` 預先計算好存欄位的模式，比照 v1.30.0 的規則，不能即時運算
 - 唯讀模式的本機端查詢快取（`app/local_cache.py` 的 `CACHED_TABLES`）已經把 `gencc_diseases` 加進去
-- 查詢站前端（`gencc_disease_query.html`）直接複製「藥材與暗黑基因關聯」（`ginseng_darkgene.html`）改造，UI 結構、顯示層級、網絡圖、CSV/JSON 下載機制完全一致，差別只在資料欄位名稱（`matched_genes`→`matched_diseases`、`hugo_symbol`→`gene_symbol` 等）——**跟暗黑基因不一樣的地方是這個頁面不預設鎖定特定藥材**（暗黑基因版本預設載入人參，但 GenCC 沒有類似的指標藥材，讓使用者自己搜尋）
 - 後台管理頁面比照「暗黑基因管理」，但**沒有瀏覽器上傳功能**——資料量太大不適合透過瀏覽器上傳，說明文字直接引導管理者在伺服器/本機執行匯入腳本
-- 功能項目 F3-11（後台管理）、F3-12（前台查詢站），比照暗黑基因的 F3-2／F3-3 命名模式
+- 功能項目 F3-11（後台管理）、F3-12（疾病為主查詢站）、F3-13（中藥為主查詢站），比照暗黑基因的 F3-2／F3-3 命名模式
 
 ## 五之三、資料庫備份與唯讀模式（v1.31.0）
 
