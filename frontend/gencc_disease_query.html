@@ -230,6 +230,17 @@ function zhConv(text){
   }
   catch(e){ return text; }
 }
+// GenCC 疾病名稱有三種語言各自獨立儲存（後台可編輯），不是用 OpenCC 自動轉換或 zhConv：
+// tw 用 disease_cn_name（繁體）、cn 用 disease_name_cn（簡體）、ko 用 disease_name_ko（韓文），
+// 三者都沒有填寫時，一律退回顯示英文原文 disease_title（不會顯示空白）。
+function diseaseNameByLang(d){
+  if (!d) return '';
+  let translated = null;
+  if (uiLang === 'tw') translated = d.disease_cn_name;
+  else if (uiLang === 'cn') translated = d.disease_name_cn;
+  else if (uiLang === 'ko') translated = d.disease_name_ko;
+  return translated || d.disease_title || '';
+}
 function ensureOptionAndSelect(selectEl, value){
   if (!selectEl || value == null) return;
   const strVal = String(value);
@@ -407,7 +418,9 @@ function renderTable(){
     wrap.innerHTML = `<table><thead><tr><th>Gene Symbol</th><th>疾病名稱</th><th>信心等級</th><th>遺傳模式</th><th>關聯靶點數</th></tr></thead><tbody>
       ${currentRelated.genes.map(d => {
         const clsClass = d.classification_title === 'Definitive' ? 'type-oncogene' : d.classification_title === 'Strong' ? 'type-tsg' : 'type-neither';
-        return `<tr><td><b>${escapeHtml(d.gene_symbol)}</b></td><td>${escapeHtml(d.disease_cn_name ? zhConv(d.disease_cn_name) + '（' + (d.disease_title||'') + '）' : (d.disease_title||''))}</td><td>${d.classification_title ? `<span class="gene-type-pill ${clsClass}">${escapeHtml(d.classification_title)}</span>` : '<span class="na">-</span>'}</td><td>${escapeHtml(d.moi_title || '')||'<span class="na">-</span>'}</td><td>${d.matched_target_count}</td></tr>`;
+        const dname = diseaseNameByLang(d);
+        const dnameDisplay = (dname && dname !== d.disease_title) ? (dname + '（' + (d.disease_title||'') + '）') : (d.disease_title||'');
+        return `<tr><td><b>${escapeHtml(d.gene_symbol)}</b></td><td>${escapeHtml(dnameDisplay)}</td><td>${d.classification_title ? `<span class="gene-type-pill ${clsClass}">${escapeHtml(d.classification_title)}</span>` : '<span class="na">-</span>'}</td><td>${escapeHtml(d.moi_title || '')||'<span class="na">-</span>'}</td><td>${d.matched_target_count}</td></tr>`;
       }).join("") || '<tr><td colspan="5" class="small">此藥材目前沒有比對到任何 GenCC 疾病，或已被顯示層級篩掉</td></tr>'}
     </tbody></table>`;
   }
@@ -508,7 +521,7 @@ function showNodeDetail(nodeId, nodesDataSet){
     rows = t ? [["Target Name", t.target_name], ["Tar ID", t.tar_id], ["DrugBank ID", t.drugbank_id || "-"]] : [];
   } else if (nodeId.startsWith("gene-")) {
     const g = currentDetail.matched_diseases.find(x => "gene-" + x.id === nodeId);
-    rows = g ? [["Gene Symbol", g.gene_symbol], ["疾病名稱", g.disease_title || "-"], ["中文名稱", g.disease_cn_name || "-"], ["信心等級", g.classification_title || "-"], ["遺傳模式", g.moi_title || "-"]] : [];
+    rows = g ? [["Gene Symbol", g.gene_symbol], ["疾病名稱（原文）", g.disease_title || "-"], ["中文名稱（繁）", g.disease_cn_name || "-"], ["中文名稱（簡）", g.disease_name_cn || "-"], ["한국어", g.disease_name_ko || "-"], ["信心等級", g.classification_title || "-"], ["遺傳模式", g.moi_title || "-"]] : [];
   }
   panel.innerHTML = `<h3 style="margin-top:0;">節點詳情</h3><table>${rows.map(([k,v]) => `<tr><td class="small" style="padding:4px 8px 4px 0;">${k}</td><td>${escapeHtml(v)}</td></tr>`).join("")}</table>`;
   panel.style.display = "block";

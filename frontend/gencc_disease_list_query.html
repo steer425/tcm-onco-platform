@@ -242,6 +242,17 @@ function zhConv(text){
   }
   catch(e){ return text; }
 }
+// GenCC 疾病名稱有三種語言各自獨立儲存（後台可編輯），不是用 OpenCC 自動轉換或 zhConv：
+// tw 用 disease_cn_name（繁體）、cn 用 disease_name_cn（簡體）、ko 用 disease_name_ko（韓文），
+// 三者都沒有填寫時，一律退回顯示英文原文 disease_title（不會顯示空白）。
+function diseaseNameByLang(d){
+  if (!d) return '';
+  let translated = null;
+  if (uiLang === 'tw') translated = d.disease_cn_name;
+  else if (uiLang === 'cn') translated = d.disease_name_cn;
+  else if (uiLang === 'ko') translated = d.disease_name_ko;
+  return translated || d.disease_title || '';
+}
 
 // ---------- 網絡圖節點數量上限：讀取後台設定的預設值 ----------
 function ensureOptionAndSelect(selectEl, value){
@@ -350,7 +361,7 @@ async function renderList(filter){
   listEl.innerHTML = hint + list.map(g => `
     <div class="geneRow" data-id="${g.id}">
       <div class="name">${escapeHtml(g.gene_symbol)} ${g.has_tcmsp_target ? '<span class="badge">有中藥靶點</span>' : ''}</div>
-      <div class="meta">${escapeHtml(g.disease_cn_name ? zhConv(g.disease_cn_name) : (g.disease_title || '未分類'))} ${g.classification_title ? '· ' + escapeHtml(g.classification_title) : ''}</div>
+      <div class="meta">${escapeHtml(diseaseNameByLang(g) || '未分類')} ${g.classification_title ? '· ' + escapeHtml(g.classification_title) : ''}</div>
     </div>
   `).join("") || '<div style="padding:20px;color:var(--muted);font-size:12.5px;">沒有符合條件的疾病資料</div>';
 
@@ -379,7 +390,7 @@ async function selectGene(geneId){
     : currentGene.classification_title === "Moderate" ? "type-both" : "type-neither";
 
   document.getElementById("geneHeader").innerHTML = `
-    <h2>${escapeHtml(currentGene.gene_symbol)}　${escapeHtml(currentGene.disease_cn_name ? zhConv(currentGene.disease_cn_name) : (currentGene.disease_title || ''))}
+    <h2>${escapeHtml(currentGene.gene_symbol)}　${escapeHtml(diseaseNameByLang(currentGene))}
       ${currentGene.classification_title ? `<span class="gene-type-pill ${clsClass}">${escapeHtml(currentGene.classification_title)}</span>` : ''}
       <span class="gene-type-pill ${currentGene.has_tcmsp_target ? 'has-target-yes' : 'has-target-no'}">是否有中藥靶點：${currentGene.has_tcmsp_target ? '有' : '無'}</span>
     </h2>
@@ -538,7 +549,7 @@ function showNodeDetail(nodeId, nodesDataSet){
   if (!node) { panel.style.display = "none"; return; }
   let rows = [];
   if (nodeId.startsWith("gene-")) {
-    rows = [["Gene Symbol", currentGene.gene_symbol], ["疾病名稱", currentGene.disease_title || "-"], ["中文名稱", currentGene.disease_cn_name || "-"], ["信心等級", currentGene.classification_title || "-"], ["遺傳模式", currentGene.moi_title || "-"]];
+    rows = [["Gene Symbol", currentGene.gene_symbol], ["疾病名稱（原文）", currentGene.disease_title || "-"], ["中文名稱（繁）", currentGene.disease_cn_name || "-"], ["中文名稱（簡）", currentGene.disease_name_cn || "-"], ["한국어", currentGene.disease_name_ko || "-"], ["信心等級", currentGene.classification_title || "-"], ["遺傳模式", currentGene.moi_title || "-"]];
   } else if (nodeId.startsWith("tgt-")) {
     const t = currentDetail.matched_targets.find(x => "tgt-" + x.tar_id === nodeId);
     rows = t ? [["Target Name", t.target_name], ["Tar ID", t.tar_id], ["DrugBank ID", t.drugbank_id || "-"]] : [];

@@ -44,6 +44,8 @@ function renderTable() {
       <td><b>${escapeHtml(d.gene_symbol)}</b><div class="hint-msg">${escapeHtml(d.sgc_id)}</div></td>
       <td>${escapeHtml(d.disease_title || "")}</td>
       <td>${escapeHtml(d.disease_cn_name || "")}</td>
+      <td>${escapeHtml(d.disease_name_cn || "")}</td>
+      <td>${escapeHtml(d.disease_name_ko || "")}</td>
       <td>${d.classification_title ? `<span class="cls-pill ${classificationClass(d.classification_title)}">${escapeHtml(d.classification_title)}</span>` : '<span class="hint-msg">-</span>'}</td>
       <td>${escapeHtml(d.moi_title || "")}</td>
       <td class="yn-cell">${d.has_tcmsp_target ? "✓" : ""}</td>
@@ -64,6 +66,8 @@ function openEdit(id) {
   document.getElementById("diseaseGeneSymbol").value = d.gene_symbol;
   document.getElementById("diseaseTitle").value = d.disease_title || "";
   document.getElementById("diseaseCnName").value = d.disease_cn_name || "";
+  document.getElementById("diseaseNameCn").value = d.disease_name_cn || "";
+  document.getElementById("diseaseNameKo").value = d.disease_name_ko || "";
   document.getElementById("diseaseClassification").value = d.classification_title || "";
   document.getElementById("diseaseMoi").value = d.moi_title || "";
   document.getElementById("diseaseStatus").value = d.status;
@@ -80,6 +84,8 @@ document.getElementById("diseaseModalSave").addEventListener("click", async () =
   const id = document.getElementById("diseaseId").value;
   const payload = {
     disease_cn_name: document.getElementById("diseaseCnName").value.trim() || null,
+    disease_name_cn: document.getElementById("diseaseNameCn").value.trim() || null,
+    disease_name_ko: document.getElementById("diseaseNameKo").value.trim() || null,
     classification_title: document.getElementById("diseaseClassification").value.trim() || null,
     moi_title: document.getElementById("diseaseMoi").value.trim() || null,
     status: document.getElementById("diseaseStatus").value,

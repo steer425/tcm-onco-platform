@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.32.4 fix seed_default_data() missing update logic for existing feature items"
+set "DEFAULT_MSG=v1.32.5 add independent tw/cn/ko translation fields for GenCC disease names"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

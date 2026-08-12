@@ -535,7 +535,13 @@ class GenccDisease(Base):
     disease_title = Column(String, nullable=True)  # 疾病名稱（小寫可讀格式）
     disease_original_curie = Column(String, nullable=True)  # OMIM:XXXXXX（原始提交來源編號）
     disease_original_title = Column(String, nullable=True)  # 原始提交的疾病名稱（通常是 OMIM 大寫格式）
-    disease_cn_name = Column(String, nullable=True)  # 中文名稱，可於後台補充/修正（比照 TcmspDisease 的做法）
+    disease_cn_name = Column(String, nullable=True)  # 中文名稱（繁體），可於後台補充/修正（比照 TcmspDisease 的做法）
+    # 以下兩個欄位是額外新增的：疾病名稱不像藥材/成分名稱那樣可以單純用 OpenCC 字形轉換就好
+    # （醫學疾病名稱的繁簡用詞習慣常常不只是字形不同，簡體中文醫學文獻慣用語有時跟繁體字形轉換結果不一致），
+    # 也沒有現成的韓文機器翻譯資源可用，所以這三種語言的疾病名稱各自獨立儲存、後台個別編輯，
+    # 不是像藥材/疾病（TCMSP）那樣繁體存一份、簡體用 OpenCC 即時轉換、韓文乾脆不翻。
+    disease_name_cn = Column(String, nullable=True)  # 中文名稱（簡體），獨立儲存，不是自動轉換
+    disease_name_ko = Column(String, nullable=True)  # 疾病名稱（韓文），獨立儲存
     classification_curie = Column(String, nullable=True)  # GENCC:XXXXXX
     classification_title = Column(String, nullable=True, index=True)  # Definitive / Strong / Moderate / Limited / Disputed Evidence / Refuted Evidence / No Known Disease Relationship / Supportive
     moi_curie = Column(String, nullable=True)  # HP:XXXXXXX

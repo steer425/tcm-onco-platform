@@ -602,6 +602,8 @@ class GenccDiseaseOut(BaseModel):
     disease_original_curie: Optional[str]
     disease_original_title: Optional[str]
     disease_cn_name: Optional[str]
+    disease_name_cn: Optional[str]
+    disease_name_ko: Optional[str]
     classification_curie: Optional[str]
     classification_title: Optional[str]
     moi_curie: Optional[str]
@@ -621,6 +623,8 @@ class GenccDiseaseCreate(BaseModel):
     gene_symbol: str
     disease_title: Optional[str] = None
     disease_cn_name: Optional[str] = None
+    disease_name_cn: Optional[str] = None
+    disease_name_ko: Optional[str] = None
     classification_title: Optional[str] = None
     moi_title: Optional[str] = None
     notes: Optional[str] = None
@@ -628,6 +632,8 @@ class GenccDiseaseCreate(BaseModel):
 
 class GenccDiseaseUpdate(BaseModel):
     disease_cn_name: Optional[str] = None
+    disease_name_cn: Optional[str] = None
+    disease_name_ko: Optional[str] = None
     classification_title: Optional[str] = None
     moi_title: Optional[str] = None
     status: Optional[str] = None
