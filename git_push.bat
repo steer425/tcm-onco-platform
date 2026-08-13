@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.32.5 add independent tw/cn/ko translation fields for GenCC disease names"
+set "DEFAULT_MSG=v1.33.0 add customizable color legend to all 6 relationship graph query stations"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

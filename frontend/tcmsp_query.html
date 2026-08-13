@@ -280,6 +280,7 @@ if (!localStorage.getItem("tcm_token")) {
 }
 </script>
 <script src="js/api.js"></script>
+<script src="js/graph-legend.js"></script>
 <script>
 let DATA = { herbs: [], ingredients: [], targets: [], diseases: [], herb_ingredient: [], ingredient_target: [], target_disease: [] };
 let herbsById, ingredientsById, targetsById, diseasesById;
@@ -521,6 +522,13 @@ let defaultHerbId = null; // 後台設定的預設藥材，未搜尋時只顯示
 let selectedMols = new Set();
 let activeTab = 'ingredients';
 let network = null;
+// 關聯圖圖例：顏色對應「藥材/成分/靶點/疾病」四種節點類型，可點色塊自訂顏色（會記住）
+const graphLegend = createGraphLegend('tcmsp_query', [
+  { key: 'herb', label: '藥材 Herb', defaultColor: '#c99a3d' },
+  { key: 'ingredient', label: '成分 Ingredient', defaultColor: '#3b82c4' },
+  { key: 'target', label: '靶點 Target', defaultColor: '#3a9d63' },
+  { key: 'disease', label: '疾病 Disease', defaultColor: '#c0533e' },
+], () => { if (currentHerbId) { renderNetwork('network', false); if (modalOpen) renderNetwork('networkModalCanvas', true); } });
 let lastNodes = null, lastEdges = null, lastOptions = null;
 let fsNetwork = null;
 
@@ -1220,20 +1228,20 @@ function renderNetwork(){
     const herb = herbsById.get(currentHerbId);
     const nodes = new vis.DataSet();
     const edges = new vis.DataSet();
-    nodes.add({id:'herb', label: zhConv(herb.herb_cn_name) + '\n' + (herb.herb_en_name||''), shape:'dot', size:30, color:'#c99a3d', font:{color:'#111',size:14,bold:true}});
+    nodes.add({id:'herb', label: zhConv(herb.herb_cn_name) + '\n' + (herb.herb_en_name||''), shape:'dot', size:30, color:graphLegend.getColor('herb'), font:{color:'#111',size:14,bold:true}});
 
     const usedTargets = new Map(); // tar_id -> count
     if(layerVisibility.ingredients){
       [...selectedMols].forEach(mid => {
         const m = ingredientsById.get(mid); if(!m) return;
-        nodes.add({id:'m_'+mid, label:m.molecule_name, shape:'dot', size:13, color:'#3b82c4', font:{color:'#fff',size:9}, title:`OB ${fmt(m.ob)}% DL ${fmt(m.dl)}`});
+        nodes.add({id:'m_'+mid, label:m.molecule_name, shape:'dot', size:13, color:graphLegend.getColor('ingredient'), font:{color:'#fff',size:9}, title:`OB ${fmt(m.ob)}% DL ${fmt(m.dl)}`});
         edges.add({from:'herb', to:'m_'+mid, color:{color:'#3a3d44',opacity:.5}, width:1});
         if(!layerVisibility.targets) return;
         let tgs = (targetsByMol.get(mid)||[]).slice().sort((a,b)=>(b.svm_score||0)-(a.svm_score||0)).slice(0, capTgt);
         tgs.forEach(r => {
           const t = targetsById.get(r.tar_id); if(!t) return;
           usedTargets.set(r.tar_id, (usedTargets.get(r.tar_id)||0) + 1);
-          if(!nodes.get('t_'+r.tar_id)) nodes.add({id:'t_'+r.tar_id, label:zhLabel('target', t.tar_id, t.target_name), shape:'dot', size:12, color:'#3a9d63', font:{color:'#fff',size:9}});
+          if(!nodes.get('t_'+r.tar_id)) nodes.add({id:'t_'+r.tar_id, label:zhLabel('target', t.tar_id, t.target_name), shape:'dot', size:12, color:graphLegend.getColor('target'), font:{color:'#fff',size:9}});
           edges.add({from:'m_'+mid, to:'t_'+r.tar_id, color:{color:'#e0b64a',opacity:.7}, width:1});
         });
       });
@@ -1245,8 +1253,8 @@ function renderNetwork(){
         dids.forEach(did => {
           const d = diseasesById.get(did); if(!d) return;
           usedDiseases.add(did);
-          if(!nodes.get('d_'+did)) nodes.add({id:'d_'+did, label:zhLabel('disease', d.dis_id, d.disease_name), shape:'dot', size:11, color:'#c0533e', font:{color:'#fff',size:8}});
-          edges.add({from:'t_'+tid, to:'d_'+did, color:{color:'#c0533e',opacity:.35}, width:1});
+          if(!nodes.get('d_'+did)) nodes.add({id:'d_'+did, label:zhLabel('disease', d.dis_id, d.disease_name), shape:'dot', size:11, color:graphLegend.getColor('disease'), font:{color:'#fff',size:8}});
+          edges.add({from:'t_'+tid, to:'d_'+did, color:{color:graphLegend.getColor('disease'),opacity:.35}, width:1});
         });
       });
     }
@@ -1254,6 +1262,7 @@ function renderNetwork(){
     const data = {nodes, edges};
     const options = { autoResize:true, physics:{ stabilization:true, barnesHut:{gravitationalConstant:-3000,centralGravity:0.2,springLength:100,springConstant:0.03,damping:0.4} }, interaction:{hover:true,tooltipDelay:80}, edges:{smooth:{type:'continuous'}} };
     if(network) network.setData(data); else network = new vis.Network(container, data, options);
+    graphLegend.mount('network');
     network.once('stabilizationIterationsDone', ()=> network.fit({animation:false}));
     setTimeout(()=>{ if(network){ network.redraw(); network.fit({animation:false}); } }, 150);
     lastNodes = nodes; lastEdges = edges; lastOptions = options;
@@ -1288,6 +1297,7 @@ function renderFullscreenNetwork(){
   if(fsNetwork){ fsNetwork.destroy(); fsNetwork = null; }
   if(!lastNodes || !lastEdges) return;
   fsNetwork = new vis.Network(container, {nodes:lastNodes, edges:lastEdges}, lastOptions);
+  graphLegend.mount('networkModalCanvas');
   fsNetwork.once('stabilizationIterationsDone', ()=> fsNetwork.fit({animation:false}));
   setTimeout(()=>{ if(fsNetwork){ fsNetwork.redraw(); fsNetwork.fit({animation:false}); } }, 150);
   fsNetwork.on('click', (params) => {

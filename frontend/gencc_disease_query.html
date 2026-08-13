@@ -213,6 +213,7 @@ body[data-page-theme="light"] #networkNodeDetail{border-color:#dfe5e0;background
 if (!localStorage.getItem("tcm_token")) { window.location.href = "index.html"; }
 </script>
 <script src="js/api.js"></script>
+<script src="js/graph-legend.js"></script>
 <script>
 let uiLang = localStorage.getItem('tcm_ui_lang') || 'tw';
 let convToTw = null, convToCn = null;
@@ -265,6 +266,12 @@ function escapeHtml(s){
 
 let allHerbs = [];
 let currentHerb = null;
+const graphLegend = createGraphLegend('gencc_disease_query', [
+  { key: 'herb', label: '藥材 Herb', defaultColor: '#c99a3d' },
+  { key: 'ingredient', label: '成分 Ingredient', defaultColor: '#3b82c4' },
+  { key: 'target', label: '靶點 Target', defaultColor: '#3a9d63' },
+  { key: 'disease', label: 'GenCC疾病 Disease', defaultColor: '#8b5fbf' },
+], () => { if (currentHerb) { renderNetwork('network', false); if (modalOpen) renderNetwork('networkModalCanvas', true); } });
 let currentDetail = null;
 let currentRelated = { ingredients: [], targets: [], genes: [] };
 let activeTab = "ingredients";
@@ -433,7 +440,7 @@ function buildGraphData(){
   const MAX_ING = parseInt(document.getElementById("maxIngSel").value, 10);
   const MAX_TGT_PER_ING = parseInt(document.getElementById("maxTargetsSel").value, 10);
   const herbNodeId = "herb-" + currentHerb.herb_id;
-  nodes.push({ id: herbNodeId, label: zhConv(currentHerb.herb_cn_name), color: "#c99a3d", shape: "dot", size: 22, font: { color: "#111" } });
+  nodes.push({ id: herbNodeId, label: zhConv(currentHerb.herb_cn_name), color: graphLegend.getColor("herb"), shape: "dot", size: 22, font: { color: "#111" } });
 
   if (!layerVisibility.ingredients) return { nodes, edges };
 
@@ -453,7 +460,7 @@ function buildGraphData(){
   const shownTgt = new Set(), shownGene = new Set();
   currentRelated.ingredients.slice(0, MAX_ING).forEach(ing => {
     const iid = "mol-" + ing.mol_id;
-    nodes.push({ id: iid, label: ing.molecule_name, color: "#3b82c4", shape: "dot", size: 10 });
+    nodes.push({ id: iid, label: ing.molecule_name, color: graphLegend.getColor("ingredient"), shape: "dot", size: 10 });
     edges.push({ from: herbNodeId, to: iid });
 
     if (!layerVisibility.targets) return;
@@ -461,7 +468,7 @@ function buildGraphData(){
       const t = targetsById.get(tid);
       const tnid = "tgt-" + tid;
       if (!shownTgt.has(tid)) {
-        nodes.push({ id: tnid, label: t.target_name, color: "#3a9d63", shape: "dot", size: 12 });
+        nodes.push({ id: tnid, label: t.target_name, color: graphLegend.getColor("target"), shape: "dot", size: 12 });
         shownTgt.add(tid);
       }
       edges.push({ from: iid, to: tnid });
@@ -471,7 +478,7 @@ function buildGraphData(){
         const g = genesById.get(gid);
         const gnid = "gene-" + gid;
         if (!shownGene.has(gid)) {
-          nodes.push({ id: gnid, label: g.gene_symbol, color: "#8b5fbf", shape: "dot", size: 16, font: { color: "#fff" } });
+          nodes.push({ id: gnid, label: g.gene_symbol, color: graphLegend.getColor("disease"), shape: "dot", size: 16, font: { color: "#fff" } });
           shownGene.add(gid);
         }
         edges.push({ from: tnid, to: gnid });
@@ -500,6 +507,7 @@ function renderNetwork(containerId, isModal){
     edges: { color: "#3a3d44", width: 1 },
     nodes: { borderWidth: 0, font: { color: "#ccc", size: 10 } },
   });
+  graphLegend.mount(containerId || "network");
   net.on("click", (params) => {
     if (params.nodes.length && isModal) showNodeDetail(params.nodes[0], dataSet.nodes);
   });

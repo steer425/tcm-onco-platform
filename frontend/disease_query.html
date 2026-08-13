@@ -234,6 +234,7 @@ tr:hover td{background:#171a20;}
 if (!localStorage.getItem("tcm_token")) { window.location.href = "index.html"; }
 </script>
 <script src="js/api.js"></script>
+<script src="js/graph-legend.js"></script>
 <script>
 let DATA = { herbs: [], ingredients: [], targets: [], diseases: [], herb_ingredient: [], ingredient_target: [], target_disease: [] };
 let diseasesById, targetsById, ingredientsById, herbsById;
@@ -249,6 +250,12 @@ let currentRelated = { targets: [], ingredients: [], herbs: [] };
 let activeTab = "targets";
 let layerVisibility = { targets: true, ingredients: true, herbs: true };
 let mainNetwork = null, modalNetwork = null;
+const graphLegend = createGraphLegend('disease_query', [
+  { key: 'disease', label: '疾病 Disease', defaultColor: '#c0533e' },
+  { key: 'target', label: '靶點 Target', defaultColor: '#3a9d63' },
+  { key: 'ingredient', label: '成分 Ingredient', defaultColor: '#3b82c4' },
+  { key: 'herb', label: '藥材 Herb', defaultColor: '#c99a3d' },
+], () => { renderNetwork('network', false); if (modalOpen) renderNetwork('networkModalCanvas', true); });
 let modalOpen = false; // 全螢幕檢視是否開啟中，開啟時切換顯示層級/挑選器要同步重繪全螢幕那個畫布，不能只更新背景的小圖
 
 // ---------- 繁簡語系切換 ----------
@@ -626,7 +633,7 @@ function buildGraphData() {
   const MAX_HERB_PER_ING = parseInt(document.getElementById("maxHerbSel").value, 10);
 
   const disNodeId = "dis-" + currentDisease.dis_id;
-  nodes.push({ id: disNodeId, label: zhConv(currentDisease.disease_cn_name) || currentDisease.disease_name, color: "#c0533e", shape: "dot", size: 22, font: { color: "#fff" }, group: "disease" });
+  nodes.push({ id: disNodeId, label: zhConv(currentDisease.disease_cn_name) || currentDisease.disease_name, color: graphLegend.getColor("disease"), shape: "dot", size: 22, font: { color: "#fff" }, group: "disease" });
 
   if (!layerVisibility.targets) return { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
 
@@ -636,7 +643,7 @@ function buildGraphData() {
 
   shownTargets.forEach(t => {
     const tid = "tgt-" + t.tar_id;
-    nodes.push({ id: tid, label: t.target_name, color: "#3a9d63", shape: "dot", size: 14, group: "target" });
+    nodes.push({ id: tid, label: t.target_name, color: graphLegend.getColor("target"), shape: "dot", size: 14, group: "target" });
     edges.push({ from: disNodeId, to: tid });
 
     if (!layerVisibility.ingredients) return;
@@ -646,7 +653,7 @@ function buildGraphData() {
       if (!ing) return;
       const iid = "mol-" + mid;
       if (!shownIngredientIds.has(mid)) {
-        nodes.push({ id: iid, label: ing.molecule_name, color: "#3b82c4", shape: "dot", size: 10, group: "ingredient" });
+        nodes.push({ id: iid, label: ing.molecule_name, color: graphLegend.getColor("ingredient"), shape: "dot", size: 10, group: "ingredient" });
         shownIngredientIds.add(mid);
       }
       edges.push({ from: tid, to: iid });
@@ -658,7 +665,7 @@ function buildGraphData() {
         if (!herb) return;
         const hnid = "herb-" + hid;
         if (!shownHerbIds.has(hid)) {
-          nodes.push({ id: hnid, label: zhConv(herb.herb_cn_name) || herb.herb_en_name, color: "#c99a3d", shape: "dot", size: 8, group: "herb" });
+          nodes.push({ id: hnid, label: zhConv(herb.herb_cn_name) || herb.herb_en_name, color: graphLegend.getColor("herb"), shape: "dot", size: 8, group: "herb" });
           shownHerbIds.add(hid);
         }
         edges.push({ from: iid, to: hnid });
@@ -683,6 +690,7 @@ function renderNetwork(containerId, isModal) {
     nodes: { borderWidth: 0, font: { color: "#ccc", size: 10 } },
   };
   const network = new vis.Network(container, data, options);
+  graphLegend.mount(containerId);
   network.on("click", (params) => {
     if (params.nodes.length && isModal) showNodeDetail(params.nodes[0], data.nodes);
   });
