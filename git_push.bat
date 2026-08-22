@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.33.0 add customizable color legend to all 6 relationship graph query stations"
+set "DEFAULT_MSG=v1.34.0 add daily news module: 10 authoritative sources, entity links back to herb/disease/target, embargo access control (F0-20), read-only cache support"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

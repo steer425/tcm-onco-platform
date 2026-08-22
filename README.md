@@ -1,6 +1,6 @@
 # TCM 中藥腫瘤篩選平台 — 目標零後台系統
 
-**目前版本：v1.33.0**（已通過使用者本機測試審查並正式上版，詳見 [CHANGELOG.md](./CHANGELOG.md)）
+**目前版本：v1.34.0**（詳見 [CHANGELOG.md](./CHANGELOG.md)）
 
 本次交付內容：**目標零（帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄）** 後端 API + 對應前端頁面，以及登入後可見的 **Dashboard（施工中佔位頁）**。
 
@@ -41,6 +41,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 | F5-1 中藥行管理（後台） | `/pharmacies`, `/pharmacies/{id}/reviews`, `/pharmacy-reviews/{id}` | `pharmacies.html` |
 | F5-2 中藥行地理推薦（前台） | `/public/pharmacies`, `/public/pharmacies/{id}`, `/public/pharmacies/{id}/reviews` | `finder.html` |
 | F5-3 評價新增/編輯/刪除（前台，使用者本人） | `/public/pharmacies/{id}/reviews`, `/public/reviews/{id}` | `finder.html` |
+| F0-13-6 每日重點新聞（Dashboard 卡片，v1.34.0） | `/news/daily`, `/news/bookmarks`, `/news/targets/{tar_id}` | `dashboard.html` + `js/news-widget.js` |
+| F0-19 新聞後台管理（查詢／軟刪除+註記／還原／來源健康度／執行紀錄，v1.34.0） | `/news/admin/*` | `announcements.html`（分頁）+ `js/news-admin.js` |
+| F0-20 未解禁新聞存取（權限開關，非頁面，v1.34.0） | 由 `/news/daily`、`/news/archive` 依 `has_permission()` 過濾 | 無獨立頁面，於角色權限矩陣指派 |
 
 ## 三、重要設計說明與限制
 

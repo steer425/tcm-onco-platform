@@ -57,6 +57,42 @@
   .drag-handle { cursor: grab; color: var(--muted); font-size: 15px; user-select: none; }
   .widget-toggle-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; }
   #editLayoutBtn.active { background: var(--primary-dark); }
+
+  /* 每日重點新聞小工具（F0-13-6）*/
+  .news-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px; }
+  .news-filter { background:#fff; color:#2f6f4f; border:1px solid #2f6f4f; padding:4px 12px; font-size:12px; border-radius:999px; }
+  .news-filter.active { background:#2f6f4f; color:#fff; }
+  .news-safety-badge { background:#fdf0e3; color:#a05a12; border-radius:999px; padding:2px 10px; font-size:11.5px; font-weight:600; }
+  .news-item { display:flex; gap:12px; padding:12px 0; border-bottom:1px solid #eef1ef; }
+  .news-item:last-child { border-bottom:none; }
+  .news-keep { display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; flex-shrink:0; padding-top:2px; }
+  .news-keep span { font-size:10px; color:#8a958f; }
+  .news-body { min-width:0; flex:1; }
+  .news-badges { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:5px; align-items:center; }
+  .news-rank { background:#2f4f3e; color:#fff; border-radius:4px; padding:1px 7px; font-size:11px; font-weight:600; }
+  .news-badge { border:1px solid #dfe5e0; background:#f5f7f6; color:#4a554e; border-radius:4px; padding:1px 7px; font-size:11px; }
+  .news-badge-warn { background:#fdf0e3; border-color:#e8c08a; color:#a05a12; }
+  .news-badge-info { background:#eaf1fb; border-color:#b9cdea; color:#2563a8; }
+  .news-badge-muted { background:#f2f2f2; border-color:#e2e2e2; color:#8a8a8a; }
+  .news-title { font-size:14.5px; font-weight:600; line-height:1.45; }
+  .news-title a { color:#1f4f37; text-decoration:none; }
+  .news-title a:hover { text-decoration:underline; }
+  .news-orig { font-size:11.5px; color:#98a29b; margin-top:1px; }
+  .news-summary { font-size:13px; line-height:1.7; color:#3b473f; margin-top:5px; }
+  .news-caveat { font-size:11.5px; line-height:1.6; color:#8a5a12; background:#fdf7ee; border-left:3px solid #e0b070; padding:5px 9px; border-radius:0 5px 5px 0; margin-top:6px; }
+  .news-entities { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
+  .news-chip { display:inline-block; font-size:11.5px; padding:2px 9px; border-radius:999px; text-decoration:none; border:1px solid transparent; cursor:pointer; }
+  .news-chip-herb { background:#e8f3ec; color:#1f4f37; border-color:#c3e0d0; }
+  .news-chip-disease { background:#eaf1fb; color:#2563a8; border-color:#c2d6ef; }
+  .news-chip-target { background:#f3edfa; color:#6b3fa0; border-color:#d8c8ef; }
+  .news-chip-ingredient { background:#fdf6e3; color:#8a6d1f; border-color:#e8d9a8; }
+  .news-chip:hover { filter:brightness(0.96); }
+  .news-meta { font-size:11.5px; color:#8a958f; margin-top:7px; }
+  .news-meta a { color:#6b7a70; }
+  .news-meta code { background:#f0f3f1; padding:0 4px; border-radius:3px; font-size:11px; }
+  .news-empty { text-align:center; color:#8a958f; font-size:13px; padding:28px 0; }
+  .news-disclaimer { margin-top:12px; padding:9px 12px; background:#f7f9f8; border:1px solid #e6ebe8; border-radius:7px; font-size:11.5px; line-height:1.65; color:#6b7a70; }
+  #newsTargetModal .modal { max-width:640px; width:92%; max-height:80vh; overflow-y:auto; }
 </style>
 </head>
 <body data-current-page="dashboard.html">
@@ -122,6 +158,42 @@
         <h3>📢 公告</h3>
         <div id="announcementsList">載入中...</div>
       </div>
+
+      <div class="card dash-card" id="cardNews" data-widget-code="F0-13-6" style="grid-column: 1 / -1;">
+        <div class="dash-edit-toolbar">
+          <span class="drag-handle">⠿⠿ 拖曳調整順序</span>
+          <label class="widget-toggle-label"><input type="checkbox" class="widget-visible-toggle"> 顯示</label>
+        </div>
+        <h3>📰 每日重點新聞　<span class="news-safety-badge" id="newsSafetyBadge" style="display:none;"></span></h3>
+        <div class="news-toolbar" id="newsViewToggle">
+          <button class="news-filter active" id="newsModeDailyBtn" onclick="showNewsDaily()">本日精選</button>
+          <button class="news-filter" id="newsModeArchiveBtn" onclick="showNewsArchive()">歷史瀏覽</button>
+        </div>
+        <div class="news-toolbar" id="newsDailyBar">
+          <button class="news-filter active" onclick="setNewsFilter('all', this)">全部</button>
+          <button class="news-filter" onclick="setNewsFilter('safety', this)">安全訊號</button>
+          <button class="news-filter" onclick="setNewsFilter('human', this)">人體證據</button>
+          <button class="news-filter" onclick="setNewsFilter('kept', this)">已保留</button>
+          <select id="newsDateSelect" onchange="onNewsDateChange(this)"
+                  style="margin-left:auto; max-width:160px;"></select>
+        </div>
+        <div class="news-toolbar" id="newsArchiveBar" style="display:none;">
+          <input type="text" id="newsArchiveQ" placeholder="關鍵字搜尋標題/摘要"
+                 style="flex:1; min-width:120px; padding:4px 8px;">
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap;">
+            <input type="checkbox" id="newsArchiveSafety"> 僅安全訊號
+          </label>
+          <select id="newsArchiveDays" style="max-width:110px;">
+            <option value="7">近 7 天</option>
+            <option value="30" selected>近 30 天</option>
+            <option value="90">近 90 天</option>
+            <option value="365">近 1 年</option>
+          </select>
+          <button class="secondary" onclick="applyNewsArchiveFilter()">搜尋</button>
+        </div>
+        <div id="newsList">載入中...</div>
+        <div class="news-disclaimer" id="newsDisclaimer"></div>
+      </div>
     </div>
   </main>
 </div>
@@ -148,10 +220,22 @@
   </div>
 </div>
 
+<!-- 新聞小工具：靶點關聯彈窗（靶點沒有專屬查詢站頁面） -->
+<div id="newsTargetModal" class="modal-backdrop" style="display:none;">
+  <div class="modal">
+    <div class="full-modal-title">
+      <h3 id="newsTargetTitle" style="margin:0;"></h3>
+      <button class="secondary" onclick="closeNewsTarget()">✕ 關閉</button>
+    </div>
+    <div id="newsTargetBody"></div>
+  </div>
+</div>
+
 <script src="js/api.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/i18n-dict.js"></script>
 <script src="js/site-lang.js"></script>
 <script src="js/dashboard.js"></script>
+<script src="js/news-widget.js"></script>
 </body>
 </html>

@@ -43,7 +43,7 @@
 
 ## 四、Dashboard 小工具
 
-Dashboard 頁面的四張卡片（主機資訊／版本資訊／專案文件／2026年工作目標）也是走 `features` 機制，代碼為 `F0-13-1` ~ `F0-13-4`，`page_url` 為 `null`（非獨立頁面）。
+Dashboard 頁面的六張卡片（主機資訊／版本資訊／專案文件／2026年工作目標／公告／每日重點新聞）也是走 `features` 機制，代碼為 `F0-13-1` ~ `F0-13-6`，`page_url` 為 `null`（非獨立頁面）。
 
 因為 Dashboard 是同一個頁面同時給管理者跟一般使用者看，小工具的 `show_frontend` / `show_backend` 欄位語意跟一般頁面不同：
 
@@ -248,6 +248,58 @@ TCMSP 藥材查詢站、疾病查詢站、暗黑基因查詢站都用「左側�
 - **真實踩過的技術陷阱（v1.31.3）**：備份 JSON 裡的日期時間欄位是用 `.isoformat()` 存成字串，還原寫入本機端 SQLite（有正式 `DateTime` 欄位型別）時，SQLite 只接受真正的 Python `datetime` 物件、不接受字串，插入前要用 `datetime.fromisoformat()` 轉換回來，不然會直接噴 `TypeError`
 - 之後如果要擴充快取範圍（例如新增其他查詢站），記得同步更新 `CACHED_TABLES` 清單，並確認新端點只查得到快取範圍內的資料表，不要漏接需要即時/敏感資料的端點進來用 `get_query_db`
 
+## 五之五、每日重點新聞模組（v1.34.0）
+
+外部新聞資料進入系統的規範。之後如果要新增其他外部資料來源（例如新的資料庫、新的期刊來源），照同一套做法，不要各自發明。
+
+### 外部內容一律跳脫後才寫進 DOM
+
+新聞內容來自 WHO / NCI / PubMed / 中國官方站等第三方網站，**站內既有頁面的作法（用樣板字串直接把資料塞進 `innerHTML`）在這裡不適用**。公告是管理者自己輸入的內容，新聞不是——第三方標題裡如果含有 `<script>` 或 `onerror=` 這類字串，直接塞進 DOM 就是 XSS。
+
+`news-widget.js` / `news-admin.js` 一律經 `escNews()` / `escNewsAdmin()` 跳脫後才寫入。**之後任何顯示外部來源文字的頁面，都要照做。**
+
+### 管理者操作寫進既有的 `AuditLog`，不要另建稽核表
+
+新聞模組的 action 命名為 `news_*`（`news_soft_delete` / `news_restore` / `news_pin` / `news_manual_collect` / `news_update_source` / `news_update_settings`），透過 `app.deps.write_audit_log` 寫入。這樣管理者在「稽核 / 登入紀錄」頁一個地方就能查全站所有操作，不用記得還有第二個地方要看。
+
+**注意：試算（`dry_run`）不留稽核紀錄**——只是查詢，不是操作。
+
+### 刪除資料一律軟刪除 + 必填註記 + 保護使用者資料
+
+- `is_deleted` + `deleted_at` + `deleted_by` + `delete_note`，前台隱藏、後台仍可查詢與還原
+- 註記是**必填**，同時寫進資料本身與 `AuditLog`
+- 批次刪除預設 `exclude_bookmarked=true`，不會動到使用者勾選保留的項目，回應要回報保護了幾筆
+- 提供 `dry_run` 讓管理者先看影響範圍再決定
+
+### 資料表型別維持可攜
+
+新聞模組的 7 張表全部用 `String` + `gen_id()` UUID 主鍵與可攜型別（`String`／`DateTime`／`Text`／`Integer`／`Boolean`／`Enum`），陣列型資料以 JSON 字串存在 `Text` 欄位。
+
+**不要用 PostgreSQL 專屬的 `ENUM`／`ARRAY`／`JSONB`／`INET`／`GIN`**——`database.py` 在本機沒設 `DATABASE_URL` 時會退回 SQLite，塞專屬型別進去會讓本機開發環境直接壞掉。這是全站 32 張既有資料表一直遵守的規則，新增資料表時要繼續遵守。
+
+### 外部資料比對回主檔（實體連結）
+
+`app/news/entity_linker.py` 把新聞內文比對到 TCMSP 藥材／成分／靶點／疾病主檔，讓新聞能接回「中藥 → 成分 → 靶點 → 疾病」的關聯網絡。之後要做類似比對時的注意事項：
+
+- **保守優先**：寧可漏抓也不要誤連。拉丁詞長度 <5、或落在通用停用詞表（cancer / protein / water 等）的一律不建索引；成分名稱門檻更嚴（≥6 字元）
+- **基因/靶點符號要大小寫敏感**：`AKT1` 用完整詞界 + 大小寫敏感比對，否則會誤中大量無關字串
+- **中文沒有詞界**，用 2~8 字滑動視窗，不能套用拉丁字母那套詞邊界規則
+- **效能用查表 + n-gram，不要用大型正規表示式聯集**：29k 個成分名做成 regex 聯集光編譯就要數秒。查表法實測 34,491 條索引下建立 201 ms、每篇比對 1.2 ms
+
+比對到的實體名稱要併進 `search_blob`，這樣中文搜尋才找得到標題是英文的文章。
+
+### 爬蟲類來源的設定放資料庫，不要寫死在程式裡
+
+外部網站會改版。選擇器、清單頁網址等設定存在 `news_sources.config`（JSON），管理者可於「公告 / 新聞管理 → 新聞來源健康度」分頁直接修改，**不需要改程式重新部署**。連續失敗次數會累計並在該頁亮警示。
+
+### 排程：Render free plan 沒有 Cron Job
+
+付費方案才有。目前由外部排程呼叫 `POST /news/admin/collect/scheduled`，見 `.github/workflows/daily-news.yml`。之後若有其他定時任務需求，沿用同一套「外部觸發 + 共享密鑰」的作法，並注意三件事：
+
+- **密鑰走 `Authorization: Bearer` 標頭，不要放在網址查詢字串**——查詢字串會被 Render 的存取日誌、反向代理與瀏覽器歷史記錄下來
+- **比對用 `secrets.compare_digest`**，不要用 `==`（避免以回應時間差推測密鑰）
+- **密鑰環境變數未設定時，端點要回 503 停用**，不要「沒設定就跳過檢查」——那樣部署時忘了設就變成任何人都能觸發的公開端點
+
 ## 六、配色主題系統
 
 全站配色改用 CSS 變數 + `data-theme` 屬性設計，主題定義集中在 `frontend/css/style.css` 開頭：
@@ -269,7 +321,7 @@ TCMSP 藥材查詢站、疾病查詢站、暗黑基因查詢站都用「左側�
 | 頁面 | 對應功能代碼 | 說明 |
 |---|---|---|
 | `index.html` | - | 登入 / 申請新帳號 |
-| `dashboard.html` | F0-13 | Dashboard（含 4 個可開關小工具） |
+| `dashboard.html` | F0-13 | Dashboard（含 6 個可開關小工具，含每日重點新聞 F0-13-6） |
 | `roles.html` | F0-2 | 角色管理（含權限矩陣，已整合全站功能設定） |
 | `users.html` | F0-5 | 帳號管理 |
 | `applications.html` | F0-4 | 帳號審核 |
@@ -296,3 +348,75 @@ TCMSP 藥材查詢站、疾病查詢站、暗黑基因查詢站都用「左側�
 | `patient-dark-gene-ranking.html` | F3-10 | 病患基因統計排行（哪位病患命中最多不重複暗黑基因） |
 
 > 有些功能代碼共用同一個頁面（例如 F0-10/F0-12 都指向 `logs.html`），這是刻意設計：避免導覽選單出現好幾個連到同一頁的重複連結。共用頁面的功能代碼會把 `show_frontend`/`show_backend` 都設為 `false`，只有「主要代表」該頁面的那個功能代碼會顯示在導覽選單裡，其餘的僅在權限矩陣表格裡顯示頁面路徑供對照。
+
+---
+
+## 九、上版流程（每次交付新版都照這個順序，不要跳步）
+
+這一章是 v1.34.0 補寫的。之前這套流程只存在於對話裡、沒有寫進任何檔案，
+結果換一個對話就沒人知道有這回事——**流程要寫在 repo 裡才會被繼承**。
+
+### 步驟
+
+```powershell
+cd D:\tcm_backend
+git add .
+git commit -m "v1.34.0 一句話摘要"
+git push
+```
+
+push 到 `main` 之後，Render（後端）與 Cloudflare Pages（前端）會各自偵測到更新並自動部署。
+也可以直接雙擊 `git_push.bat`（它就是上面三行的包裝，會先要求輸入 Y 確認）。
+
+### 版本號要同步的五個地方
+
+漏掉任何一個都會造成「版本資訊頁顯示的版本跟實際不符」：
+
+| 檔案 | 位置 |
+|---|---|
+| `app/main.py` | `FastAPI(version="x.y.z")` |
+| `app/routers/project_info.py` | `APP_VERSION`（該檔註解明寫要與 main.py 一致） |
+| `README.md` | 標頭「目前版本：vx.y.z」 |
+| `CHANGELOG.md` | 最上方新增 `## vx.y.z — YYYY-MM-DD（一句話摘要）` |
+| `git_push.bat` | `DEFAULT_MSG`（不改的話 commit 訊息會沿用上一版，git log 會對不上） |
+
+`rules.md`（本檔）也要一併更新：新章節記的是**之後別人會踩到的規則**，不是功能說明。
+
+### push 之後可能還要跑的一次性腳本（**依這一版改了什麼決定，不是每次都要跑**）
+
+| 腳本 | 什麼時候要跑 |
+|---|---|
+| `python -m app.migrate_schema` | **對既有資料表新增/修改欄位時**。只是新增全新資料表則不用——`create_all()` 會自動建。但「全新」是相對**正式資料庫**而言：本機或測試庫若已經建過該表的舊版，仍要跑一次才會補上新欄位（v1.34.0 的 `news_articles.is_embargoed`／`embargo_until` 就是這個情況） |
+| `python -m app.seed_gencc_translations` | **改了 GenCC 疾病三語系翻譯時**（v1.32.6 起）。只補空值、不覆蓋既有翻譯，可重複執行 |
+| `python -m app.import_tcmsp_data` / `import_dark_genes` / `import_gencc_diseases` | 匯入或更新對應的來源資料時 |
+
+在本機對正式資料庫跑這些腳本前要先指定連線字串：
+
+```powershell
+$env:DATABASE_URL="（Neon 連線字串）"
+python -m app.seed_gencc_translations
+```
+
+> `database.py` 沒設 `DATABASE_URL` 時會退回本機 SQLite，**忘了設就會跑在本機空資料庫上、
+> 看起來成功但正式環境完全沒變**。這是最容易誤判「跑過了」的地方。
+
+### 上版前的檢查
+
+- 四種語系全測（見第五之二章「上版前的強制檢查規則」）
+- `python -m tests.test_news_e2e` 全過（**不是** `python -m pytest tests/ -q`——`test_news_e2e.py`
+  是手寫的端對端驗證腳本，函式名稱不是 pytest 慣例的 `test_*`，`pytest` 指令會直接回報
+  「collected 0 items」、結束碼 5，**看起來像失敗，但其實根本沒有跑到任何一項驗證**，
+  這是這次開發中實際發現的認知陷阱，不是理論疑慮）
+- 五個版本號一致（上表）
+- 這支端對端腳本**必須從空資料庫跑起**，否則第二次執行會沿用上一輪的每日精選、
+  在依索引取文章的地方 `IndexError`。腳本開頭已經會自動刪掉預設的 `test.db`，
+  但如果你自己指定了 `DATABASE_URL`，就要自行確保那是乾淨的庫
+- `git status` 看一次，確認沒有把本機檔（`.db`、`.env`、暫存檔）帶上去
+
+### 已知環境限制：git 不能透過遠端工具跑
+
+Claude 的裝置橋接**無法刪除**使用者磁碟上的檔案，而 git 幾乎每個寫入操作都要建立再刪除
+`.git/index.lock`。因此透過橋接執行 `git add` / `git commit` / `git checkout` 會失敗，
+還會留下刪不掉的 `index.lock` 擋住後續所有 git 指令（要手動刪掉才能繼續）。
+**git 一律由使用者自己在 PowerShell 執行**，Claude 只負責把檔案改好。
+同理，`.git/` 底下的東西 Claude 一律不要碰。

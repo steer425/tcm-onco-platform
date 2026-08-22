@@ -79,6 +79,29 @@ def require_permission(feature_code: str, need_execute: bool = True):
     return checker
 
 
+def has_permission(db: "Session", user: models.User, feature_code: str, need_execute: bool = False) -> bool:
+    """`require_permission()` 的非阻斷版本：回傳布林值而不是拋例外，
+    供「依權限調整回傳內容/篩選條件」而不是「整支端點擋掉」的情境使用
+    （例如新聞未解禁內容：一般使用者看不到，不代表整支 API 要 403）。"""
+    if is_admin(user):
+        return True
+    role_ids = [ur.role_id for ur in user.roles]
+    if not role_ids:
+        return False
+    feature = db.query(models.Feature).filter(models.Feature.code == feature_code).first()
+    if not feature:
+        return False
+    perm = (
+        db.query(models.RolePermission)
+        .filter(
+            models.RolePermission.role_id.in_(role_ids),
+            models.RolePermission.feature_id == feature.id,
+        )
+        .all()
+    )
+    return any((p.can_execute if need_execute else p.can_view) for p in perm)
+
+
 def write_audit_log(db: "Session", actor: Optional[models.User], action: str,
                      target_type: str = None, target_id: str = None, detail: str = None):
     log = models.AuditLog(

@@ -9,3 +9,6 @@ venv/
 *.egg-info/
 .pytest_cache/
 backups/
+_to_delete/
+
+.github/workflows/

@@ -8,3 +8,6 @@ python-jose[cryptography]==3.3.0
 python-multipart==0.0.9
 pytest==8.3.3
 httpx==0.27.2
+# 每日重點新聞模組：HTML 爬蟲類來源（NCCIH / OCCAM / MSK / 中國官方站）解析用。
+# AI 摘要直接以 httpx 呼叫 Anthropic API，不另裝 SDK，省下建置時間與相依體積。
+beautifulsoup4==4.12.3

@@ -639,3 +639,256 @@ class LoginLog(Base):
     logout_at = Column(DateTime, nullable=True)
     duration_seconds = Column(Integer, nullable=True)
     notes = Column(Text, nullable=True)
+
+
+# ===========================================================================
+# 每日重點新聞模組（中藥與腫瘤｜10 個權威官方追蹤網站）
+# ---------------------------------------------------------------------------
+# 定位：科研輔助情報，服務於證據查證、安全監測與研究追蹤，
+#       不作為醫療診斷或治療建議。
+#
+# 設計說明：
+#   * 沿用全站慣例：String(uuid) 主鍵、可攜型別（不用 PostgreSQL 專屬的
+#     ENUM/ARRAY/JSONB/INET），確保本機 SQLite 退回模式仍可運作。
+#   * 管理者操作紀錄不另建表，一律寫進現成的 AuditLog（write_audit_log）。
+#   * 陣列型資料（癌別、標籤等）以 JSON 字串存在 Text 欄位，
+#     由 schemas 層負責序列化/反序列化。
+# ===========================================================================
+
+
+class NewsCollectorKind(str, enum.Enum):
+    api = "api"          # 官方 API（PubMed E-utilities、ClinicalTrials.gov v2）
+    rss = "rss"          # RSS/Atom（WHO、NCI）
+    scrape = "scrape"    # HTML 爬蟲（NCCIH、OCCAM、MSK、NHC、SATCM）
+
+
+class NewsEvidenceLevel(str, enum.Enum):
+    """對應追蹤指南的證據層級分類，決定前台標籤與排序權重。"""
+    policy_global = "policy_global"          # 政策與全球標準（WHO）
+    clinical_evidence = "clinical_evidence"  # 癌症臨床與實證（NCI）
+    research_policy = "research_policy"      # 研究政策與資助（OCCAM）
+    natural_product = "natural_product"      # 天然物研究與安全（NCCIH）
+    literature_index = "literature_index"    # 學術文獻索引（PubMed）
+    trial_registry = "trial_registry"        # 臨床試驗登錄（ClinicalTrials.gov）
+    cancer_center = "cancer_center"          # 癌症中心臨床實務（MSK）
+    herb_safety = "herb_safety"              # 草藥安全與交互作用（About Herbs）
+    national_policy = "national_policy"      # 國家衛生政策（中國衛健委）
+    tcm_policy = "tcm_policy"                # 中醫藥國家政策（中醫藥管理局）
+
+
+class NewsEvidenceMaturity(str, enum.Enum):
+    """證據成熟度。preclinical 會被降權，且前台強制顯示「不可推論至病患層級」。"""
+    human = "human"
+    mixed = "mixed"
+    preclinical = "preclinical"
+    unknown = "unknown"
+
+
+class NewsArticleStatus(str, enum.Enum):
+    active = "active"
+    archived = "archived"
+    deleted = "deleted"
+
+
+class NewsRunStatus(str, enum.Enum):
+    running = "running"
+    success = "success"
+    partial = "partial"
+    failed = "failed"
+
+
+class NewsEntityType(str, enum.Enum):
+    """新聞內文比對到的平台實體種類，供前台產生可點連結。"""
+    herb = "herb"
+    ingredient = "ingredient"
+    target = "target"
+    disease = "disease"
+
+
+class NewsSource(Base):
+    """10 個權威官方追蹤來源。爬蟲選擇器等設定放在 config（JSON 字串），
+    來源改版時於後台修改即可，不需改程式重新部署。"""
+    __tablename__ = "news_sources"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    slug = Column(String, unique=True, nullable=False, index=True)
+    name_zh = Column(String, nullable=False)
+    name_en = Column(String, nullable=False)
+    homepage = Column(String, nullable=False)
+    kind = Column(Enum(NewsCollectorKind), nullable=False)
+    evidence_level = Column(Enum(NewsEvidenceLevel), nullable=False)
+    # 來源權威度（0~1），參與排序加權
+    weight = Column(String, nullable=False, default="0.50")
+    lang = Column(String, nullable=False, default="en")
+    # True 表示來源查詢式本身已鎖定主題，可略過關鍵字硬過濾
+    prefiltered = Column(Boolean, nullable=False, default=False)
+    is_enabled = Column(Boolean, nullable=False, default=True)
+    config = Column(Text, nullable=True)          # JSON 字串
+    notes = Column(Text, nullable=True)
+    # 健康度追蹤：連續失敗次數超過門檻時後台亮警示
+    last_success_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+    consecutive_failures = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class NewsArticle(Base):
+    __tablename__ = "news_articles"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    source_id = Column(String, ForeignKey("news_sources.id"), nullable=False, index=True)
+
+    # ---- 識別與去重 ----
+    url = Column(Text, nullable=False)
+    url_hash = Column(String, nullable=False, unique=True, index=True)   # sha256(正規化 URL)
+    content_hash = Column(String, nullable=True, index=True)             # sha256(標題+摘要)
+    title_simhash = Column(String, nullable=True)                        # 64-bit 以 16 進位字串存
+    external_id = Column(String, nullable=True, index=True)              # PMID / NCT
+    doi = Column(String, nullable=True)
+
+    # ---- 內容 ----
+    title = Column(Text, nullable=False)
+    title_zh = Column(Text, nullable=True)
+    abstract = Column(Text, nullable=True)
+    summary_zh = Column(Text, nullable=True)
+    key_points = Column(Text, nullable=True)      # JSON 陣列字串
+    caveat_zh = Column(Text, nullable=True)       # 解讀注意事項（必附）
+    authors = Column(Text, nullable=True)
+    journal = Column(String, nullable=True)
+    lang = Column(String, nullable=True)
+
+    # ---- 分類 ----
+    evidence_level = Column(Enum(NewsEvidenceLevel), nullable=False)
+    evidence_maturity = Column(Enum(NewsEvidenceMaturity), nullable=False,
+                               default=NewsEvidenceMaturity.unknown)
+    study_design = Column(String, nullable=True)
+    cancer_types = Column(Text, nullable=True)        # JSON 陣列字串
+    intervention_types = Column(Text, nullable=True)  # JSON 陣列字串
+    tags = Column(Text, nullable=True)                # JSON 陣列字串
+    is_safety_signal = Column(Boolean, nullable=False, default=False, index=True)
+
+    # ---- 未解禁（embargo）----
+    # 部分臨床研究來源在正式公開前會有禁運期限制；未解禁內容一般使用者查不到，
+    # 只有管理者或擁有 F0-20 can_view 權限的角色可提早查閱（見 app/deps.py 的 has_permission()）。
+    is_embargoed = Column(Boolean, nullable=False, default=False, index=True)
+    embargo_until = Column(DateTime, nullable=True)
+
+    # ---- 排序 ----
+    relevance_score = Column(String, nullable=False, default="0")
+    rank_score = Column(String, nullable=False, default="0")
+
+    # ---- 時間 ----
+    published_at = Column(DateTime, nullable=True, index=True)
+    collected_at = Column(DateTime, default=datetime.utcnow, index=True)
+    source_updated_at = Column(DateTime, nullable=True)
+
+    # ---- 狀態與軟刪除（管理者刪除舊新聞時強制填註記）----
+    status = Column(Enum(NewsArticleStatus), nullable=False,
+                    default=NewsArticleStatus.active, index=True)
+    is_deleted = Column(Boolean, nullable=False, default=False, index=True)
+    deleted_at = Column(DateTime, nullable=True)
+    deleted_by = Column(String, ForeignKey("users.id"), nullable=True)
+    delete_note = Column(Text, nullable=True)
+
+    raw_payload = Column(Text, nullable=True)   # 原始回傳 JSON，供追溯
+    # 後台查詢用：title + title_zh + summary_zh + abstract + 識別碼，全轉小寫。
+    # 不用全文索引是因為中文斷詞在 SQLite/PostgreSQL 兩邊行為不一致，
+    # 本模組一年約 3,650 筆，單欄 LIKE 掃描成本可忽略。
+    search_blob = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class NewsArticleEntity(Base):
+    """新聞內文比對到的平台實體，讓讀者可以從新聞點進查詢站。
+
+    四種 id 欄位只會有一個有值（依 entity_type 決定），保留真實外鍵，
+    因此可以直接 join 回主檔做統計，也能安全地產生連結。
+    """
+    __tablename__ = "news_article_entities"
+    __table_args__ = (
+        UniqueConstraint("article_id", "entity_type", "entity_key",
+                         name="uq_news_article_entity"),
+    )
+
+    id = Column(String, primary_key=True, default=gen_id)
+    article_id = Column(String, ForeignKey("news_articles.id"), nullable=False, index=True)
+    entity_type = Column(Enum(NewsEntityType), nullable=False, index=True)
+    # entity_key 是該實體主鍵的字串形式，用於唯一約束（herb 是 Integer，其餘是 String）
+    entity_key = Column(String, nullable=False)
+
+    herb_id = Column(Integer, ForeignKey("tcmsp_herbs.id"), nullable=True, index=True)
+    mol_id = Column(String, ForeignKey("tcmsp_ingredients.mol_id"), nullable=True, index=True)
+    tar_id = Column(String, ForeignKey("tcmsp_targets.tar_id"), nullable=True, index=True)
+    dis_id = Column(String, ForeignKey("tcmsp_diseases.dis_id"), nullable=True, index=True)
+
+    display_name = Column(String, nullable=True)   # 顯示用名稱（中文優先）
+    matched_text = Column(String, nullable=True)   # 原文實際命中的字串
+    match_type = Column(String, nullable=True)     # exact_en / exact_cn / pinyin / alias
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class NewsDailyDigest(Base):
+    """每日重點新聞（預設每天 10 篇，篇數可由 news_settings 調整）。"""
+    __tablename__ = "news_daily_digests"
+    __table_args__ = (
+        UniqueConstraint("digest_date", "article_id", name="uq_news_digest_date_article"),
+    )
+
+    id = Column(String, primary_key=True, default=gen_id)
+    digest_date = Column(String, nullable=False, index=True)   # 'YYYY-MM-DD'（Asia/Taipei）
+    article_id = Column(String, ForeignKey("news_articles.id"), nullable=False, index=True)
+    rank = Column(Integer, nullable=False)
+    rank_score = Column(String, nullable=False, default="0")
+    pick_reason = Column(Text, nullable=True)     # AI/系統說明為何入選
+    is_pinned = Column(Boolean, nullable=False, default=False)  # 置頂項目不會被隔日重跑覆蓋
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class UserNewsBookmark(Base):
+    """使用者勾選保留的新聞。被保留的文章不會被管理者的批次刪除影響。"""
+    __tablename__ = "user_news_bookmarks"
+    __table_args__ = (
+        UniqueConstraint("user_id", "article_id", name="uq_user_news_bookmark"),
+    )
+
+    id = Column(String, primary_key=True, default=gen_id)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    article_id = Column(String, ForeignKey("news_articles.id"), nullable=False, index=True)
+    folder = Column(String, nullable=False, default="default")
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class NewsCollectionRun(Base):
+    """每日收集執行紀錄，供後台查詢與排查來源異常。"""
+    __tablename__ = "news_collection_runs"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    run_date = Column(String, nullable=False, index=True)     # 'YYYY-MM-DD'
+    trigger_type = Column(String, nullable=False, default="scheduled")  # scheduled/manual/backfill
+    triggered_by = Column(String, ForeignKey("users.id"), nullable=True)
+    status = Column(Enum(NewsRunStatus), nullable=False, default=NewsRunStatus.running)
+    started_at = Column(DateTime, default=datetime.utcnow)
+    finished_at = Column(DateTime, nullable=True)
+    duration_ms = Column(Integer, nullable=True)
+    fetched_count = Column(Integer, nullable=False, default=0)
+    new_count = Column(Integer, nullable=False, default=0)
+    duplicate_count = Column(Integer, nullable=False, default=0)
+    filtered_count = Column(Integer, nullable=False, default=0)
+    digest_count = Column(Integer, nullable=False, default=0)
+    linked_entity_count = Column(Integer, nullable=False, default=0)
+    per_source = Column(Text, nullable=True)      # JSON：{slug: {fetched, error}}
+    error_message = Column(Text, nullable=True)
+
+
+class NewsSetting(Base):
+    """新聞模組設定（每日篇數、相關度門檻、免責聲明等）。"""
+    __tablename__ = "news_settings"
+
+    key = Column(String, primary_key=True)
+    value = Column(Text, nullable=False)          # JSON 字串
+    description = Column(String, nullable=True)
+    updated_by = Column(String, ForeignKey("users.id"), nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

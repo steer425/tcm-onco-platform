@@ -32,6 +32,9 @@ FEATURE_CONFIG = [
     {"code": "F0-13-5", "module": "目標零", "name": "Dashboard-公告小工具",
      "nav_label": "公告", "page_url": None,
      "show_frontend": True, "show_backend": True, "sort_order": 15},
+    {"code": "F0-13-6", "module": "目標零", "name": "Dashboard-每日重點新聞小工具",
+     "nav_label": "每日重點新聞", "page_url": None,
+     "show_frontend": True, "show_backend": True, "sort_order": 16},
 
     # ---- 後台管理頁面 ----
     {"code": "F0-2", "module": "目標零", "name": "角色管理",
@@ -52,6 +55,18 @@ FEATURE_CONFIG = [
     {"code": "F0-17", "module": "目標零", "name": "公告管理",
      "nav_label": "公告管理", "page_url": "announcements.html",
      "show_frontend": False, "show_backend": True, "sort_order": 46},
+    # 新聞管理併入「公告管理」頁的分頁呈現，因此 page_url 為 None
+    # （不另生導覽項目，僅作為權限矩陣可指派的功能項）
+    {"code": "F0-19", "module": "目標零", "name": "新聞管理（公告管理頁分頁）",
+     "nav_label": "新聞管理", "page_url": None,
+     "show_frontend": False, "show_backend": True, "sort_order": 46},
+    # 不是獨立頁面，也不是「能不能管理新聞」的權限——這是「能否提早看到未解禁
+    # （embargo）臨床研究新聞」的權限開關，可見 app/deps.py 的 has_permission()、
+    # app/routers/news.py 的 /news/daily、/news/archive。管理者永遠可看（bypass），
+    # 其餘角色要在權限矩陣把這個代碼的 can_view 打開才提早看得到。
+    {"code": "F0-20", "module": "目標零", "name": "中藥腫瘤新聞追蹤（未解禁內容存取）",
+     "nav_label": "腫瘤新聞進階存取", "page_url": None,
+     "show_frontend": False, "show_backend": False, "sort_order": 0},
     {"code": "F0-18", "module": "目標零", "name": "個人化設定",
      "nav_label": "個人化設定", "page_url": "personal-settings.html",
      "show_frontend": True, "show_backend": True, "sort_order": 47},

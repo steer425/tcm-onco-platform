@@ -15,6 +15,18 @@
   .status-off { background:#fdecea; color:#c0392b; }
   .file-chip { display:inline-flex; align-items:center; gap:6px; background:#f0f3f1; border-radius:6px; padding:3px 8px; font-size:12px; margin:2px 4px 2px 0; }
   .file-chip button { padding:1px 6px; font-size:11px; }
+
+  /* 分頁（樣式沿用 logs.html 的作法，保持全站一致） */
+  .tabs { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+  .tabs button { background:#fff; color:#2f6f4f; border:1px solid #2f6f4f; }
+  .tabs button.active { background:#2f6f4f; color:#fff; }
+
+  /* 新聞管理 */
+  .news-admin-bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  .news-admin-danger { margin-top:14px; padding:12px 14px; background:#fdf7ee; border:1px solid #e8c08a; border-radius:8px; }
+  .news-admin-msg { margin-top:12px; padding:9px 12px; background:#eaf1fb; border:1px solid #c2d6ef; border-radius:7px; font-size:12.5px; color:#2563a8; }
+  .news-admin-note { font-size:11.5px; color:#c0392b; margin-top:2px; }
+  .news-admin-sub { font-size:11px; color:#8a958f; margin-top:2px; }
 </style>
 </head>
 <body data-current-page="announcements.html">
@@ -25,11 +37,18 @@
   </aside>
   <main class="main">
     <div class="topbar">
-      <h2 style="margin:0;">公告管理</h2>
+      <h2 style="margin:0;">公告 / 新聞管理</h2>
       <div class="user-info" id="userInfo"></div>
     </div>
 
-    <div class="card">
+    <div class="tabs">
+      <button class="active" data-tab="ann">公告管理</button>
+      <button data-tab="news">新聞管理</button>
+      <button data-tab="newsSources">新聞來源健康度</button>
+      <button data-tab="newsRuns">收集執行紀錄</button>
+    </div>
+
+    <div class="card" id="tab-ann">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px;">
         <input id="searchInput" placeholder="搜尋公告標題" style="max-width:220px;" />
         <select id="statusFilter" style="max-width:160px;">
@@ -44,6 +63,95 @@
           <tr><th>標題</th><th>顯示期間</th><th>狀態</th><th>附件</th><th>備注</th><th style="width:200px;">操作</th></tr>
         </thead>
         <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- ================= 新聞管理 ================= -->
+    <div class="card" id="tab-news" style="display:none;">
+      <div class="news-admin-bar">
+        <input id="nQ" placeholder="搜尋標題／摘要／PMID／NCT／DOI" style="max-width:260px;" />
+        <select id="nView" style="max-width:150px;">
+          <option value="active">未刪除</option>
+          <option value="deleted">已刪除</option>
+          <option value="all">全部</option>
+        </select>
+        <label style="font-size:12px;">起<input type="date" id="nFrom" style="margin-left:4px;" /></label>
+        <label style="font-size:12px;">迄<input type="date" id="nTo" style="margin-left:4px;" /></label>
+        <label style="font-size:12px;"><input type="checkbox" id="nSafety" /> 僅安全訊號</label>
+        <button onclick="newsAdminSearch(1)">查詢</button>
+      </div>
+
+      <div class="news-admin-danger">
+        <h4 style="margin:0 0 8px; font-size:13.5px; color:#8a5a12;">刪除舊新聞（軟刪除，可還原）</h4>
+        <div class="news-admin-bar">
+          <label style="font-size:12px;">刪除幾天前
+            <input type="number" id="nOlderThan" min="1" placeholder="例如 180" style="width:110px; margin-left:4px;" />
+          </label>
+          <input id="nNote" placeholder="刪除註記（必填，將寫入稽核紀錄）" style="flex:1; min-width:240px;" />
+          <label style="font-size:12px;"><input type="checkbox" id="nProtect" checked /> 保護已被使用者保留的新聞</label>
+          <button class="secondary" onclick="newsAdminDelete(true)">試算</button>
+          <button class="danger" onclick="newsAdminDelete(false)">執行刪除</button>
+          <button class="secondary" onclick="newsAdminRestore()">還原勾選</button>
+        </div>
+        <p style="margin:8px 0 0; font-size:11.5px; color:#8a958f;">
+          勾選表格中的項目可針對個別新聞刪除；未勾選時則依「刪除幾天前」的條件批次處理。
+        </p>
+      </div>
+
+      <div id="nMsg" class="news-admin-msg" style="display:none;"></div>
+
+      <div style="font-size:12px; color:#6b7a70; margin:10px 0;">
+        共 <span id="nTotal">0</span> 筆　已勾選 <span id="nSelected">0</span> 筆
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:34px;"><input type="checkbox" id="nCheckAll" onchange="newsAdminToggleAll(this)" /></th>
+            <th>標題</th><th style="width:150px;">來源</th><th style="width:120px;">證據層級</th>
+            <th style="width:100px;">收集日</th><th style="width:70px;">保留數</th><th style="width:90px;">狀態</th>
+          </tr>
+        </thead>
+        <tbody id="nTableBody"></tbody>
+      </table>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; font-size:12px;">
+        <button class="secondary" onclick="newsAdminPage(-1)">上一頁</button>
+        <span>第 <span id="nPage">1</span> 頁</span>
+        <button class="secondary" onclick="newsAdminPage(1)">下一頁</button>
+      </div>
+    </div>
+
+    <!-- ================= 新聞來源健康度 ================= -->
+    <div class="card" id="tab-newsSources" style="display:none;">
+      <p style="font-size:12px; color:#6b7a70; margin:0 0 12px;">
+        爬蟲類來源的網站改版時會抓不到資料。連續失敗次數會在這裡累計，
+        選擇器等設定存在資料庫，可直接修改而不需重新部署。
+      </p>
+      <table>
+        <thead>
+          <tr><th>來源</th><th style="width:70px;">方式</th><th style="width:70px;">權重</th>
+              <th style="width:80px;">新聞數</th><th>最近狀態</th><th style="width:70px;">啟用</th>
+              <th style="width:70px;">設定</th></tr>
+        </thead>
+        <tbody id="nSourceBody"></tbody>
+      </table>
+    </div>
+
+    <!-- ================= 收集執行紀錄 ================= -->
+    <div class="card" id="tab-newsRuns" style="display:none;">
+      <div class="news-admin-bar" style="margin-bottom:12px;">
+        <button id="nCollectBtn" onclick="newsAdminCollect()">立即執行一次收集</button>
+        <span style="font-size:11.5px; color:#8a958f;">
+          每日清晨 4:00（台北）由排程自動執行。手動收集需時 1–3 分鐘，請耐心等候。
+        </span>
+      </div>
+      <table>
+        <thead>
+          <tr><th style="width:100px;">日期</th><th style="width:80px;">觸發</th><th style="width:80px;">狀態</th>
+              <th style="width:60px;">抓取</th><th style="width:60px;">新增</th><th style="width:60px;">重複</th>
+              <th style="width:60px;">精選</th><th style="width:70px;">實體連結</th>
+              <th style="width:70px;">耗時</th><th>錯誤</th></tr>
+        </thead>
+        <tbody id="nRunBody"></tbody>
       </table>
     </div>
   </main>
@@ -80,10 +188,32 @@
   </div>
 </div>
 
+<div id="newsSourceConfigModal" class="modal-backdrop" style="display:none;">
+  <div class="modal" style="max-width:640px;">
+    <h3 id="newsSourceConfigTitle">來源設定</h3>
+    <p style="font-size:12px; color:#6b7a70;">
+      敏感欄位（api_key 等）以密碼框顯示，讀到的是遮蔽值 <code>********</code>；
+      留空即代表不修改，不會把畫面上的遮蔽字串當成新金鑰送出。
+      陣列/物件型欄位（例如選擇器設定）用 JSON 格式編輯。
+    </p>
+    <div id="newsSourceConfigFields"></div>
+    <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+      <input type="text" id="newsSourceConfigNewKey" placeholder="新增欄位名稱" style="flex:1;">
+      <button type="button" class="secondary" onclick="addSourceConfigField()">新增欄位</button>
+    </div>
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="secondary" onclick="closeSourceConfigModal()">關閉</button>
+      <button onclick="saveSourceConfig()">儲存</button>
+    </div>
+    <div id="newsSourceConfigMsg" class="hint-msg"></div>
+  </div>
+</div>
+
 <script src="js/api.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/i18n-dict.js"></script>
 <script src="js/site-lang.js"></script>
 <script src="js/announcements.js"></script>
+<script src="js/news-admin.js"></script>
 </body>
 </html>

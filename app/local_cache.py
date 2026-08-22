@@ -36,6 +36,13 @@ CACHED_TABLES = [
     "tcmsp_target_disease",
     "dark_genes",
     "gencc_diseases",
+    # 新聞模組：每日重點新聞屬於「每天更新一次、供大量前台讀取」的參考資料，適合快取。
+    # 刻意不快取 user_news_bookmarks（使用者個人收藏，綁 users 外鍵）與 news_settings
+    # （管理設定，讀取量小），維持「不快取帳號/使用者相關資料」的既有原則。
+    "news_sources",
+    "news_articles",
+    "news_article_entities",
+    "news_daily_digests",
 ]
 
 _local_engine = None

@@ -372,12 +372,20 @@ async function bootstrapData() {
   }
   rebuildIndexes();
 
-  // 決定預設顯示的疾病：優先用後台設定的「預設疾病」，沒設定時退回清單第一筆（依 dis_id 排序）
+  // 決定預設顯示的疾病：網址參數 ?dis=xxx > 後台設定的「預設疾病」> 清單第一筆（依 dis_id 排序）
+  // ?dis= 是給「每日重點新聞」小工具的疾病標籤深連結用的，
+  // 寫法與 tcmsp_query.html 的 ?herb= 一致。
   let defaultDisease = null;
-  try {
-    const cfg = await api('/system-settings/default-disease');
-    if (cfg.dis_id) defaultDisease = diseasesById.get(cfg.dis_id);
-  } catch (e) { /* 拿不到設定就退回第一筆 */ }
+  const urlDisId = new URLSearchParams(window.location.search).get('dis');
+  if (urlDisId && diseasesById.get(urlDisId)) {
+    defaultDisease = diseasesById.get(urlDisId);
+  }
+  if (!defaultDisease) {
+    try {
+      const cfg = await api('/system-settings/default-disease');
+      if (cfg.dis_id) defaultDisease = diseasesById.get(cfg.dis_id);
+    } catch (e) { /* 拿不到設定就退回第一筆 */ }
+  }
   if (!defaultDisease) {
     const sorted = DATA.diseases.slice().sort((a, b) => (a.dis_id || "").localeCompare(b.dis_id || ""));
     defaultDisease = sorted[0];

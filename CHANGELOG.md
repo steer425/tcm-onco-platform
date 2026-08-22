@@ -1,5 +1,164 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.34.0 — 2026-08-22（每日重點新聞區：10 個權威官方來源自動彙整，新聞可點連回藥材／疾病／靶點）
+
+### 新功能
+
+Dashboard 新增「📰 每日重點新聞」卡片（功能代碼 `F0-13-6`），每日清晨 4:00（台北時間）自動追蹤《中藥與腫瘤｜10 個權威官方追蹤網站》所列來源，產出當日 10 篇重點新聞。使用者可勾選「保留」存進個人收藏；管理者在「公告 / 新聞管理」頁維護。
+
+### 10 個來源與抓取方式
+
+| 來源 | 方式 | 備注 |
+|---|---|---|
+| WHO 傳統醫學 | RSS | `who.int/rss-feeds/news-english.xml`（全站 feed，一定要開主題過濾） |
+| NCI | RSS | `ncinewsreleases.rss` + `cancer-currents-blog.rss`。**`/syndication/rss.xml` 會回 403，不要用** |
+| NCI OCCAM | 爬蟲 | 站台無 feed |
+| NCCIH | 爬蟲 | **`/news/rss` 實測 404**（網路上很多地方仍在引用這個網址），頁面也沒有 `rel=alternate` |
+| PubMed | API | E-utilities（esearch → efetch），鎖定 MeSH `Medicine, Chinese Traditional` + `Drugs, Chinese Herbal` |
+| ClinicalTrials.gov | API | v2，5 個介入關鍵字分次查詢後依 NCT 去重 |
+| MSK 整合醫學 | 爬蟲 | `/news` 未暴露 RSS |
+| MSK About Herbs | 爬蟲 | 資料庫型，一律標記為安全訊號來源 |
+| 中國衛健委 / 中醫藥管理局 | 爬蟲 | 設 `allow_failure`，海外節點可能不通，失敗只記錄不中斷當日流程 |
+
+### 排序哲學：不看熱度，看證據可信度
+
+主題相關度 0.30、來源權威度 0.22、證據成熟度 0.20、研究設計 0.16、時效性 0.12，安全訊號另加 0.12。
+
+- **安全訊號優先**（藥物-草藥交互作用、CYP/P-gp、肝腎毒性、警訊）——這個模組的定位是安全監測與證據查證，不是療效推薦
+- **臨床前研究自動降權**：偵測到 in vitro / 細胞株 / 分子對接 / 網路藥理 / 動物模型時標記 `preclinical`，排序權重 0.40（人體證據是 1.00），且前台強制顯示「不可推論至病患層級」
+- **臨床試驗登錄**一律帶出狀態／期別／收案數，前台標示「僅為登錄，不代表有效」
+- 單一來源每日上限 4 篇，避免 PubMed 洗版
+
+### 新聞接回關聯網絡（`app/news/entity_linker.py`）
+
+這是這次改版的重點：新聞如果只是一則則獨立連結，跟平台其他部分是斷開的。比對器把新聞內文對回 TCMSP 主檔，前台顯示為可點標籤：
+
+- 藥材 → `tcmsp_query.html?herb={herb_id}`
+- 疾病 → `disease_query.html?dis={dis_id}`（**本次為 `disease_query.html` 新增 `?dis=` 參數支援**，寫法比照既有的 `?herb=`）
+- 靶點 → 沒有專屬查詢站頁面，改開彈窗（`GET /news/targets/{tar_id}` 回傳關聯藥材與疾病）
+- 成分 → 目前只記錄不產生連結
+
+比對規則刻意保守，寧可漏抓也不要誤連：
+
+- 拉丁字母以「詞」為單位做 1~4 連字詞比對，需完整詞界；長度 <5 或落在停用詞表（cancer / protein / water 等）的一律不建索引
+- 中文以 2~8 字滑動視窗比對（中文沒有詞界可用）
+- **基因/靶點符號大小寫敏感**——否則 `AKT1` 會誤中一堆無關字串，實測 `akt1`（小寫）正確不命中
+- 成分名稱門檻更嚴（≥6 字元），避免 water / glucose 這類通用字把每篇新聞都連上
+
+**效能**：用「詞典查表 + n-gram」而不是 29k 詞的正規表示式聯集（後者光編譯就要數秒）。實測 499 藥材 + 3,311 靶點 + 837 疾病 + 29,384 成分共 34,491 條索引：索引建立 201 ms、每篇文章比對 1.2 ms，一次收集 120 篇只多 0.15 秒。
+
+比對到的實體中文名會併進 `search_blob`，所以後台搜「胃癌」也找得到標題是英文的 gastric cancer 研究——沒設 `ANTHROPIC_API_KEY`（無 AI 翻譯）時尤其重要。
+
+### 沿用既有基礎建設，不重複造輪子
+
+| 需求 | 用的是 |
+|---|---|
+| 取得登入者 | `app.deps.get_current_user`（JWT Bearer） |
+| 管理者判定 | `app.deps.require_admin`（角色「管理者」） |
+| 稽核紀錄 | `app.deps.write_audit_log` → 既有的 `AuditLog` 表，**不另建新聞專用稽核表** |
+| 功能開關／權限矩陣 | `feature_config.FEATURE_CONFIG` + `/nav/menu` |
+
+管理者操作寫進 `AuditLog` 的 action 為 `news_soft_delete` / `news_restore` / `news_pin` / `news_manual_collect` / `news_update_source` / `news_update_settings`，可在「稽核 / 登入紀錄」頁一起查詢。
+
+### 新增 7 張資料表
+
+`news_sources`、`news_articles`、`news_article_entities`、`news_daily_digests`、`user_news_bookmarks`、`news_collection_runs`、`news_settings`。
+
+全部沿用全站慣例：`String` + `gen_id()` UUID 主鍵、可攜型別（`String`／`DateTime`／`Text`／`Integer`／`Boolean`／`Enum`），陣列型資料以 JSON 字串存在 `Text` 欄位。**刻意不用 PostgreSQL 專屬的 `ENUM`／`ARRAY`／`JSONB`／`INET`／`GIN`**——`database.py` 在本機沒設 `DATABASE_URL` 時會退回 SQLite，塞專屬型別進去會讓本機開發環境直接壞掉。
+
+### 刪除舊新聞的設計
+
+- **軟刪除為主**：前台隱藏，後台仍可查詢與還原
+- **註記必填**：`note` 為必要欄位，同時寫進文章本身與 `AuditLog`
+- **保護已被使用者保留的新聞**：`exclude_bookmarked` 預設 `true`，批次刪除不會動到有人勾選保留的項目，回應會回報保護了幾筆；使用者的「我的保留」仍看得到該文並標記 `article_removed`
+- **可先試算**：`dry_run: true` 只回報影響筆數，不寫入、**不留稽核紀錄**
+
+### 後台併入「公告管理」頁
+
+`announcements.html` 改名為「公告 / 新聞管理」，用 `logs.html` 那套現成的 tabs 樣式加三個分頁：新聞管理、新聞來源健康度、收集執行紀錄。新增權限代碼 `F0-19`（`page_url` 為 `None`，不產生導覽項目，只作為權限矩陣可指派的功能項）。
+
+爬蟲類來源的網站改版時會抓不到資料，連續失敗次數會在「新聞來源健康度」分頁累計；選擇器等設定存在 `news_sources.config`，可直接於後台修改，**不需要改程式重新部署**。
+
+### 安全性：第三方內容一律跳脫
+
+新聞內容來自 WHO / NCI / PubMed / 中國官方站等第三方網站，`news-widget.js` 與 `news-admin.js` 一律經 `escNews()` / `escNewsAdmin()` 跳脫後才寫入 DOM。這點跟站內的公告不同——公告是管理者自己輸入的內容，新聞不是。
+
+### 每日 04:00 排程
+
+**Render free plan 沒有 Cron Job**（付費方案才有），所以由外部排程呼叫 `POST /news/admin/collect/scheduled`。
+
+**密鑰走 `Authorization: Bearer` 標頭，不放在網址查詢字串**——查詢字串會被 Render 的存取日誌、反向代理與瀏覽器歷史記錄下來，標頭不會。比對用 `secrets.compare_digest` 避免時間差攻擊。需在 Render 後台設環境變數 `NEWS_COLLECT_SECRET`，**未設定時端點回 503 停用**（而不是變成公開端點）。
+
+新增 `.github/workflows/daily-news.yml`：每天 UTC 20:00（台北 04:00）觸發，密鑰存 GitHub repo secret（不會出現在程式碼或提示詞裡），含喚醒預熱、3 次重試（401/503 不重試）、結果摘要與失敗來源列表。另有一個 Claude 排程任務作為替代方案。⚠️ free plan 會休眠，第一次呼叫要等 30–60 秒冷啟動。
+
+### 已測試驗證
+
+`tests/test_news_e2e.py` — **63 項斷言全過、零警告**（執行方式：`python -m tests.test_news_e2e`，不是 pytest）。腳本開頭會自動刪掉上一輪的 `test.db`——沒有這一步的話第二次執行會沿用前一次的每日精選，在依索引取文章的地方 `IndexError`，很容易被誤判成程式壞掉。對真實 app（165 條路由全載入）、真實 JWT 登入、真實資料表執行，只有外網抓取以假資料替換。
+
+涵蓋：功能代碼經 `seed_default_data()` 建立、未登入 401、一般使用者查後台 403、管理者 200、主題過濾、近似重複去重、安全訊號排 #1、臨床前排末位、每篇都有解讀注意事項、實體連結三種類型與連結網址正確、靶點彈窗帶出關聯藥材與疾病、收藏跨使用者隔離、中文關鍵字搜尋、刪除註記必填、試算與實際刪除筆數一致、批次刪除保護已保留文章、前台隱藏但後台查得到、還原、稽核寫進 `AuditLog` 且試算不留紀錄、來源健康度、執行紀錄、設定驗證，以及排程端點的四種拒絕路徑（未設密鑰 503／無標頭 401／錯誤密鑰 401／密鑰放查詢字串無效）與正確密鑰 200。
+
+另外做了**正式環境升級模擬**：用升級前的 models 建一個有資料的資料庫（32 張表），換成新版 models 後跑 `create_all()`，確認 7 張新表正確建立、原有資料完好、新表可正常寫入。
+
+### 開發過程中發現並修正的問題
+
+1. **中文搜尋查不到英文原文的文章**——沒設 `ANTHROPIC_API_KEY` 時 `title_zh` 是空的，後台搜「胃癌」找不到那篇 gastric cancer 研究。改成把比對到的實體中文名併進 `search_blob`。
+2. **SQLAlchemy 2.x 的 subquery 強制轉型警告**——`in_()` 收 `subquery()` 會發 `SAWarning: Coercing Subquery object into a select()`，未來版本會變成錯誤。全部改成直接傳 query。
+3. **`older_than_days` 條件不會誤刪當天剛收的新聞**——這點寫成了測試斷言，避免日後改動時退化。
+
+### 未解禁（embargo）內容：權限控管而不是整支端點擋掉
+
+臨床研究新聞常有禁發期（embargo）。`news_articles` 增加 `is_embargoed` 與 `embargo_until`
+兩個欄位，並新增功能代碼 **`F0-20`「中藥腫瘤新聞追蹤（未解禁內容存取）」**——
+這不是頁面、也不是「能不能管理新聞」，而是「**能否提早看到尚未解禁的文章**」這一個開關。
+管理者永遠看得到（沿用既有 bypass），其餘角色要在權限矩陣把它的 `can_view` 打開。
+
+為此在 `app/deps.py` 新增 **`has_permission()`**：`require_permission()` 的非阻斷版本，
+回傳布林值而不是拋 403。差別很重要——未解禁新聞的正確行為是「**這一列不給你看**」，
+不是「整支 `/news/daily` 回 403」。沒有權限的使用者在查詢階段就被過濾掉那些列，
+因此回應裡一律帶 `is_embargoed` 欄位是安全的：拿得到這個欄位的人本來就有權限看，
+欄位只是讓他知道「這篇是提前存取」。
+
+解禁條件是 `is_embargoed = false` **或** `embargo_until <= 現在`，
+所以設了 `is_embargoed=true` 但沒填 `embargo_until` 等於無限期封存，這是刻意的。
+
+### 唯讀模式：新聞內容進本機端快取，帳號資料不進
+
+依 `.claude/rules/backend.md` 的 session 路由規則，`/news/daily`、`/news/archive`
+同時注入兩個 session：新聞內文／來源／每日精選走 `get_query_db`（唯讀模式下讀本機端
+SQLite 快取），收藏、帳號、模組設定走 `get_db`（一律連遠端）。
+`app/local_cache.py` 的快取白名單只加入 `news_sources`／`news_articles`／
+`news_article_entities`／`news_daily_digests` 四張——**刻意不快取 `user_news_bookmarks`
+（個人收藏，綁 users 外鍵）與 `news_settings`（管理設定，讀取量小）**，
+維持既有「不快取帳號／使用者相關資料」的原則。
+
+### 系統與文件同步
+
+版本號在專案裡共出現於五個地方，這一版把**過去容易漏掉的兩個**也一併補上並寫成規則：
+
+| 檔案 | 內容 |
+|---|---|
+| `app/main.py` | `FastAPI(version=)` 1.33.0 → 1.34.0，description 加「每日重點新聞」 |
+| `app/routers/project_info.py` | `APP_VERSION` 同步（版本資訊頁讀這個值） |
+| `README.md` | 標頭「目前版本」同步；功能對照表補 `F0-13-6`、`F0-19` 兩列 |
+| `CHANGELOG.md` | 本條目 |
+| `git_push.bat` | `DEFAULT_MSG` 同步——**不改的話 commit 訊息會沿用上一版**，`git log` 與實際版本對不上 |
+
+`rules.md` 新增 **第九章「上版流程」**：完整的 PowerShell 步驟、上面這張版本同步表、
+以及「哪些一次性腳本要跑、哪些不用」的對照（`migrate_schema` 只在改既有資料表欄位時跑；
+`seed_gencc_translations` 只在改 GenCC 翻譯時跑；本版兩者都不需要）。
+
+會寫這一章，是因為這套上版流程原本只存在於對話紀錄裡、沒有落在任何檔案上，
+換一個開發脈絡就無從得知。**流程要寫進 repo 才會被繼承。**
+同章也記下一條環境限制：Claude 的裝置橋接無法刪除檔案，而 git 每個寫入操作都要建立再刪除
+`.git/index.lock`，因此 git 一律由使用者在 PowerShell 執行。
+
+### 部署注意事項
+
+- **正式環境不需要跑 `python -m app.migrate_schema`**：7 張新聞資料表對正式資料庫而言全都是新表，`Base.metadata.create_all()` 在伺服器啟動時會連同 `is_embargoed`／`embargo_until` 一起建好（已實測驗證）。**但本機或測試資料庫如果已經建過舊版的 `news_articles`（沒有 embargo 兩欄），就要跑一次 `migrate_schema` 補欄位**——腳本已加入對應的 `ALTER TABLE`
+- 新增相依套件 `beautifulsoup4==4.12.3`（HTML 爬蟲類來源解析用）。AI 摘要直接以 `httpx` 呼叫 Anthropic API，不另裝 SDK，省下建置時間與相依體積
+- Render 環境變數：`NEWS_COLLECT_SECRET`（必要）、`ANTHROPIC_API_KEY`（選填，未設會降級為規則式摘要，流程不中斷）、`PUBMED_API_KEY`／`NEWS_CONTACT_EMAIL`（選填）
+- 首次部署後請到「公告 / 新聞管理 → 收集執行紀錄 → 立即執行一次收集」跑一次，再看「新聞來源健康度」分頁確認中國兩個官方站在 Render 新加坡節點是否可達
+
 ## v1.33.0 — 2026-08-06（全部六個查詢站的關聯網絡圖，新增可自訂顏色的圖例）
 
 ### 新功能

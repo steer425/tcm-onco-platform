@@ -110,7 +110,7 @@ window.openPermModal = async (roleId, roleName) => {
       <td>
         <div style="font-weight:600;">${p.feature_code}</div>
         <div class="host-detail">${p.feature_name}</div>
-        ${p.page_url ? `<div class="host-detail">路徑：frontend\\${p.page_url}</div>` : '<div class="host-detail">（Dashboard 小工具，非獨立頁面）</div>'}
+        ${p.page_url ? `<div class="host-detail">路徑：frontend\\${p.page_url}</div>` : '<div class="host-detail">（無獨立頁面，例如 Dashboard 小工具或純權限開關）</div>'}
       </td>
       <td class="chk-cell"><input type="checkbox" data-field="can_view" ${p.can_view ? "checked" : ""}></td>
       <td class="chk-cell"><input type="checkbox" data-field="can_execute" ${p.can_execute ? "checked" : ""}></td>

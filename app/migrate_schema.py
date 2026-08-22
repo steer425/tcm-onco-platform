@@ -40,6 +40,9 @@ ALTER_STATEMENTS = [
     "ALTER TABLE gencc_diseases ADD COLUMN disease_name_ko VARCHAR",
     "ALTER TABLE tcmsp_diseases ADD COLUMN target_count INTEGER DEFAULT 0 NOT NULL",
     "ALTER TABLE dark_genes ADD COLUMN has_tcmsp_target BOOLEAN DEFAULT FALSE NOT NULL",
+    # 新聞模組：未解禁（embargo）內容標記，見 rules.md「新聞模組」章節
+    "ALTER TABLE news_articles ADD COLUMN is_embargoed BOOLEAN DEFAULT FALSE NOT NULL",
+    "ALTER TABLE news_articles ADD COLUMN embargo_until TIMESTAMP",
 ]
 
 

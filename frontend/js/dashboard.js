@@ -160,6 +160,7 @@ const WIDGET_CARD_MAP = {
   "F0-13-3": "cardDocs",
   "F0-13-4": "cardGoals",
   "F0-13-5": "cardAnnouncements",
+  "F0-13-6": "cardNews",
 };
 
 async function applyWidgetVisibility() {
