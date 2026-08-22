@@ -12,3 +12,4 @@ backups/
 _to_delete/
 
 .github/workflows/
+.claude/settings.local.json
