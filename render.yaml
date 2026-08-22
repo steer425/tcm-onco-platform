@@ -28,6 +28,15 @@ services:
         value: https://tcm-onco-backend.onrender.com/auth/facebook/callback
       - key: FRONTEND_BASE_URL
         value: https://fwc-tcmsp.pages.dev
+      # ---- 每日重點新聞模組（v1.34.0）----
+      - key: NEWS_COLLECT_SECRET
+        sync: false  # 必填。外部排程觸發 POST /news/admin/collect/scheduled 的共享密鑰；未設定時該端點回 503 停用
+      - key: ANTHROPIC_API_KEY
+        sync: false  # 選填。新聞 AI 中文摘要；未設定會自動降級為規則式摘要，收集流程不中斷
+      - key: PUBMED_API_KEY
+        sync: false  # 選填。PubMed E-utilities 提高速率上限用
+      - key: NEWS_CONTACT_EMAIL
+        sync: false  # 選填。爬蟲 User-Agent 附上的聯絡信箱，符合各站 robots 禮儀
     autoDeploy: true
 
   # ---------------------------------------------------------------------
