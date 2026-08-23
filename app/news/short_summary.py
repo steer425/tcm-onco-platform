@@ -125,16 +125,29 @@ def truncate(text: str, char_limit: int) -> str:
     return window.rstrip() + "…"
 
 
+_CJK_RE = re.compile(r"[\u4e00-\u9fff]")
+
+
 def fallback(art: dict, lang: str, char_limit: int) -> str | None:
     """沒有 API key 或呼叫失敗時的降級。
 
-    韓文刻意回 None——沒有翻譯能力時硬塞中文或英文並標成韓文摘要，
-    比不顯示更糟糕（使用者會以為系統壞了，而不是知道「這個語系還沒產生」）。
+    原則：**沒有翻譯能力時就留白，不要拿別的語言冒充。**
+
+    - 韓文一律 None。
+    - 中文：只有在原文本身就含中文時才截斷沿用；來源是英文（PubMed 佔多數）的話
+      截出來仍是英文，把它填進「中文摘要」欄位，使用者會以為系統把英文當中文，
+      比空著更難查出真正的原因（沒設 API key）。
+    - 英文：截斷英文原文是合理的降級，因為多數來源本來就是英文。
+
+    這條規則是實際踩過才寫下來的：第一版中文降級直接截斷英文原文，
+    畫面上看起來「摘要有出來」，但完全不是使用者要的東西。
     """
     if lang == "ko":
         return None
     if lang == "zh-TW":
         base = art.get("summary_zh") or art.get("abstract") or ""
+        if not _CJK_RE.search(base):
+            return None
     else:
         base = art.get("abstract") or ""
     base = truncate(base, char_limit)

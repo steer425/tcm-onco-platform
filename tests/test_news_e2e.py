@@ -365,6 +365,18 @@ def main():
     check("韓文在無 API key 時不硬塞中文（回空）",
           r.status_code == 200 and not r.json()["summaries"], r.json()["summaries"])
 
+    # 中文降級的關鍵規則：來源是英文時不要拿英文截斷冒充中文摘要。
+    # 第一版就是這樣寫的，畫面上「摘要有出來」但根本不是中文，反而更難查出是沒設 API key。
+    r = client.post("/news/summaries", json={"article_ids": ids, "lang": "tw"}, headers=U)
+    zh = r.json()["summaries"]
+    check("英文來源在無 API key 時不產生中文摘要（不冒充）", not zh, zh)
+
+    from app.news.short_summary import fallback as _fb
+    check("原文本身是中文時，中文降級仍會截斷沿用",
+          bool(_fb({"abstract": "本研究探討黃連素對肝纖維化的作用。" * 20}, "zh-TW", 120)))
+    check("原文是英文時，中文降級回 None",
+          _fb({"abstract": "OBJECTIVES: To investigate the effects." * 20}, "zh-TW", 120) is None)
+
     arch = client.get("/news/archive?days=30&lang=en", headers=U).json()
     check("/news/archive 也回報摘要語系", arch.get("summary_lang") == "en",
           arch.get("summary_lang"))

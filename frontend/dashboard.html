@@ -79,6 +79,15 @@
   .news-title a:hover { text-decoration:underline; }
   .news-orig { font-size:11.5px; color:#98a29b; margin-top:1px; }
   .news-summary { font-size:13px; line-height:1.7; color:#3b473f; margin-top:5px; }
+  /* 原文／譯文並列。窄螢幕（含手機、以及 Dashboard 卡片被縮窄時）自動改成上下堆疊，
+     不然兩欄各剩三十幾個字元寬，讀起來比不分欄還糟。 */
+  .news-cols { display:grid; grid-template-columns:1fr 1fr; gap:6px 18px; margin-top:6px; }
+  @media (max-width: 900px) { .news-cols { grid-template-columns:1fr; gap:10px; } }
+  .news-col-label { font-size:11px; font-weight:600; color:#8a958f; letter-spacing:.03em;
+                    padding-bottom:2px; border-bottom:1px solid #e8ede9; margin-bottom:4px; }
+  .news-col-body { font-size:13px; line-height:1.7; color:#3b473f; }
+  .news-col-body.is-empty { color:#a8b0aa; font-style:italic; }
+  .news-col-note { font-size:11px; color:#c98a2b; margin-top:4px; }
   .news-caveat { font-size:11.5px; line-height:1.6; color:#8a5a12; background:#fdf7ee; border-left:3px solid #e0b070; padding:5px 9px; border-radius:0 5px 5px 0; margin-top:6px; }
   .news-entities { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
   .news-chip { display:inline-block; font-size:11.5px; padding:2px 9px; border-radius:999px; text-decoration:none; border:1px solid transparent; cursor:pointer; }

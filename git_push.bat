@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.35.0 add multilingual short summaries for news (default 200 chars, admin-configurable length, zh-TW/en/ko, lazily generated and cached)"
+set "DEFAULT_MSG=v1.35.1 show original abstract and translated summary side by side; stop falling back to English text in the Chinese summary column"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

@@ -138,12 +138,49 @@
     } catch (e) { return "tw"; }
   }
 
-  // 摘要顯示優先序：當前語系的簡短摘要 > 收集時產的繁中摘要 > 空（等隨選補上）。
-  // 容器永遠留著（帶 data-summary-for），這樣稍後 fillMissingSummaries() 才有節點可以填。
+  const NEWS_SUMMARY_LABEL = {
+    tw: "中文摘要", cn: "中文摘要", en: "English summary", ko: "한국어 요약",
+  };
+
+  // 原文與譯文並列。
+  //
+  // 為什麼要並列而不是只顯示譯文：這是科研查證用途，讀者需要能立刻對照原文用字，
+  // 尤其是劑量、樣本數、統計顯著性這類「翻譯一旦失準就會誤導」的地方。
+  // 只顯示譯文等於逼使用者每次都得點開原文連結才能確認。
+  //
+  // 右欄沒有內容時，刻意寫明「為什麼沒有」，而不是默默拿英文原文填進去——
+  // 那會讓使用者以為系統把英文當成中文摘要，反而更難查出問題。
   function newsSummaryBlock(it) {
-    const text = it.summary || it.summary_zh || "";
-    const style = text ? "" : ' style="display:none;"';
-    return `<div class="news-summary" data-summary-for="${escNews(it.id)}"${style}>${escNews(text)}</div>`;
+    const lang = newsSiteLang();
+    const label = NEWS_SUMMARY_LABEL[lang] || "摘要";
+    const original = it.abstract || "";
+    // 中文語系下，若收集時產的 summary_zh 真的是中文（有 API key 時才會是），
+    // 就先拿它墊著，不必等隨選摘要補上。用「含不含中日韓文字」判斷，
+    // 是因為沒有 API key 時 summary_zh 其實是英文原文的截斷，拿它當中文摘要會誤導。
+    const zhFallback = (lang === "tw" || lang === "cn") &&
+      it.summary_zh && /[\u4e00-\u9fff]/.test(it.summary_zh) ? it.summary_zh : "";
+    const translated = it.summary || zhFallback;
+    const notAi = it.summary && it.summary_is_ai === false;
+
+    const right = translated
+      ? `<div class="news-col-body">${escNews(translated)}</div>` +
+        (notAi ? `<div class="news-col-note">未經 AI 翻譯，這是直接截斷原文的結果（後台未設定 ANTHROPIC_API_KEY）。</div>` : "")
+      : `<div class="news-col-body is-empty">尚未產生。請確認後台已設定 ANTHROPIC_API_KEY，並於「摘要與模組設定」按重產。</div>`;
+
+    // 沒有原文可對照時（部分公告類來源沒有內文），就不要硬擠出一個空白左欄
+    if (!original) {
+      return `<div class="news-summary" data-summary-for="${escNews(it.id)}">${right}</div>`;
+    }
+    return `<div class="news-cols" data-summary-for="${escNews(it.id)}">
+        <div>
+          <div class="news-col-label">原文摘要</div>
+          <div class="news-col-body">${escNews(original)}</div>
+        </div>
+        <div>
+          <div class="news-col-label">${escNews(label)}</div>
+          ${right}
+        </div>
+      </div>`;
   }
 
   // 畫面先出來，缺的語系摘要之後再補。
@@ -163,12 +200,16 @@
       if (!r || r.enabled === false) return;
       Object.entries(r.summaries || {}).forEach(([id, v]) => {
         if (!v || !v.summary) return;
-        const el = document.querySelector(`[data-summary-for="${CSS.escape(id)}"]`);
-        if (!el) return;
-        el.textContent = v.summary;        // textContent：第三方內容一律不進 innerHTML
-        el.style.display = "";
         const hit = items.find((x) => x.id === id);
-        if (hit) hit.summary = v.summary;  // 存回記憶體，切換篩選重繪時就不必再要一次
+        if (hit) {
+          hit.summary = v.summary;          // 存回記憶體，切換篩選重繪時就不必再要一次
+          hit.summary_is_ai = !!v.is_ai;
+        }
+        const el = document.querySelector(`[data-summary-for="${CSS.escape(id)}"]`);
+        if (!el || !hit) return;
+        // 整塊重繪而不是只改文字：右欄可能要從「尚未產生」的提示切換成正文＋註記，
+        // 結構不同，逐一改文字節點反而更容易漏掉狀態。
+        el.outerHTML = newsSummaryBlock(hit);
       });
     } catch (e) { /* 補不到就算了，原本的繁中摘要仍在 */ }
   }

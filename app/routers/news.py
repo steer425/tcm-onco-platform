@@ -42,6 +42,9 @@ def _to_article(a: models.NewsArticle, src: models.NewsSource,
         "id": a.id,
         "title": a.title,
         "title_zh": a.title_zh,
+        # 原文摘要：前台要「原文 / 譯文並列」，所以一定要帶。截到 1200 字是為了
+        # 控制清單端點的回應大小（一次 10~50 篇），實際閱讀原文請點連結。
+        "abstract": (a.abstract or "")[:1200] or None,
         "summary_zh": a.summary_zh,
         "key_points": loads(a.key_points, []),
         "caveat_zh": a.caveat_zh,
