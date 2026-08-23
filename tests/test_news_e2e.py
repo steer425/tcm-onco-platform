@@ -391,6 +391,23 @@ def main():
                       json={"article_ids": [f"x{i}" for i in range(13)], "lang": "en"},
                       headers=U).status_code == 422)
 
+    r = client.get("/news/admin/summaries/test-key", headers=A)
+    check("未設定金鑰時檢測 → not_set",
+          r.status_code == 200 and r.json()["reason"] == "not_set", r.json())
+    # 用一把假金鑰實際跑一次，確認回應裡不會出現金鑰本身。
+    # 不管對方回 401 還是連不到（沙箱可能沒有對外網路），金鑰都不該被回顯。
+    _SENTINEL = "sk-ant-sentinel-do-not-echo-0123456789"
+    _os.environ["ANTHROPIC_API_KEY"] = _SENTINEL
+    r2 = client.get("/news/admin/summaries/test-key", headers=A)
+    check("錯誤金鑰不會被判定為有效",
+          r2.status_code == 200 and r2.json()["ok"] is False, r2.json().get("reason"))
+    check("檢測結果不會外洩金鑰本身", _SENTINEL not in r2.text, r2.json().get("reason"))
+    _os.environ.pop("ANTHROPIC_API_KEY", None)
+    check("一般使用者不能檢測金鑰 → 403",
+          client.get("/news/admin/summaries/test-key", headers=U).status_code == 403)
+    check("檢測有留稽核",
+          "news_test_api_key" in [x.action for x in db.query(models.AuditLog).all()])
+
     r = client.get("/news/admin/summaries/stats", headers=A)
     stats = r.json()
     check("覆蓋率統計 → 200", r.status_code == 200, r.status_code)

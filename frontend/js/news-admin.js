@@ -524,4 +524,32 @@
       if (btn) { btn.disabled = false; btn.textContent = original; }
     }
   };
+
+  // 「有設環境變數」不等於「金鑰能用」。這顆按鈕會請後端實際送一次最小請求，
+  // 把 401（金鑰錯）、429（額度滿）、連不到 API 這幾種情況分開講清楚，
+  // 而不是讓管理者面對一個「摘要就是出不來」的黑箱。
+  window.newsAdminTestApiKey = async function (btn) {
+    const box = document.getElementById("nSummaryKeyTest");
+    const original = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "檢測中…"; }
+    try {
+      const r = await api("/news/admin/summaries/test-key");
+      if (box) {
+        box.style.display = "";
+        box.style.borderLeftColor = r.ok ? "#2f6f4f" : "#b4463c";
+        box.style.background = r.ok ? "#f2f8f4" : "#fdf1f0";
+        box.textContent = (r.ok ? "✅ " : "❌ ") + r.message;
+      }
+      if (r.ok) loadNewsSummarySettings();
+    } catch (err) {
+      if (box) {
+        box.style.display = "";
+        box.style.borderLeftColor = "#b4463c";
+        box.style.background = "#fdf1f0";
+        box.textContent = "❌ 檢測失敗：" + err.message;
+      }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = original; }
+    }
+  };
 })();

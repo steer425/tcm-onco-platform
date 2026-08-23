@@ -502,3 +502,19 @@ def summary_stats(current_user: models.User = Depends(require_admin),
     return {"total_articles": total, "char_limit": char_limit,
             "summary_enabled": bool(cfg.get("summary_enabled", True)),
             "has_api_key": bool(os.environ.get("ANTHROPIC_API_KEY")), "by_lang": out}
+
+
+@router.get("/summaries/test-key", summary="（後台）實際打一次 API，檢測 ANTHROPIC_API_KEY 是否可用")
+def test_summary_api_key(current_user: models.User = Depends(require_admin),
+                         db: Session = Depends(get_db)):
+    """只檢查環境變數存不存在是不夠的——金鑰打錯／過期／額度用盡時變數一樣在，
+    但每次生成都會失敗然後靜靜退回降級，症狀跟「沒設」完全一樣。
+    這支會實際送一個 max_tokens=1 的最小請求，把對方真正的回應講清楚。
+
+    回應不包含金鑰本身，只有狀態與截短後的錯誤訊息。
+    """
+    result = short_summary.check_api_key()
+    write_audit_log(db, current_user, "news_test_api_key", target_type="news_setting",
+                    detail=dumps({"ok": result["ok"], "reason": result["reason"]}))
+    db.commit()
+    return result

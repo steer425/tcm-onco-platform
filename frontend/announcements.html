@@ -164,6 +164,10 @@
         簡體中文沿用繁體那一份（前端自動做繁簡字形轉換），因此只有繁中／英文／韓文需要各自生成。
       </p>
 
+      <div id="nSummaryKeyTest"
+           style="display:none; margin-bottom:14px; padding:10px 12px; border-left:3px solid #2f6f4f;
+                  background:#f2f8f4; font-size:12.5px; line-height:1.7;"></div>
+
       <div id="nSummaryKeyWarn"
            style="display:none; margin-bottom:14px; padding:10px 12px; border-left:3px solid #c98a2b;
                   background:#fdf6e9; font-size:12.5px; line-height:1.7;"></div>
@@ -178,6 +182,7 @@
                  style="width:90px;">
         </label>
         <button onclick="newsAdminSaveSummarySettings()">儲存設定</button>
+        <button onclick="newsAdminTestApiKey(this)">檢測 API 金鑰</button>
         <span style="font-size:11.5px; color:#8a958f;">
           預設 200 字，可設 60–600。改完字數不會自動重產既有摘要，要按下方的「重產」。
         </span>

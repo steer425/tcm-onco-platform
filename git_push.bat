@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.35.1 show original abstract and translated summary side by side; stop falling back to English text in the Chinese summary column"
+set "DEFAULT_MSG=v1.35.2 add an admin button that really calls the Anthropic API to verify ANTHROPIC_API_KEY, instead of only checking the env var exists"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

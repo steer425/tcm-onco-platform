@@ -240,3 +240,54 @@ def generate(arts: list[dict], lang: str, char_limit: int = DEFAULT_CHAR_LIMIT, 
         logger.error("簡短摘要整體失敗（%s），全部降級：%s", lang, exc)
         return [{"summary": fallback(a, lang, char_limit), "is_ai": False, "model": None}
                 for a in arts]
+
+
+def check_api_key(api_key: str | None = None) -> dict:
+    """實際打一次 Anthropic API，確認金鑰真的能用。
+
+    為什麼需要這個：只檢查環境變數存不存在（`os.environ.get`）沒有意義——
+    金鑰打錯、過期、額度用盡時變數一樣存在，但每次生成都會失敗然後靜靜退回降級，
+    畫面上的症狀跟「沒設」一模一樣，管理者無從分辨。
+
+    刻意用 max_tokens=1 的最小請求：只要能通過驗證就夠了，不需要真的產出內容。
+    回傳絕不包含金鑰本身，只有狀態與對方的錯誤訊息（截短）。
+    """
+    api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return {"ok": False, "reason": "not_set",
+                "message": "後端未設定 ANTHROPIC_API_KEY 環境變數。"}
+
+    try:
+        resp = httpx.post(
+            API_URL,
+            headers={"content-type": "application/json", "x-api-key": api_key,
+                     "anthropic-version": "2023-06-01"},
+            json={"model": MODEL, "max_tokens": 1,
+                  "messages": [{"role": "user", "content": "hi"}]},
+            timeout=30.0,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error("API 金鑰檢測連線失敗：%s", exc)
+        return {"ok": False, "reason": "network", "model": MODEL,
+                "message": f"連不到 Anthropic API：{str(exc)[:200]}"}
+
+    if resp.status_code == 200:
+        return {"ok": True, "reason": "ok", "model": MODEL,
+                "message": f"金鑰有效，模型 {MODEL} 可正常呼叫。"}
+
+    detail = ""
+    try:
+        detail = str(resp.json().get("error", {}).get("message", ""))[:300]
+    except Exception:  # noqa: BLE001
+        detail = resp.text[:300]
+
+    reason = {401: "invalid", 403: "forbidden", 404: "model_not_found",
+              429: "rate_limited"}.get(resp.status_code, "http_error")
+    hint = {
+        "invalid": "金鑰不正確或已撤銷，請到 console.anthropic.com 重新產生後更新 Render 環境變數。",
+        "forbidden": "金鑰有效但沒有這個模型的權限。",
+        "model_not_found": f"找不到模型 {MODEL}，可用 NEWS_SUMMARY_MODEL 環境變數指定其他模型。",
+        "rate_limited": "額度或速率上限已達，稍後再試。",
+    }.get(reason, "")
+    return {"ok": False, "reason": reason, "model": MODEL,
+            "message": f"HTTP {resp.status_code}：{hint} {detail}".strip()}
