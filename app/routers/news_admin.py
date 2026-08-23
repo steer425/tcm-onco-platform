@@ -19,8 +19,10 @@ from sqlalchemy.orm import Session
 from app import models
 from app.database import get_db
 from app.deps import get_current_user, require_admin, write_audit_log
+from app.news import short_summary
 from app.news.service import (
-    dumps, get_settings, loads, run_daily_collection, set_setting, sync_sources,
+    backfill_summaries, dumps, get_settings, loads, run_daily_collection, set_setting,
+    sync_sources,
 )
 from app.routers.news import _to_article
 
@@ -423,6 +425,11 @@ class SettingsIn(BaseModel):
     auto_archive_days: Optional[int] = Field(default=None, ge=7, le=3650)
     link_ingredients: Optional[bool] = None
     disclaimer_zh: Optional[str] = Field(default=None, min_length=1, max_length=2000)
+    summary_enabled: Optional[bool] = None
+    # 上下限與 short_summary 模組一致：太短寫不出證據層級，太長就失去「快速掃讀」的意義
+    summary_length: Optional[int] = Field(default=None,
+                                          ge=short_summary.MIN_CHAR_LIMIT,
+                                          le=short_summary.MAX_CHAR_LIMIT)
 
 
 @router.put("/settings", summary="（後台）更新新聞模組設定")
@@ -438,3 +445,60 @@ def update_settings(payload: SettingsIn,
     write_audit_log(db, current_user, "news_update_settings", target_type="news_setting",
                     detail=dumps(changed))
     return {"ok": True, "updated": changed}
+
+
+class BackfillIn(BaseModel):
+    lang: str = Field(description="摘要語系：zh-TW / en / ko")
+    days: int = Field(default=30, ge=1, le=365, description="回補幾天內收集的文章")
+    limit: int = Field(default=30, ge=1, le=100, description="這一批最多處理幾篇")
+    include_stale: bool = Field(
+        default=False,
+        description="連「字數上限已經改過、內容還是舊長度」的摘要也一起重產")
+
+
+@router.post("/summaries/backfill", summary="（後台）回補指定語系的簡短摘要")
+def backfill_summary(payload: BackfillIn,
+                     current_user: models.User = Depends(require_admin),
+                     db: Session = Depends(get_db)):
+    """把還沒有該語系摘要的舊文章補上。
+
+    刻意做成「按一次補一批、回傳還剩幾篇」而不是一次全補完：
+    回補會實際打 AI API，一次上千篇既會讓請求逾時，費用也不受管理者控制。
+    """
+    try:
+        result = backfill_summaries(db, payload.lang, days=payload.days,
+                                    limit=payload.limit,
+                                    include_stale=payload.include_stale)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    write_audit_log(db, current_user, "news_backfill_summary", target_type="news_summary",
+                    detail=dumps({"lang": payload.lang, "days": payload.days,
+                                  "limit": payload.limit,
+                                  "include_stale": payload.include_stale,
+                                  "written": result["written"]}))
+    db.commit()
+    return result
+
+
+@router.get("/summaries/stats", summary="（後台）各語系摘要覆蓋率")
+def summary_stats(current_user: models.User = Depends(require_admin),
+                  db: Session = Depends(get_db)):
+    """讓管理者知道「哪個語系補到什麼程度」，才有辦法決定要不要再按一次回補。"""
+    total = (db.query(models.NewsArticle)
+             .filter(models.NewsArticle.is_deleted.is_(False)).count())
+    cfg = get_settings(db)
+    char_limit = int(cfg.get("summary_length", short_summary.DEFAULT_CHAR_LIMIT))
+
+    out = []
+    for lang in short_summary.SUMMARY_LANGS:
+        rows = db.query(models.NewsArticleSummary).filter(
+            models.NewsArticleSummary.lang == lang)
+        have = rows.count()
+        stale = rows.filter(models.NewsArticleSummary.char_limit != char_limit).count()
+        ai = rows.filter(models.NewsArticleSummary.is_ai.is_(True)).count()
+        out.append({"lang": lang, "have": have, "missing": max(0, total - have),
+                    "stale": stale, "ai_generated": ai})
+    return {"total_articles": total, "char_limit": char_limit,
+            "summary_enabled": bool(cfg.get("summary_enabled", True)),
+            "has_api_key": bool(os.environ.get("ANTHROPIC_API_KEY")), "by_lang": out}

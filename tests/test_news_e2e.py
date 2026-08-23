@@ -319,6 +319,117 @@ def main():
               for x in client.get("/news/admin/runs", headers=A).json()))
     _os.environ.pop("NEWS_COLLECT_SECRET", None)
 
+    # ------------------------------------------------------------------
+    print("\n【多語系簡短摘要】")
+    # 這一段刻意在「沒有 ANTHROPIC_API_KEY」的狀態下跑，驗證的是降級路徑：
+    # 正式環境有 key 時走 AI，沒 key 時要能安全退回截斷，而且不能假裝有韓文摘要。
+    _os.environ.pop("ANTHROPIC_API_KEY", None)
+
+    r = client.put("/news/admin/settings", json={"summary_length": 120}, headers=A)
+    check("設定摘要字數 120 → 200", r.status_code == 200, r.status_code)
+    check("摘要字數上限太小被擋 → 422",
+          client.put("/news/admin/settings", json={"summary_length": 10},
+                     headers=A).status_code == 422)
+    check("摘要字數上限太大被擋 → 422",
+          client.put("/news/admin/settings", json={"summary_length": 5000},
+                     headers=A).status_code == 422)
+
+    daily = client.get("/news/daily?lang=en", headers=U).json()
+    check("/news/daily 回報使用的摘要語系", daily.get("summary_lang") == "en",
+          daily.get("summary_lang"))
+    check("cn 對應到繁中那一列（OpenCC 在前端轉簡體）",
+          client.get("/news/daily?lang=cn", headers=U).json().get("summary_lang") == "zh-TW")
+    check("語系參數打錯不會讓每日新聞失敗",
+          client.get("/news/daily?lang=xx", headers=U).status_code == 200)
+
+    # 文章 id 從後台查詢取，不從當日精選取——前面的軟刪除與排程重跑會讓當日精選變動，
+    # 讓摘要測試相依於那個結果只會製造難查的偶發失敗。
+    pool = client.post("/news/admin/articles/search",
+                       json={"include_deleted": False, "limit": 3}, headers=A).json()["items"]
+    ids = [a["id"] for a in pool][:3]
+    check("取得可測試的文章", len(ids) >= 1, len(ids))
+    check("尚未產生時 summary 為 None",
+          all(i.get("summary") is None for i in daily["items"]),
+          [i.get("summary") for i in daily["items"]][:2])
+    r = client.post("/news/summaries", json={"article_ids": ids, "lang": "en"}, headers=U)
+    check("產生英文摘要 → 200", r.status_code == 200, r.status_code)
+    en = r.json()["summaries"]
+    check("英文摘要有產出", len(en) >= 1, len(en))
+    check("無 API key 時標記為非 AI 產生",
+          all(v["is_ai"] is False for v in en.values()))
+    check("摘要長度不超過設定上限",
+          all(len(v["summary"]) <= 120 for v in en.values() if v["summary"]),
+          max((len(v["summary"]) for v in en.values() if v["summary"]), default=0))
+
+    r = client.post("/news/summaries", json={"article_ids": ids, "lang": "ko"}, headers=U)
+    check("韓文在無 API key 時不硬塞中文（回空）",
+          r.status_code == 200 and not r.json()["summaries"], r.json()["summaries"])
+
+    arch = client.get("/news/archive?days=30&lang=en", headers=U).json()
+    check("/news/archive 也回報摘要語系", arch.get("summary_lang") == "en",
+          arch.get("summary_lang"))
+    check("已產生的摘要會出現在列表端點",
+          any(i.get("summary") for i in arch["items"] if i["id"] in ids))
+
+    check("不支援的語系 → 400",
+          client.post("/news/summaries", json={"article_ids": ids, "lang": "fr"},
+                      headers=U).status_code == 400)
+    check("一次最多 12 篇",
+          client.post("/news/summaries",
+                      json={"article_ids": [f"x{i}" for i in range(13)], "lang": "en"},
+                      headers=U).status_code == 422)
+
+    r = client.get("/news/admin/summaries/stats", headers=A)
+    stats = r.json()
+    check("覆蓋率統計 → 200", r.status_code == 200, r.status_code)
+    check("統計含三個語系", len(stats["by_lang"]) == 3, len(stats["by_lang"]))
+    check("統計回報目前沒有 API key", stats["has_api_key"] is False)
+    en_stat = next(x for x in stats["by_lang"] if x["lang"] == "en")
+    check("英文已有摘要筆數正確", en_stat["have"] == len(en), en_stat["have"])
+
+    check("一般使用者不能回補摘要 → 403",
+          client.post("/news/admin/summaries/backfill", json={"lang": "en"},
+                      headers=U).status_code == 403)
+    r = client.post("/news/admin/summaries/backfill",
+                    json={"lang": "en", "days": 30, "limit": 50}, headers=A)
+    check("管理者回補摘要 → 200", r.status_code == 200, r.status_code)
+    check("全部都有摘要時回補不重複產生（也不重複計費）",
+          r.json()["processed"] == 0 and r.json()["remaining"] == 0, r.json())
+    check("回補語系打錯 → 400",
+          client.post("/news/admin/summaries/backfill", json={"lang": "fr"},
+                      headers=A).status_code == 400)
+    check("回補有留稽核",
+          "news_backfill_summary" in [x.action for x in
+                                      db.query(models.AuditLog).all()])
+
+    # 改字數上限不會自動重產（那會讓管理者一改設定就觸發大量 API 呼叫），
+    # 但要標成 stale，並且能用 include_stale 明確地重產。
+    client.put("/news/admin/settings", json={"summary_length": 200}, headers=A)
+    stale_before = next(x for x in
+                        client.get("/news/admin/summaries/stats", headers=A).json()["by_lang"]
+                        if x["lang"] == "en")["stale"]
+    check("改字數上限後舊摘要被標記為 stale", stale_before >= 1, stale_before)
+    check("改設定不會自動重產",
+          client.post("/news/admin/summaries/backfill",
+                      json={"lang": "en", "limit": 50}, headers=A).json()["processed"] == 0)
+
+    r = client.post("/news/admin/summaries/backfill",
+                    json={"lang": "en", "limit": 50, "include_stale": True}, headers=A)
+    check("include_stale 會重產舊長度的摘要", r.json()["written"] == stale_before, r.json())
+    check("重產後不再有 stale",
+          next(x for x in client.get("/news/admin/summaries/stats", headers=A).json()["by_lang"]
+               if x["lang"] == "en")["stale"] == 0)
+    check("重產後總筆數不變（是更新不是新增）",
+          next(x for x in client.get("/news/admin/summaries/stats", headers=A).json()["by_lang"]
+               if x["lang"] == "en")["have"] == en_stat["have"])
+
+    check("關閉摘要功能後不再產生",
+          client.put("/news/admin/settings", json={"summary_enabled": False},
+                     headers=A).status_code == 200
+          and client.post("/news/summaries", json={"article_ids": ids, "lang": "ko"},
+                          headers=U).json()["enabled"] is False)
+    client.put("/news/admin/settings", json={"summary_enabled": True}, headers=A)
+
     db.close()
     print("\n" + "=" * 60)
     if FAIL:

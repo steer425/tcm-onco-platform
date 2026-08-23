@@ -892,3 +892,35 @@ class NewsSetting(Base):
     description = Column(String, nullable=True)
     updated_by = Column(String, ForeignKey("users.id"), nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class NewsArticleSummary(Base):
+    """每篇新聞的多語系「簡短摘要」（預設 200 字，長度可由 news_settings 調整）。
+
+    刻意獨立成一張表，而不是在 news_articles 直接加 summary_en／summary_ko 欄位：
+
+    1. 語系是會長大的。之後要加日文只是多寫入一列，不用 ALTER TABLE，
+       也不會讓 news_articles 每加一個語系就寬一截。
+    2. 多數文章只會被少數語系讀到。獨立成表才有辦法「有人真的用那個語系看，
+       才產生那個語系的摘要」，不必每篇都先付 N 個語系的 API 費用。
+    3. 摘要有自己的生命週期（字數上限改了要重產、模型換了要重產），
+       把 char_limit／model 記在同一列，之後才判斷得出哪些需要重新產生。
+
+    `lang` 只存「真的需要各自生成」的語系：'zh-TW'／'en'／'ko'。
+    簡體中文刻意不存——前端全站語系機制已經用 OpenCC 做繁→簡字形轉換
+    （見 frontend/js/site-lang.js），簡中直接沿用繁中這一列即可，
+    再花一次 API 費用產簡體是重複投資。
+    """
+    __tablename__ = "news_article_summaries"
+    __table_args__ = (
+        UniqueConstraint("article_id", "lang", name="uq_news_summary_article_lang"),
+    )
+
+    id = Column(String, primary_key=True, default=gen_id)
+    article_id = Column(String, ForeignKey("news_articles.id"), nullable=False, index=True)
+    lang = Column(String, nullable=False, index=True)     # 'zh-TW' / 'en' / 'ko'
+    summary = Column(Text, nullable=False)
+    char_limit = Column(Integer, nullable=False)          # 產生當下的字數上限，供日後判斷要不要重產
+    is_ai = Column(Boolean, nullable=False, default=False)  # False = 降級的規則式截斷
+    model = Column(String, nullable=True)
+    generated_at = Column(DateTime, default=datetime.utcnow)

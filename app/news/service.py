@@ -22,6 +22,7 @@ from .collectors.base import RawItem
 from .entity_linker import EntityIndex, article_text, build_index
 from .scoring import classify, rank_score, relevance, select_daily
 from .sources import SOURCES, SOURCE_BY_SLUG
+from . import short_summary
 from .summarizer import summarize
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,9 @@ DEFAULT_SETTINGS = {
     "max_per_source_per_day": 4,
     "auto_archive_days": 90,
     "link_ingredients": True,
+    # 簡短摘要（news_article_summaries）：預設 200 字，管理者可在後台調整。
+    "summary_enabled": True,
+    "summary_length": short_summary.DEFAULT_CHAR_LIMIT,
     "disclaimer_zh": (
         "本區內容為研究情報彙整，僅供科研查證與安全監測參考，不構成醫療診斷或治療建議。"
         "任何中藥使用須由合格醫療專業人員評估肝腎功能、凝血狀態及現行化療／標靶／免疫治療之交互作用。"
@@ -453,3 +457,142 @@ def _update_source_health(db: Session, slug_to_id: dict[str, str], stats: dict) 
             row.last_error = None
             row.consecutive_failures = 0
     db.flush()
+
+
+# ---------------------------------------------------------------------------
+# 多語系簡短摘要（news_article_summaries）
+#
+# 產生策略刻意是「隨選 + 快取」而不是「收集時把所有語系一次做完」：
+# 每天 10 篇 × 4 個語系 = 40 次生成，但實際上絕大多數使用者只看一種語系，
+# 其餘語系的費用等於丟進水裡。改成「有人真的用那個語系開這一頁，才產生並存起來」，
+# 冷門語系完全不花錢，而熱門語系只在第一次被看到時付一次。
+# ---------------------------------------------------------------------------
+def _summary_char_limit(db: Session) -> int:
+    cfg = get_settings(db)
+    raw = cfg.get("summary_length", short_summary.DEFAULT_CHAR_LIMIT)
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        value = short_summary.DEFAULT_CHAR_LIMIT
+    return max(short_summary.MIN_CHAR_LIMIT, min(short_summary.MAX_CHAR_LIMIT, value))
+
+
+def _article_payload(db: Session, article: models.NewsArticle) -> dict:
+    src = db.query(models.NewsSource).filter(
+        models.NewsSource.id == article.source_id).first()
+    return {
+        "title": article.title,
+        "abstract": article.abstract,
+        "summary_zh": article.summary_zh,
+        "journal": article.journal,
+        "study_design": article.study_design,
+        "source_name": src.name_zh if src else None,
+        "evidence_maturity": (article.evidence_maturity.value
+                              if article.evidence_maturity else "unknown"),
+        "is_safety_signal": bool(article.is_safety_signal),
+    }
+
+
+def get_summaries(db: Session, article_ids: list[str], lang: str, *,
+                  generate_missing: bool = False, max_generate: int = 12) -> dict[str, dict]:
+    """取得指定語系的簡短摘要。回傳 {article_id: {summary, is_ai, stale}}。
+
+    `generate_missing=False`（預設）只讀快取，讓 /news/daily 這種每次載入都會打的端點
+    保持「不會因為要產摘要而變慢」；真正的生成走專門的批次端點。
+
+    字數上限改過之後，舊摘要不會自動重產（那會在管理者一改設定就引發大量 API 呼叫），
+    但會標成 stale=True，讓後台知道哪些可以回補。
+    """
+    if not article_ids or lang not in short_summary.SUMMARY_LANGS:
+        return {}
+    limit = _summary_char_limit(db)
+    rows = (db.query(models.NewsArticleSummary)
+            .filter(models.NewsArticleSummary.article_id.in_(article_ids),
+                    models.NewsArticleSummary.lang == lang)
+            .all())
+    out = {r.article_id: {"summary": r.summary, "is_ai": bool(r.is_ai),
+                          "stale": r.char_limit != limit} for r in rows}
+
+    if not generate_missing:
+        return out
+
+    missing = [aid for aid in article_ids if aid not in out][:max_generate]
+    if not missing:
+        return out
+
+    articles = (db.query(models.NewsArticle)
+                .filter(models.NewsArticle.id.in_(missing)).all())
+    if not articles:
+        return out
+
+    payloads = [_article_payload(db, a) for a in articles]
+    generated = short_summary.generate(payloads, lang, limit)
+
+    for article, result in zip(articles, generated):
+        text = result.get("summary")
+        if not text:
+            continue          # 例如韓文又沒有 API key：不寫入空列，留待日後補產
+        db.add(models.NewsArticleSummary(
+            article_id=article.id, lang=lang, summary=text, char_limit=limit,
+            is_ai=bool(result.get("is_ai")), model=result.get("model"),
+        ))
+        out[article.id] = {"summary": text, "is_ai": bool(result.get("is_ai")),
+                           "stale": False}
+    db.commit()
+    return out
+
+
+def backfill_summaries(db: Session, lang: str, *, days: int = 30, limit: int = 30,
+                       include_stale: bool = False) -> dict:
+    """後台「回補摘要」：把還沒有該語系摘要的舊文章補上。
+
+    有 limit 上限是刻意的——一次回補上千篇會讓請求逾時、費用也不受控。
+    管理者按幾次就補幾批，回傳值會告訴他還剩幾篇。
+    """
+    if lang not in short_summary.SUMMARY_LANGS:
+        raise ValueError(f"不支援的摘要語系：{lang}")
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    char_limit = _summary_char_limit(db)
+
+    have = db.query(models.NewsArticleSummary.article_id).filter(
+        models.NewsArticleSummary.lang == lang)
+    if include_stale:
+        have = have.filter(models.NewsArticleSummary.char_limit == char_limit)
+
+    todo_q = (db.query(models.NewsArticle)
+              .filter(models.NewsArticle.is_deleted.is_(False),
+                      models.NewsArticle.collected_at >= cutoff,
+                      ~models.NewsArticle.id.in_(have))
+              .order_by(models.NewsArticle.collected_at.desc()))
+    remaining = todo_q.count()
+    articles = todo_q.limit(limit).all()
+    if not articles:
+        return {"lang": lang, "processed": 0, "written": 0, "remaining": 0,
+                "char_limit": char_limit}
+
+    payloads = [_article_payload(db, a) for a in articles]
+    generated = short_summary.generate(payloads, lang, char_limit)
+
+    written = 0
+    for article, result in zip(articles, generated):
+        text = result.get("summary")
+        if not text:
+            continue
+        existing = (db.query(models.NewsArticleSummary)
+                    .filter(models.NewsArticleSummary.article_id == article.id,
+                            models.NewsArticleSummary.lang == lang).first())
+        if existing:                      # include_stale 的重產路徑
+            existing.summary = text
+            existing.char_limit = char_limit
+            existing.is_ai = bool(result.get("is_ai"))
+            existing.model = result.get("model")
+            existing.generated_at = datetime.utcnow()
+        else:
+            db.add(models.NewsArticleSummary(
+                article_id=article.id, lang=lang, summary=text, char_limit=char_limit,
+                is_ai=bool(result.get("is_ai")), model=result.get("model"),
+            ))
+        written += 1
+    db.commit()
+    return {"lang": lang, "processed": len(articles), "written": written,
+            "remaining": max(0, remaining - written), "char_limit": char_limit}

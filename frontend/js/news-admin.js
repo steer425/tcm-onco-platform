@@ -48,13 +48,14 @@
         tabs.forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
         const key = btn.dataset.tab;
-        ["ann", "news", "newsSources", "newsRuns"].forEach((k) => {
+        ["ann", "news", "newsSources", "newsRuns", "newsSettings"].forEach((k) => {
           const panel = document.getElementById("tab-" + k);
           if (panel) panel.style.display = (k === key) ? "" : "none";
         });
         if (key === "news" && !nRows.length) newsAdminSearch(1);
         if (key === "newsSources" && !sourcesLoaded) loadNewsSources();
         if (key === "newsRuns" && !runsLoaded) loadNewsRuns();
+        if (key === "newsSettings") loadNewsSummarySettings();
       });
     });
   }
@@ -423,4 +424,104 @@
   } else {
     initTabs();
   }
+
+  // ===========================================================================
+  // 摘要與模組設定分頁
+  //
+  // 這一頁刻意「不自動做任何會花錢的事」：載入時只讀設定與覆蓋率統計，
+  // 真正會呼叫 AI 的回補／重產一律要管理者按下按鈕，而且一次一批。
+  // ===========================================================================
+    const NEWS_LANG_LABEL = { "zh-TW": "繁體中文", en: "English", ko: "한국어" };
+
+  async function loadNewsSummarySettings() {
+    const tbody = document.getElementById("nSummaryStatsBody");
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="6" style="color:#8a958f;">載入中…</td></tr>`;
+    try {
+      const [cfg, stats] = await Promise.all([
+        api("/news/admin/settings"),
+        api("/news/admin/summaries/stats"),
+      ]);
+
+      const enabled = document.getElementById("nSummaryEnabled");
+      const length = document.getElementById("nSummaryLength");
+      if (enabled) enabled.checked = cfg.summary_enabled !== false;
+      if (length) length.value = cfg.summary_length ?? 200;
+
+      // 沒有 API key 時要講清楚會發生什麼，不然管理者只會看到「摘要怪怪的」卻不知道原因
+      const warn = document.getElementById("nSummaryKeyWarn");
+      if (warn) {
+        if (stats.has_api_key) {
+          warn.style.display = "none";
+        } else {
+          warn.style.display = "";
+          warn.innerHTML =
+            "<strong>目前未設定 <code>ANTHROPIC_API_KEY</code></strong>（Render 環境變數）。" +
+            "此時摘要會降級為「直接截斷原文」：繁體中文與英文仍會有內容，" +
+            "<strong>但韓文不會產生</strong>——沒有翻譯能力時硬塞中文並標成韓文摘要，" +
+            "比留白更容易讓人誤判。設定 API key 後再按「重產」即可換成 AI 摘要。";
+        }
+      }
+
+      tbody.innerHTML = (stats.by_lang || []).map((row) => {
+        const lang = escNewsAdmin(row.lang);
+        const label = escNewsAdmin(NEWS_LANG_LABEL[row.lang] || row.lang);
+        return `<tr>
+          <td>${label}<div style="font-size:11px; color:#8a958f;">${lang}</div></td>
+          <td>${row.have}</td>
+          <td>${row.missing > 0 ? `<strong>${row.missing}</strong>` : 0}</td>
+          <td>${row.stale > 0 ? `<strong>${row.stale}</strong>` : 0}</td>
+          <td>${row.ai_generated}</td>
+          <td>
+            <button onclick="newsAdminBackfill('${lang}', false, this)"
+                    ${row.missing ? "" : "disabled"}>回補 ${row.missing || 0} 篇</button>
+            <button onclick="newsAdminBackfill('${lang}', true, this)"
+                    ${row.stale ? "" : "disabled"}>重產 ${row.stale || 0} 篇</button>
+          </td>
+        </tr>`;
+      }).join("") || `<tr><td colspan="6" style="color:#8a958f;">尚無資料。</td></tr>`;
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" style="color:#b4463c;">載入失敗：${escNewsAdmin(err.message)}</td></tr>`;
+    }
+  }
+
+  window.newsAdminSaveSummarySettings = async function () {
+    const enabled = document.getElementById("nSummaryEnabled");
+    const length = document.getElementById("nSummaryLength");
+    const value = parseInt(length?.value, 10);
+    if (!Number.isFinite(value) || value < 60 || value > 600) {
+      alert("摘要字數上限請填 60–600 之間的整數。");
+      return;
+    }
+    try {
+      await api("/news/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify({ summary_enabled: !!enabled?.checked, summary_length: value }),
+      });
+      alert("已儲存。既有摘要不會自動重產，需要的話請按對應語系的「重產」。");
+      loadNewsSummarySettings();
+    } catch (err) {
+      alert("儲存失敗：" + err.message);
+    }
+  };
+
+  window.newsAdminBackfill = async function (lang, includeStale, btn) {
+    const label = NEWS_LANG_LABEL[lang] || lang;
+    const verb = includeStale ? "重產" : "回補";
+    if (!confirm(`${verb} ${label} 摘要？\n\n一次最多處理 50 篇，會實際呼叫 AI API。`)) return;
+    const original = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "處理中…"; }
+    try {
+      const r = await api("/news/admin/summaries/backfill", {
+        method: "POST",
+        body: JSON.stringify({ lang, days: 365, limit: 50, include_stale: !!includeStale }),
+      });
+      alert(`${verb}完成：處理 ${r.processed} 篇、寫入 ${r.written} 篇，還剩 ${r.remaining} 篇。`
+            + (r.remaining ? "\n\n再按一次可以繼續處理下一批。" : ""));
+      loadNewsSummarySettings();
+    } catch (err) {
+      alert(`${verb}失敗：` + err.message);
+      if (btn) { btn.disabled = false; btn.textContent = original; }
+    }
+  };
 })();

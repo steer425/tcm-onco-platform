@@ -115,7 +115,7 @@
             <a href="${escNews(it.url)}" target="_blank" rel="noopener">${escNews(it.title_zh || it.title)}</a>
           </div>
           ${it.title_zh ? `<div class="news-orig">${escNews(it.title)}</div>` : ""}
-          ${it.summary_zh ? `<div class="news-summary">${escNews(it.summary_zh)}</div>` : ""}
+          ${newsSummaryBlock(it)}
           ${it.caveat_zh ? `<div class="news-caveat">解讀注意：${escNews(it.caveat_zh)}</div>` : ""}
           ${entities ? `<div class="news-entities">${entities}</div>` : ""}
           <div class="news-meta">${meta}</div>
@@ -128,6 +128,49 @@
     if (newsFilter === "human") return items.filter((i) => (i.tags || []).includes("human_evidence"));
     if (newsFilter === "kept") return items.filter((i) => i.is_bookmarked);
     return items;
+  }
+
+  // 目前的全站語系（tw/cn/en/ko）。site-lang.js 還沒初始化完就先當繁中，
+  // 摘要只是輔助資訊，不值得為了它把整張卡片的載入卡住。
+  function newsSiteLang() {
+    try {
+      return (window.getCurrentSiteLanguage && window.getCurrentSiteLanguage()) || "tw";
+    } catch (e) { return "tw"; }
+  }
+
+  // 摘要顯示優先序：當前語系的簡短摘要 > 收集時產的繁中摘要 > 空（等隨選補上）。
+  // 容器永遠留著（帶 data-summary-for），這樣稍後 fillMissingSummaries() 才有節點可以填。
+  function newsSummaryBlock(it) {
+    const text = it.summary || it.summary_zh || "";
+    const style = text ? "" : ' style="display:none;"';
+    return `<div class="news-summary" data-summary-for="${escNews(it.id)}"${style}>${escNews(text)}</div>`;
+  }
+
+  // 畫面先出來，缺的語系摘要之後再補。
+  //
+  // 為什麼不在 /news/daily 裡順便產：那支端點每次開 Dashboard 都會打到，
+  // 若順手產摘要，第一個開頁的人就要等 N 次 AI 呼叫才看得到新聞。
+  // 這裡改成非同步補件，補不到就維持原本的繁中摘要，不影響閱讀。
+  async function fillMissingSummaries(items) {
+    const lang = newsSiteLang();
+    const need = items.filter((i) => !i.summary).map((i) => i.id).slice(0, 12);
+    if (!need.length) return;
+    try {
+      const r = await api("/news/summaries", {
+        method: "POST",
+        body: JSON.stringify({ article_ids: need, lang }),
+      });
+      if (!r || r.enabled === false) return;
+      Object.entries(r.summaries || {}).forEach(([id, v]) => {
+        if (!v || !v.summary) return;
+        const el = document.querySelector(`[data-summary-for="${CSS.escape(id)}"]`);
+        if (!el) return;
+        el.textContent = v.summary;        // textContent：第三方內容一律不進 innerHTML
+        el.style.display = "";
+        const hit = items.find((x) => x.id === id);
+        if (hit) hit.summary = v.summary;  // 存回記憶體，切換篩選重繪時就不必再要一次
+      });
+    } catch (e) { /* 補不到就算了，原本的繁中摘要仍在 */ }
   }
 
   function renderNews() {
@@ -145,6 +188,7 @@
       return;
     }
     body.innerHTML = items.map(renderNewsItem).join("");
+    fillMissingSummaries(items);
   }
 
   function renderNewsHeader() {
@@ -170,7 +214,9 @@
     if (!body) return;
     body.innerHTML = "載入中...";
     try {
-      newsData = await api("/news/daily" + (date ? `?date=${encodeURIComponent(date)}` : ""));
+      const qs = new URLSearchParams({ lang: newsSiteLang() });
+      if (date) qs.set("date", date);
+      newsData = await api("/news/daily?" + qs.toString());
       renderNewsHeader();
       renderNews();
     } catch (err) {
@@ -187,7 +233,7 @@
     const days = parseInt(document.getElementById("newsArchiveDays")?.value, 10) || 30;
     const safetyOnly = document.getElementById("newsArchiveSafety")?.checked || false;
     const q = document.getElementById("newsArchiveQ")?.value.trim() || "";
-    const params = new URLSearchParams({ days: String(days), limit: "50" });
+    const params = new URLSearchParams({ days: String(days), limit: "50", lang: newsSiteLang() });
     if (safetyOnly) params.set("safety_only", "true");
     if (q) params.set("q", q);
     try {

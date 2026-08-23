@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.34.0 add daily news module: 10 authoritative sources, entity links back to herb/disease/target, embargo access control (F0-20), read-only cache support"
+set "DEFAULT_MSG=v1.35.0 add multilingual short summaries for news (default 200 chars, admin-configurable length, zh-TW/en/ko, lazily generated and cached)"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

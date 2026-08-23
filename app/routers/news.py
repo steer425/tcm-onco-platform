@@ -16,7 +16,8 @@ from sqlalchemy.orm import Session
 from app import models
 from app.database import get_db, get_query_db
 from app.deps import get_current_user, has_permission
-from app.news.service import get_settings, loads, taipei_today
+from app.news import short_summary
+from app.news.service import get_settings, get_summaries, loads, taipei_today
 
 router = APIRouter(prefix="/news", tags=["每日重點新聞"])
 
@@ -127,12 +128,44 @@ def _load_related(query_db: Session, db: Session, article_ids: list[str], user_i
     return ents, counts, mine
 
 
+def _summary_lang(site_lang: Optional[str]) -> Optional[str]:
+    """前端傳來的全站語系代碼（tw/cn/en/ko）→ 摘要儲存語系（zh-TW/en/ko）。
+
+    傳進不認得的值時回 None 而不是丟 400：摘要只是輔助顯示，
+    不該因為語系參數打錯就讓整個每日新聞端點失敗。
+    """
+    if not site_lang:
+        return None
+    return short_summary.SITE_LANG_TO_SUMMARY_LANG.get(site_lang.strip().lower())
+
+
+def _attach_summaries(db: Session, items: list[dict], site_lang: Optional[str]) -> Optional[str]:
+    """把已快取的簡短摘要掛到 items 上，回傳實際使用的語系。
+
+    刻意只讀快取、不在這裡生成——這個端點每次開 Dashboard 都會被打到，
+    要是順手產摘要，第一個開頁的人就得等 10 次 API 呼叫。
+    生成走 POST /news/summaries，由前端在畫面出來之後再補。
+    """
+    lang = _summary_lang(site_lang)
+    if not lang or not items:
+        return lang
+    if not get_settings(db).get("summary_enabled", True):
+        return lang
+    found = get_summaries(db, [i["id"] for i in items], lang)
+    for item in items:
+        hit = found.get(item["id"])
+        item["summary"] = hit["summary"] if hit else None
+        item["summary_is_ai"] = bool(hit["is_ai"]) if hit else False
+    return lang
+
+
 # ---------------------------------------------------------------------------
 # 每日重點新聞
 # ---------------------------------------------------------------------------
 @router.get("/daily", summary="（前台）取得每日重點新聞（預設 10 篇）")
 def get_daily(
     date: Optional[str] = Query(None, description="YYYY-MM-DD，預設今天（Asia/Taipei）"),
+    lang: Optional[str] = Query(None, description="全站語系代碼 tw/cn/en/ko，決定簡短摘要用哪個語系"),
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),               # 帳號/收藏/模組設定：一律連遠端，不進唯讀快取
     query_db: Session = Depends(get_query_db),    # 新聞內文/來源/每日精選：唯讀模式下可讀本機端快取
@@ -150,6 +183,7 @@ def get_daily(
         if not fallback:
             settings = get_settings(db)
             return {"digest_date": target, "total": 0, "items": [],
+                    "summary_lang": _summary_lang(lang),
                     "disclaimer": settings["disclaimer_zh"],
                     "generated_at": None, "available_dates": []}
         target = fallback[0]
@@ -183,10 +217,13 @@ def get_daily(
                  .filter(models.NewsDailyDigest.digest_date == target)
                  .order_by(models.NewsDailyDigest.created_at.asc()).first())
 
+    summary_lang = _attach_summaries(db, items, lang)
+
     return {
         "digest_date": target,
         "total": len(items),
         "items": items,
+        "summary_lang": summary_lang,
         "disclaimer": get_settings(db)["disclaimer_zh"],
         "generated_at": generated[0].isoformat() if generated and generated[0] else None,
         "available_dates": dates,
@@ -201,6 +238,7 @@ def get_archive(
     cancer_type: Optional[str] = None,
     safety_only: bool = False,
     q: Optional[str] = None,
+    lang: Optional[str] = Query(None, description="全站語系代碼 tw/cn/en/ko，決定簡短摘要用哪個語系"),
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),               # 帳號/收藏：一律連遠端，不進唯讀快取
     query_db: Session = Depends(get_query_db),    # 新聞內文/來源：唯讀模式下可讀本機端快取
@@ -228,12 +266,43 @@ def get_archive(
     ids = [a.id for a, _ in rows]
     ents, counts, mine = _load_related(query_db, db, ids, current_user.id)
 
+    items = [_to_article(a, s, ents.get(a.id, []),
+                         is_bookmarked=a.id in mine,
+                         bookmark_count=counts.get(a.id, 0))
+             for a, s in rows]
+    summary_lang = _attach_summaries(db, items, lang)
+
+    return {"total": len(items), "items": items, "summary_lang": summary_lang}
+
+
+class SummaryRequest(BaseModel):
+    article_ids: list[str] = Field(min_length=1, max_length=12)
+    lang: str = Field(description="全站語系代碼 tw/cn/en/ko")
+
+
+@router.post("/summaries", summary="（前台）取得／產生指定語系的簡短摘要")
+def fetch_summaries(payload: SummaryRequest,
+                    current_user: models.User = Depends(get_current_user),
+                    db: Session = Depends(get_db)):
+    """前端在每日新聞畫面渲染完之後才呼叫這支，補上缺的語系摘要。
+
+    跟 /daily 分開是刻意的：/daily 只讀快取所以永遠很快，
+    真正可能要等 AI 的生成放在這裡，前端可以先把新聞顯示出來、摘要之後再補進去。
+
+    上限 12 篇是為了讓單次請求時間可控（每日精選預設 10 篇，一次剛好夠）。
+    """
+    lang = _summary_lang(payload.lang)
+    if not lang:
+        raise HTTPException(status_code=400, detail=f"不支援的語系：{payload.lang}")
+    if not get_settings(db).get("summary_enabled", True):
+        return {"lang": lang, "enabled": False, "summaries": {}}
+
+    found = get_summaries(db, payload.article_ids, lang, generate_missing=True)
     return {
-        "total": len(rows),
-        "items": [_to_article(a, s, ents.get(a.id, []),
-                              is_bookmarked=a.id in mine,
-                              bookmark_count=counts.get(a.id, 0))
-                  for a, s in rows],
+        "lang": lang,
+        "enabled": True,
+        "summaries": {aid: {"summary": v["summary"], "is_ai": v["is_ai"]}
+                      for aid, v in found.items()},
     }
 
 
