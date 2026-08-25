@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.36.2 make the API-key diagnostic always answer fast (12s cap) so a hanging provider cannot turn into a browser-level Failed to fetch"
+set "DEFAULT_MSG=v1.36.3 default Gemini model to gemini-2.5-flash; gemini-2.0-flash has been retired"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

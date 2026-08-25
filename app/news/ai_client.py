@@ -31,7 +31,10 @@ ANTHROPIC_MODEL = os.environ.get("NEWS_SUMMARY_MODEL", "claude-sonnet-4-5")
 # NEWS_GEMINI_URL 若有設就整串照用（給端點改版時應急），否則由 base + 模型組出來。
 GEMINI_BASE = os.environ.get("NEWS_GEMINI_BASE",
                              "https://generativelanguage.googleapis.com/v1beta")
-GEMINI_MODEL = os.environ.get("NEWS_GEMINI_MODEL", "gemini-2.0-flash")
+# 預設模型會退役（gemini-2.0-flash 就是實際遇到的：檢測回 404 並附上「已不再提供」）。
+# 因此 (1) 預設值要跟得上，(2) 一定要能用環境變數覆寫，(3) 檢測遇到 404 時
+# 會用同一把金鑰列出實際可用的模型名稱——管理者不必等改程式就能自己換掉。
+GEMINI_MODEL = os.environ.get("NEWS_GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_URL = os.environ.get("NEWS_GEMINI_URL") or \
     f"{GEMINI_BASE}/models/{GEMINI_MODEL}:generateContent"
 
