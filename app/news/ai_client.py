@@ -27,9 +27,13 @@ logger = logging.getLogger(__name__)
 ANTHROPIC_URL = os.environ.get("NEWS_ANTHROPIC_URL", "https://api.anthropic.com/v1/messages")
 ANTHROPIC_MODEL = os.environ.get("NEWS_SUMMARY_MODEL", "claude-sonnet-4-5")
 
-GEMINI_URL = os.environ.get("NEWS_GEMINI_URL",
-                            "https://generativelanguage.googleapis.com/v1beta/interactions")
-GEMINI_MODEL = os.environ.get("NEWS_GEMINI_MODEL", "gemini-3.7-flash")
+# 正式的 REST 介面是 /v1beta/models/{model}:generateContent。
+# NEWS_GEMINI_URL 若有設就整串照用（給端點改版時應急），否則由 base + 模型組出來。
+GEMINI_BASE = os.environ.get("NEWS_GEMINI_BASE",
+                             "https://generativelanguage.googleapis.com/v1beta")
+GEMINI_MODEL = os.environ.get("NEWS_GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_URL = os.environ.get("NEWS_GEMINI_URL") or \
+    f"{GEMINI_BASE}/models/{GEMINI_MODEL}:generateContent"
 
 
 def _env(name: str) -> str | None:
@@ -74,17 +78,21 @@ def _build_request(provider: str, system: str, user: str, max_output_tokens: int
             "messages": [{"role": "user", "content": user}],
         }
 
+    # 金鑰走 x-goog-api-key 標頭。文件範例是 ?key=<金鑰>，但查詢字串會被
+    # 存取日誌、反向代理與瀏覽器歷史記錄下來——這跟排程密鑰是同一條規則，一律走標頭。
     return GEMINI_URL, {
         "content-type": "application/json",
         "x-goog-api-key": _env("GEMINI_API_KEY") or "",
     }, {
-        "model": GEMINI_MODEL,
-        "system_instruction": system,
-        "input": user,
-        # 要求純 JSON 輸出。不指定 schema 是因為兩支呼叫端各有自己的形狀，
-        # 而且解析端本來就對「模型多包了一層 ``` 或少了收尾括號」有容錯。
-        "response_format": {"type": "text", "mime_type": "application/json"},
-        "generation_config": {"max_output_tokens": max_output_tokens, "temperature": 0.2},
+        "systemInstruction": {"parts": [{"text": system}]},
+        "contents": [{"role": "user", "parts": [{"text": user}]}],
+        "generationConfig": {
+            "maxOutputTokens": max_output_tokens,
+            "temperature": 0.2,
+            # 要求純 JSON。不附 schema 是因為兩支呼叫端各有自己的形狀，
+            # 而且解析端本來就對「多包了 ``` 或少了收尾括號」有容錯。
+            "responseMimeType": "application/json",
+        },
     }
 
 
@@ -93,8 +101,8 @@ def _extract_text(provider: str, data: dict) -> str:
         return "".join(b.get("text", "") for b in data.get("content", [])
                        if b.get("type") == "text")
 
-    # Interactions API 把結果放在 output_text；舊的 generateContent 形狀則在
-    # candidates[].content.parts[].text。兩種都接，這樣端點若被環境變數改回舊的也還能用。
+    # generateContent 的結果在 candidates[].content.parts[].text。
+    # 也接 output_text，這樣端點若被環境變數換成別的形狀還能用。
     if isinstance(data.get("output_text"), str):
         return data["output_text"]
     out = []
@@ -159,17 +167,38 @@ def check_key() -> dict:
         "looks_like_expected_key": key.startswith(_EXPECTED_PREFIX[provider]),
     }
 
+    url, headers, payload = _build_request(provider, "You are a test.", "hi", 8)
     try:
-        url, headers, payload = _build_request(provider, "You are a test.", "hi", 8)
-        resp = httpx.post(url, headers=headers, json=payload, timeout=30.0)
+        resp = httpx.post(url, headers=headers, json=payload, timeout=45.0)
     except Exception as exc:  # noqa: BLE001
         logger.error("AI 金鑰檢測連線失敗（%s）：%s", provider, exc)
         return {"ok": False, "reason": "network", **diag,
-                "message": f"連不到 {provider} API：{str(exc)[:200]}"}
+                "message": (f"連不到 {provider} API（端點 {url}）：{str(exc)[:200]}。"
+                            "若是逾時，多半是端點網址不對或對外連線被擋；"
+                            "端點可用 NEWS_GEMINI_URL／NEWS_GEMINI_BASE 環境變數覆寫。")}
 
     if resp.status_code == 200:
         return {"ok": True, "reason": "ok", **diag,
                 "message": f"金鑰有效，{provider} 的 {diag['model']} 可正常呼叫。"}
+
+    # 模型名稱會改版，光說「找不到模型」對管理者沒有幫助。
+    # Gemini 可以用金鑰列出實際可用的模型，直接把名字告訴他。
+    available = ""
+    if provider == "gemini" and resp.status_code in (400, 404):
+        try:
+            lst = httpx.get(f"{GEMINI_BASE}/models",
+                            headers={"x-goog-api-key": key}, timeout=20.0)
+            if lst.status_code == 200:
+                names = [m.get("name", "").replace("models/", "")
+                         for m in lst.json().get("models", [])
+                         if "generateContent" in (m.get("supportedGenerationMethods") or [])]
+                if names:
+                    available = ("　可用的模型："
+                                 + "、".join(names[:8])
+                                 + ("…" if len(names) > 8 else "")
+                                 + "（用環境變數 NEWS_GEMINI_MODEL 指定）")
+        except Exception:  # noqa: BLE001
+            pass
 
     try:
         body = resp.json()
@@ -192,4 +221,4 @@ def check_key() -> dict:
 
     return {"ok": False, "reason": reason, **diag,
             "message": (f"HTTP {resp.status_code}：{_HINTS.get(reason, '')} {detail} "
-                        + " ".join(extra)).strip()}
+                        + " ".join(extra) + available).strip()}

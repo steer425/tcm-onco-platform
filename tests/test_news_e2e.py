@@ -435,6 +435,28 @@ def main():
     check("可強制指定供應商", ai_client.active_provider() == "anthropic")
     _os.environ["NEWS_AI_PROVIDER"] = "none"
     check("可強制停用 AI", ai_client.active_provider() is None)
+    _os.environ.pop("NEWS_AI_PROVIDER", None)
+
+    # 端點與請求形狀：官方 REST 介面是 /v1beta/models/{model}:generateContent，
+    # 金鑰走標頭不走查詢字串（查詢字串會被存取日誌與代理記錄下來）
+    u, h, b = ai_client._build_request("gemini", "sys", "hi", 8)
+    check("Gemini 用 generateContent 端點", u.endswith(":generateContent"), u)
+    check("模型名稱組進網址", "/models/" in u, u)
+    check("金鑰走標頭不走查詢字串",
+          "x-goog-api-key" in h and "key=" not in u, sorted(h))
+    check("請求含 systemInstruction / contents",
+          "systemInstruction" in b and "contents" in b, sorted(b))
+
+    # 回應解析：candidates 形狀為主，output_text 也接
+    check("解析 candidates 形狀",
+          ai_client._extract_text("gemini",
+              {"candidates": [{"content": {"parts": [{"text": "甲"}, {"text": "乙"}]}}]}) == "甲乙")
+    check("也接 output_text 形狀",
+          ai_client._extract_text("gemini", {"output_text": "丙"}) == "丙")
+    check("Anthropic 解析不受影響",
+          ai_client._extract_text("anthropic",
+              {"content": [{"type": "text", "text": "丁"}]}) == "丁")
+    _os.environ["NEWS_AI_PROVIDER"] = "none"
     check("停用時摘要走降級",
           all(r["is_ai"] is False for r in
               short_summary_generate([{"abstract": "x" * 400}], "en", 120)))

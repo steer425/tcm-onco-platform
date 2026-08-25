@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.36.0 support Gemini as the AI provider for news summaries (free tier, no credit card) with Anthropic as an alternative"
+set "DEFAULT_MSG=v1.36.1 fix the Gemini endpoint to the documented generateContent REST path, and list the models the key can actually use"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

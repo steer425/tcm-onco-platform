@@ -1,5 +1,46 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.36.1 — 2026-08-23（修正 Gemini 端點：改用官方的 generateContent，並列出金鑰實際可用的模型）
+
+### 問題
+
+v1.36.0 的 Gemini 端點寫成 `/v1beta/interactions`，實測結果是**連線逾時**
+（`連不到 gemini API：The read operation timed out`）。
+
+我當初是照著抓下來的文件摘要實作的，但那份摘要描述的介面與官方 REST 參考不符。
+**沒有金鑰就沒辦法端對端驗證，這是那一版明講過的風險，結果真的踩到了。**
+
+### 修正
+
+改用官方 REST 參考的路徑與形狀：
+
+| 項目 | 內容 |
+|---|---|
+| 端點 | `POST /v1beta/models/{model}:generateContent` |
+| 金鑰 | `x-goog-api-key` 標頭（**不用 `?key=`**，查詢字串會被存取日誌與代理記錄下來，與排程密鑰同一條規則）|
+| 請求 | `systemInstruction` + `contents[].parts[].text` + `generationConfig`（`responseMimeType: application/json`）|
+| 回應 | `candidates[].content.parts[].text`（也相容 `output_text`）|
+
+預設模型改為 `gemini-2.0-flash`。端點可用 `NEWS_GEMINI_BASE`／`NEWS_GEMINI_URL` 覆寫，
+模型可用 `NEWS_GEMINI_MODEL` 覆寫。
+
+### 檢測會列出可用的模型
+
+模型名稱會改版，光說「找不到模型」對管理者沒有幫助。Gemini 遇到 400／404 時，
+檢測會用同一把金鑰呼叫 `GET /v1beta/models`，把**這把金鑰實際可用、且支援
+generateContent 的模型名稱**列出來，並告訴他用 `NEWS_GEMINI_MODEL` 指定。
+
+逾時訊息也改成會帶出實際打的端點網址，並提示可用環境變數覆寫——
+上一版只說「連不到」，管理者無從判斷是端點不對還是網路不通。
+
+### 已測試驗證
+
+`python -m tests.test_news_e2e` — **127 項斷言全過**（v1.36.0 的 120 項 + 本次 7 項）。
+
+新增：Gemini 用 generateContent 端點、模型名稱組進網址、金鑰走標頭不走查詢字串、
+請求含 systemInstruction/contents、解析 candidates 形狀、也接 output_text、
+Anthropic 解析不受影響。
+
 ## v1.36.0 — 2026-08-23（新聞 AI 摘要改可用 Gemini 免費層，不再綁單一供應商）
 
 ### 為什麼
