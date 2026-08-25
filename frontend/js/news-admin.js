@@ -14,6 +14,7 @@
     literature_index: "學術文獻索引", trial_registry: "臨床試驗登錄",
     cancer_center: "癌症中心臨床實務", herb_safety: "草藥安全與交互作用",
     national_policy: "國家衛生政策", tcm_policy: "中醫藥國家政策",
+    general_news: "一般新聞（後台自訂）",
   };
 
   let nPage = 1;
@@ -53,7 +54,10 @@
           if (panel) panel.style.display = (k === key) ? "" : "none";
         });
         if (key === "news" && !nRows.length) newsAdminSearch(1);
-        if (key === "newsSources" && !sourcesLoaded) loadNewsSources();
+        if (key === "newsSources") {
+          if (!sourcesLoaded) loadNewsSources();
+          loadNewsKeywords();
+        }
         if (key === "newsRuns" && !runsLoaded) loadNewsRuns();
         if (key === "newsSettings") loadNewsSummarySettings();
       });
@@ -218,7 +222,8 @@
         tr.innerHTML = `
           <td>
             <a href="${escNewsAdmin(s.homepage)}" target="_blank" rel="noopener">${escNewsAdmin(s.name_zh)}</a>
-            <div class="news-admin-sub">${escNewsAdmin(s.name_en)}</div>
+            <div class="news-admin-sub">${escNewsAdmin(s.name_en)}${
+              s.is_custom ? ' · <span style="color:#c98a2b;">後台自訂</span>' : ""}</div>
           </td>
           <td style="font-size:12px; text-transform:uppercase;">${escNewsAdmin(s.kind)}</td>
           <td style="font-size:12px;">${Number(s.weight).toFixed(2)}</td>
@@ -226,7 +231,12 @@
           <td style="font-size:12px;">${state}</td>
           <td><input type="checkbox" ${s.is_enabled ? "checked" : ""}
                      onchange="newsAdminToggleSource('${escNewsAdmin(s.slug)}', this)"></td>
-          <td><button class="secondary" onclick="openSourceConfigModal('${escNewsAdmin(s.slug)}')">設定</button></td>`;
+          <td>
+            <button class="secondary" onclick="openSourceConfigModal('${escNewsAdmin(s.slug)}')">設定</button>
+            ${s.is_custom
+              ? `<button class="danger" onclick="newsAdminDeleteSource('${escNewsAdmin(s.slug)}', this)">刪除</button>`
+              : ""}
+          </td>`;
         tbody.appendChild(tr);
       });
     } catch (err) {
@@ -564,6 +574,179 @@
       }
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = original; }
+    }
+  };
+
+  // =========================================================================
+  // 新增來源（只輸入網址）
+  // =========================================================================
+  function renderProbe(r, prefix) {
+    const box = document.getElementById("nProbeResult");
+    if (!box) return;
+    box.style.display = "";
+    const okColor = r.ok ? "#2f6f4f" : "#b4463c";
+    box.style.borderLeftColor = okColor;
+    box.style.background = r.ok ? "#f6faf7" : "#fdf1f0";
+
+    const samples = (r.samples || []).slice(0, 5)
+      .map((t) => `<li>${escNewsAdmin(t)}</li>`).join("");
+    const warns = (r.warnings || [])
+      .map((w) => `<div style="color:#c98a2b;">⚠ ${escNewsAdmin(w)}</div>`).join("");
+
+    box.innerHTML =
+      `<div><strong>${prefix}</strong></div>`
+      + (r.name ? `<div>站名：${escNewsAdmin(r.name)}</div>` : "")
+      + (r.kind ? `<div>抓取方式：${r.kind === "rss" ? "RSS（較可靠）" : "HTML 爬蟲（站方改版會失準）"}</div>` : "")
+      + `<div>試抓到 <strong>${r.found || 0}</strong> 篇</div>`
+      + (samples ? `<ul style="margin:6px 0 0 18px;">${samples}</ul>` : "")
+      + (r.error ? `<div style="color:#b4463c; margin-top:6px;">${escNewsAdmin(r.error)}</div>` : "")
+      + (warns ? `<div style="margin-top:6px;">${warns}</div>` : "");
+  }
+
+  window.newsAdminProbeSource = async function (btn) {
+    const url = document.getElementById("nNewSourceUrl")?.value.trim();
+    if (!url) { alert("請先輸入網址。"); return; }
+    const original = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "試抓中…"; }
+    try {
+      const r = await api("/news/admin/sources/probe", {
+        method: "POST", body: JSON.stringify({ url }),
+      });
+      renderProbe(r, r.ok ? "✅ 可以當作新聞來源" : "❌ 這個網址不適合當新聞來源");
+    } catch (err) {
+      renderProbe({ ok: false, error: err.message }, "❌ 試抓失敗");
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = original; }
+    }
+  };
+
+  window.newsAdminAddSource = async function (btn) {
+    const url = document.getElementById("nNewSourceUrl")?.value.trim();
+    if (!url) { alert("請先輸入網址。"); return; }
+    const isOfficial = document.getElementById("nNewSourceOfficial")?.checked || false;
+    const original = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "新增中…"; }
+    try {
+      const r = await api("/news/admin/sources", {
+        method: "POST", body: JSON.stringify({ url, is_official: isOfficial }),
+      });
+      renderProbe(r, `✅ 已新增「${r.name}」`);
+      document.getElementById("nNewSourceUrl").value = "";
+      sourcesLoaded = false;
+      loadNewsSources();
+    } catch (err) {
+      // 後端把 probe 結果一起放在 detail 裡，直接顯示比只丟一句錯誤有用得多
+      let detail = err.message;
+      try {
+        const parsed = JSON.parse(err.message);
+        if (parsed && parsed.probe) {
+          renderProbe({ ...parsed.probe, ok: false, error: parsed.message },
+                      "❌ 未新增");
+          return;
+        }
+        if (parsed && parsed.message) detail = parsed.message;
+      } catch (e) { /* 不是 JSON 就照原樣顯示 */ }
+      renderProbe({ ok: false, error: detail }, "❌ 未新增");
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = original; }
+    }
+  };
+
+  window.newsAdminDeleteSource = async function (slug, btn) {
+    if (!confirm(`刪除自訂來源「${slug}」？\n\n已經收過新聞的來源不能刪，請改用停用。`)) return;
+    if (btn) btn.disabled = true;
+    try {
+      await api(`/news/admin/sources/${encodeURIComponent(slug)}`, { method: "DELETE" });
+      sourcesLoaded = false;
+      loadNewsSources();
+    } catch (err) {
+      alert("刪除失敗：" + err.message);
+      if (btn) btn.disabled = false;
+    }
+  };
+
+  // =========================================================================
+  // 主題過濾關鍵字 CRUD
+  // =========================================================================
+  async function loadNewsKeywords() {
+    const wrap = document.getElementById("nKeywordGroups");
+    if (!wrap) return;
+    wrap.innerHTML = `<div style="color:#8a958f;">載入中…</div>`;
+    try {
+      const d = await api("/news/admin/keywords");
+      const explain = document.getElementById("nKeywordExplain");
+      if (explain) explain.textContent = d.explain || "";
+
+      wrap.innerHTML = d.groups.map((g) => {
+        const c = d.counts[g] || { enabled: 0, total: 0 };
+        const items = (d.items[g] || []).map((k) => `
+          <li style="display:flex; align-items:center; gap:6px; padding:3px 0;
+                     ${k.is_enabled ? "" : "opacity:.45;"}">
+            <input type="checkbox" ${k.is_enabled ? "checked" : ""}
+                   title="啟用／停用"
+                   onchange="newsAdminToggleKeyword('${escNewsAdmin(k.id)}', this)">
+            <span style="flex:1; font-size:12.5px;">${escNewsAdmin(k.term)}</span>
+            ${k.is_default ? '<span style="font-size:10.5px; color:#8a958f;">預設</span>' : ""}
+            <button class="secondary" style="padding:1px 7px; font-size:11px;"
+                    onclick="newsAdminDeleteKeyword('${escNewsAdmin(k.id)}', '${escNewsAdmin(k.term)}')">刪</button>
+          </li>`).join("");
+        return `
+          <div>
+            <div style="font-weight:600; font-size:13px; margin-bottom:6px;">
+              ${escNewsAdmin(d.labels[g] || g)}
+              <span style="font-weight:400; color:#8a958f; font-size:11.5px;">
+                啟用 ${c.enabled} / 共 ${c.total}</span>
+            </div>
+            <div style="display:flex; gap:6px; margin-bottom:8px;">
+              <input type="text" id="nKwInput-${escNewsAdmin(g)}" placeholder="新增關鍵字"
+                     style="flex:1;" onkeydown="if(event.key==='Enter')newsAdminAddKeyword('${escNewsAdmin(g)}')">
+              <button onclick="newsAdminAddKeyword('${escNewsAdmin(g)}')">新增</button>
+            </div>
+            <ul style="list-style:none; margin:0; padding:0; max-height:320px; overflow:auto;
+                       border:1px solid #e8ede9; border-radius:6px; padding:6px 10px;">
+              ${items || '<li style="color:#8a958f; font-size:12px;">（沒有關鍵字）</li>'}
+            </ul>
+          </div>`;
+      }).join("");
+    } catch (err) {
+      wrap.innerHTML = `<div style="color:#b4463c;">載入失敗：${escNewsAdmin(err.message)}</div>`;
+    }
+  }
+
+  window.newsAdminAddKeyword = async function (group) {
+    const input = document.getElementById("nKwInput-" + group);
+    const term = input?.value.trim();
+    if (!term) return;
+    try {
+      await api("/news/admin/keywords", {
+        method: "POST", body: JSON.stringify({ group, term }),
+      });
+      input.value = "";
+      loadNewsKeywords();
+    } catch (err) {
+      alert("新增失敗：" + err.message);
+    }
+  };
+
+  window.newsAdminToggleKeyword = async function (id, cb) {
+    try {
+      await api(`/news/admin/keywords/${encodeURIComponent(id)}`, {
+        method: "PUT", body: JSON.stringify({ is_enabled: cb.checked }),
+      });
+      loadNewsKeywords();
+    } catch (err) {
+      cb.checked = !cb.checked;   // 後端擋下來時把勾選狀態改回去，不要讓畫面說謊
+      alert("更新失敗：" + err.message);
+    }
+  };
+
+  window.newsAdminDeleteKeyword = async function (id, term) {
+    if (!confirm(`刪除關鍵字「${term}」？`)) return;
+    try {
+      await api(`/news/admin/keywords/${encodeURIComponent(id)}`, { method: "DELETE" });
+      loadNewsKeywords();
+    } catch (err) {
+      alert("刪除失敗：" + err.message);
     }
   };
 })();

@@ -44,7 +44,7 @@
     <div class="tabs">
       <button class="active" data-tab="ann">公告管理</button>
       <button data-tab="news">新聞管理</button>
-      <button data-tab="newsSources">新聞來源健康度</button>
+      <button data-tab="newsSources">新聞來源與關鍵字</button>
       <button data-tab="newsRuns">收集執行紀錄</button>
       <button data-tab="newsSettings">摘要與模組設定</button>
     </div>
@@ -121,9 +121,30 @@
       </div>
     </div>
 
-    <!-- ================= 新聞來源健康度 ================= -->
+    <!-- ================= 新聞來源與關鍵字 ================= -->
     <div class="card" id="tab-newsSources" style="display:none;">
-      <p style="font-size:12px; color:#6b7a70; margin:0 0 12px;">
+
+      <h3 style="margin:0 0 4px;">新增來源</h3>
+      <p style="font-size:12px; color:#6b7a70; margin:0 0 10px; line-height:1.7;">
+        只要貼上網址，系統會自己判斷這個站有沒有 RSS、站名叫什麼、是中文還是英文站。
+        <strong>一定會先實際抓一次</strong>——抓不到就不會存進去，
+        免得問題拖到隔天清晨 4:00 的排程才爆，那時沒有人在看。
+      </p>
+      <div class="news-admin-bar" style="gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+        <input type="text" id="nNewSourceUrl" placeholder="https://example.com/news"
+               style="flex:1; min-width:280px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px;"
+               title="預設一律是「一般新聞」最低權重，避免商業新聞在排序上蓋過人體試驗研究">
+          <input type="checkbox" id="nNewSourceOfficial"> 政府／學術官方來源
+        </label>
+        <button class="secondary" onclick="newsAdminProbeSource(this)">試抓看看</button>
+        <button onclick="newsAdminAddSource(this)">新增</button>
+      </div>
+      <div id="nProbeResult" style="display:none; margin-bottom:18px; padding:10px 12px;
+           border-left:3px solid #2f6f4f; background:#f6faf7; font-size:12.5px; line-height:1.8;"></div>
+
+      <h3 style="margin:22px 0 4px;">來源健康度</h3>
+      <p style="font-size:12px; color:#6b7a70; margin:0 0 10px;">
         爬蟲類來源的網站改版時會抓不到資料。連續失敗次數會在這裡累計，
         選擇器等設定存在資料庫，可直接修改而不需重新部署。
       </p>
@@ -131,10 +152,14 @@
         <thead>
           <tr><th>來源</th><th style="width:70px;">方式</th><th style="width:70px;">權重</th>
               <th style="width:80px;">新聞數</th><th>最近狀態</th><th style="width:70px;">啟用</th>
-              <th style="width:70px;">設定</th></tr>
+              <th style="width:120px;">操作</th></tr>
         </thead>
         <tbody id="nSourceBody"></tbody>
       </table>
+
+      <h3 style="margin:26px 0 4px;">主題過濾關鍵字</h3>
+      <p id="nKeywordExplain" style="font-size:12px; color:#6b7a70; margin:0 0 12px; line-height:1.7;"></p>
+      <div id="nKeywordGroups" style="display:grid; grid-template-columns:1fr 1fr; gap:20px;"></div>
     </div>
 
     <!-- ================= 收集執行紀錄 ================= -->

@@ -6,10 +6,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
+import re
 import secrets
 from datetime import datetime, timedelta
 from typing import Any, Literal, Optional
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -19,7 +22,7 @@ from sqlalchemy.orm import Session
 from app import models
 from app.database import get_db
 from app.deps import get_current_user, require_admin, write_audit_log
-from app.news import short_summary
+from app.news import discover, keywords as news_keywords, short_summary
 from app.news.service import (
     backfill_summaries, dumps, get_settings, loads, run_daily_collection, set_setting,
     sync_sources,
@@ -298,7 +301,9 @@ def admin_sources(current_user: models.User = Depends(require_admin),
         "kind": s.kind.value if s.kind else None,
         "evidence_level": s.evidence_level.value if s.evidence_level else None,
         "weight": float(s.weight or 0), "lang": s.lang,
-        "is_enabled": bool(s.is_enabled), "notes": s.notes,
+        "is_enabled": bool(s.is_enabled),
+        "is_custom": bool(getattr(s, "is_custom", False)),
+        "notes": s.notes,
         "config": _redact_config(loads(s.config, {})),
         "last_success_at": s.last_success_at.isoformat() if s.last_success_at else None,
         "last_error": s.last_error,
@@ -525,3 +530,242 @@ def test_summary_api_key(current_user: models.User = Depends(require_admin),
                     detail=dumps({"ok": result["ok"], "reason": result["reason"]}))
     db.commit()
     return result
+
+
+# ===========================================================================
+# 自訂新聞來源（管理者只輸入網址，其餘由系統推斷）
+# ===========================================================================
+def _slugify_url(url: str) -> str:
+    """由網址產生 slug。加 custom- 前綴是為了一眼分辨自訂來源，
+    也避免跟 sources.py 裡的官方 slug（who/nci/pubmed…）撞名。"""
+    parsed = urlparse(discover.normalize_url(url))
+    raw = f"{parsed.netloc}{parsed.path}".lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", raw).strip("-")[:48]
+    return f"custom-{slug or 'source'}"
+
+
+class SourceProbeIn(BaseModel):
+    url: str = Field(min_length=4, max_length=500)
+
+
+@router.post("/sources/probe", summary="（後台）試抓一個網址，回報能不能當新聞來源")
+def probe_source(payload: SourceProbeIn,
+                 current_user: models.User = Depends(require_admin),
+                 db: Session = Depends(get_db)):
+    """只試抓、不儲存。管理者可以先看結果再決定要不要加。"""
+    return asyncio.run(discover.probe(
+        payload.url,
+        contact_email=os.environ.get("NEWS_CONTACT_EMAIL", "research@example.org")))
+
+
+class SourceCreateIn(BaseModel):
+    url: str = Field(min_length=4, max_length=500)
+    name: Optional[str] = Field(default=None, max_length=80)
+    # 預設一律是「一般新聞」最低權重，避免商業新聞在排序上蓋過人體試驗研究。
+    # 確定是政府／學術單位的站才勾這個，會提升到國家衛生政策層級與中等權重。
+    is_official: bool = False
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+@router.post("/sources", summary="（後台）新增自訂新聞來源（只需網址）")
+def create_source(payload: SourceCreateIn,
+                  current_user: models.User = Depends(require_admin),
+                  db: Session = Depends(get_db)):
+    """新增前一定會實際抓一次，抓不到就不讓存。
+
+    這是刻意的：允許存一個抓不到東西的來源，問題會延到隔天清晨 4:00 的排程才爆，
+    那時沒有人在看，而且錯誤會混在其他來源的統計裡很難發現。
+    寧可現在就擋下來並說明原因。
+    """
+    probe = asyncio.run(discover.probe(
+        payload.url,
+        contact_email=os.environ.get("NEWS_CONTACT_EMAIL", "research@example.org")))
+    if not probe["ok"]:
+        raise HTTPException(status_code=400, detail={
+            "message": probe.get("error") or "這個網址抓不到任何文章，未新增。",
+            "warnings": probe.get("warnings", []),
+            "probe": probe,
+        })
+
+    slug = _slugify_url(payload.url)
+    if db.query(models.NewsSource).filter(models.NewsSource.slug == slug).first():
+        raise HTTPException(status_code=409, detail=f"這個網址已經加過了（{slug}）。")
+
+    name = (payload.name or probe["name"] or urlparse(probe["url"]).netloc)[:80]
+    level = (models.NewsEvidenceLevel.national_policy if payload.is_official
+             else models.NewsEvidenceLevel.general_news)
+    row = models.NewsSource(
+        slug=slug, name_zh=name, name_en=name, homepage=probe["homepage"],
+        kind=models.NewsCollectorKind(probe["kind"]),
+        evidence_level=level,
+        weight="0.55" if payload.is_official else "0.30",
+        lang=probe["lang"], prefiltered=False, is_enabled=True, is_custom=True,
+        config=dumps(probe["config"]),
+        notes=payload.note or "；".join(probe.get("warnings", [])) or None,
+    )
+    db.add(row)
+    write_audit_log(db, current_user, "news_create_source", target_type="news_source",
+                    target_id=slug,
+                    detail=dumps({"url": payload.url, "kind": probe["kind"],
+                                  "found": probe["found"], "is_official": payload.is_official}))
+    db.commit()
+    return {"ok": True, "slug": slug, "name": name, "kind": probe["kind"],
+            "found": probe["found"], "samples": probe["samples"],
+            "warnings": probe.get("warnings", [])}
+
+
+@router.delete("/sources/{slug}", summary="（後台）刪除自訂新聞來源")
+def delete_source(slug: str,
+                  current_user: models.User = Depends(require_admin),
+                  db: Session = Depends(get_db)):
+    """只能刪自訂來源，而且必須沒有留下任何文章。
+
+    官方來源不給刪：它們定義在 sources.py，刪掉之後下次部署 sync_sources()
+    又會建回來，變成「刪了又出現」的鬼打牆。要停用請用啟用開關。
+
+    已經收過文章的來源也不給刪：文章有外鍵指向來源，硬刪會讓那些新聞
+    失去出處。同樣請改用停用。
+    """
+    row = db.query(models.NewsSource).filter(models.NewsSource.slug == slug).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="找不到這個來源。")
+    if not row.is_custom:
+        raise HTTPException(status_code=400,
+                            detail="這是系統內建來源，不能刪除。請改用啟用／停用開關。")
+    count = (db.query(models.NewsArticle)
+             .filter(models.NewsArticle.source_id == row.id).count())
+    if count:
+        raise HTTPException(status_code=409, detail=(
+            f"這個來源底下還有 {count} 篇新聞，刪掉會讓那些新聞失去出處。"
+            "請改用停用，或先把那些新聞刪除。"))
+    db.delete(row)
+    write_audit_log(db, current_user, "news_delete_source", target_type="news_source",
+                    target_id=slug, detail=dumps({"name": row.name_zh}))
+    db.commit()
+    return {"ok": True, "deleted": slug}
+
+
+# ===========================================================================
+# 主題過濾關鍵字 CRUD
+# ===========================================================================
+@router.get("/keywords", summary="（後台）主題過濾關鍵字清單")
+def list_keywords(current_user: models.User = Depends(require_admin),
+                  db: Session = Depends(get_db)):
+    news_keywords.seed_defaults(db)
+    rows = (db.query(models.NewsKeyword)
+            .order_by(models.NewsKeyword.group, models.NewsKeyword.term).all())
+    grouped: dict[str, list] = {g: [] for g in news_keywords.GROUPS}
+    for r in rows:
+        grouped.setdefault(r.group, []).append({
+            "id": r.id, "term": r.term, "is_enabled": bool(r.is_enabled),
+            "is_default": bool(r.is_default), "note": r.note,
+        })
+    return {"groups": news_keywords.GROUPS,
+            "labels": news_keywords.GROUP_LABEL,
+            "counts": news_keywords.counts(db),
+            "items": grouped,
+            "explain": ("一篇文章必須同時命中『中藥／天然物』與『腫瘤／癌症』兩組，"
+                        "才會被收進來（來源本身已鎖定主題者除外）。"
+                        "因此兩組都不能全部停用。")}
+
+
+class KeywordIn(BaseModel):
+    group: Literal["tcm", "cancer"]
+    term: str = Field(min_length=1, max_length=80)
+    note: Optional[str] = Field(default=None, max_length=200)
+
+
+@router.post("/keywords", summary="（後台）新增關鍵字")
+def create_keyword(payload: KeywordIn,
+                   current_user: models.User = Depends(require_admin),
+                   db: Session = Depends(get_db)):
+    term = news_keywords.normalize(payload.term)
+    if not term:
+        raise HTTPException(status_code=422, detail="關鍵字不能是空白。")
+    exists = (db.query(models.NewsKeyword)
+              .filter(models.NewsKeyword.group == payload.group,
+                      models.NewsKeyword.term == term).first())
+    if exists:
+        raise HTTPException(status_code=409, detail=f"「{term}」已經在這一組裡了。")
+    row = models.NewsKeyword(group=payload.group, term=term, note=payload.note,
+                             is_default=False, is_enabled=True,
+                             created_by=current_user.id)
+    db.add(row)
+    write_audit_log(db, current_user, "news_create_keyword", target_type="news_keyword",
+                    detail=dumps({"group": payload.group, "term": term}))
+    db.commit()
+    return {"ok": True, "id": row.id, "term": term}
+
+
+class KeywordUpdateIn(BaseModel):
+    term: Optional[str] = Field(default=None, min_length=1, max_length=80)
+    is_enabled: Optional[bool] = None
+    note: Optional[str] = Field(default=None, max_length=200)
+
+
+def _guard_last_enabled(db: Session, group: str, exclude_id: str) -> None:
+    """擋下「把某一組的最後一個啟用關鍵字停用/刪除」。
+
+    兩組任一為空時，relevance() 會判定所有文章都不相關，
+    當天收集會全軍覆沒而且完全沒有錯誤訊息——那是最難查的一種壞法。
+    """
+    remaining = (db.query(models.NewsKeyword)
+                 .filter(models.NewsKeyword.group == group,
+                         models.NewsKeyword.is_enabled.is_(True),
+                         models.NewsKeyword.id != exclude_id).count())
+    if remaining == 0:
+        raise HTTPException(status_code=400, detail=(
+            f"「{news_keywords.GROUP_LABEL.get(group, group)}」至少要保留一個啟用中的關鍵字。"
+            "這一組全空的話，之後收集會判定所有文章都不相關，而且不會有任何錯誤訊息。"))
+
+
+@router.put("/keywords/{keyword_id}", summary="（後台）修改關鍵字")
+def update_keyword(keyword_id: str, payload: KeywordUpdateIn,
+                   current_user: models.User = Depends(require_admin),
+                   db: Session = Depends(get_db)):
+    row = db.query(models.NewsKeyword).filter(models.NewsKeyword.id == keyword_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="找不到這個關鍵字。")
+    changed = payload.model_dump(exclude_none=True)
+    if not changed:
+        raise HTTPException(status_code=400, detail="沒有要更新的內容。")
+
+    if changed.get("is_enabled") is False:
+        _guard_last_enabled(db, row.group, row.id)
+    if "term" in changed:
+        term = news_keywords.normalize(changed["term"])
+        if not term:
+            raise HTTPException(status_code=422, detail="關鍵字不能是空白。")
+        dup = (db.query(models.NewsKeyword)
+               .filter(models.NewsKeyword.group == row.group,
+                       models.NewsKeyword.term == term,
+                       models.NewsKeyword.id != row.id).first())
+        if dup:
+            raise HTTPException(status_code=409, detail=f"「{term}」已經在這一組裡了。")
+        row.term = term
+    if "is_enabled" in changed:
+        row.is_enabled = bool(changed["is_enabled"])
+    if "note" in changed:
+        row.note = changed["note"]
+
+    write_audit_log(db, current_user, "news_update_keyword", target_type="news_keyword",
+                    target_id=row.id, detail=dumps(changed))
+    db.commit()
+    return {"ok": True, "id": row.id, "term": row.term, "is_enabled": row.is_enabled}
+
+
+@router.delete("/keywords/{keyword_id}", summary="（後台）刪除關鍵字")
+def delete_keyword(keyword_id: str,
+                   current_user: models.User = Depends(require_admin),
+                   db: Session = Depends(get_db)):
+    row = db.query(models.NewsKeyword).filter(models.NewsKeyword.id == keyword_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="找不到這個關鍵字。")
+    if row.is_enabled:
+        _guard_last_enabled(db, row.group, row.id)
+    group, term = row.group, row.term
+    db.delete(row)
+    write_audit_log(db, current_user, "news_delete_keyword", target_type="news_keyword",
+                    detail=dumps({"group": group, "term": term}))
+    db.commit()
+    return {"ok": True, "deleted": term}

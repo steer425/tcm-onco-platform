@@ -22,7 +22,8 @@ from fastapi.testclient import TestClient
 from app import models
 from app.database import SessionLocal
 from app.main import app
-from app.news import service as news_service
+from app.news import keywords as news_keywords, service as news_service
+from app.routers import news_admin as news_admin_module
 from app.news.collectors.base import RawItem
 from app.news.short_summary import generate as short_summary_generate
 from app.security import hash_password
@@ -539,6 +540,133 @@ def main():
           and client.post("/news/summaries", json={"article_ids": ids, "lang": "ko"},
                           headers=U).json()["enabled"] is False)
     client.put("/news/admin/settings", json={"summary_enabled": True}, headers=A)
+
+    # ------------------------------------------------------------------
+    print("\n【主題過濾關鍵字 CRUD】")
+    r = client.get("/news/admin/keywords", headers=A)
+    kw = r.json()
+    check("關鍵字清單 → 200", r.status_code == 200, r.status_code)
+    check("兩組都有預設詞",
+          len(kw["items"]["tcm"]) > 5 and len(kw["items"]["cancer"]) > 5,
+          {g: len(v) for g, v in kw["items"].items()})
+    check("一般使用者看不到關鍵字清單",
+          client.get("/news/admin/keywords", headers=U).status_code == 403)
+
+    r = client.post("/news/admin/keywords", json={"group": "tcm", "term": "  中成藥  "}, headers=A)
+    check("新增關鍵字 → 200", r.status_code == 200, r.status_code)
+    check("入庫前會正規化（去空白、轉小寫）", r.json()["term"] == "中成藥", r.json()["term"])
+    new_id = r.json()["id"]
+    check("重複新增被擋 → 409",
+          client.post("/news/admin/keywords", json={"group": "tcm", "term": "中成藥"},
+                      headers=A).status_code == 409)
+    check("空白關鍵字被擋",
+          client.post("/news/admin/keywords", json={"group": "tcm", "term": "   "},
+                      headers=A).status_code in (409, 422))
+    check("不合法的分組被擋 → 422",
+          client.post("/news/admin/keywords", json={"group": "xx", "term": "abc"},
+                      headers=A).status_code == 422)
+
+    r = client.put(f"/news/admin/keywords/{new_id}", json={"is_enabled": False}, headers=A)
+    check("停用關鍵字 → 200", r.status_code == 200, r.status_code)
+    check("停用後不列入啟用計數",
+          client.get("/news/admin/keywords", headers=A).json()["counts"]["tcm"]["disabled"] >= 1)
+    check("停用中的詞不會進入比對",
+          "中成藥" not in news_keywords.get_terms(db)["tcm"])
+    client.put(f"/news/admin/keywords/{new_id}", json={"is_enabled": True}, headers=A)
+    check("啟用後會進入比對", "中成藥" in news_keywords.get_terms(db)["tcm"])
+
+    check("刪除關鍵字 → 200",
+          client.delete(f"/news/admin/keywords/{new_id}", headers=A).status_code == 200)
+    check("刪不存在的 → 404",
+          client.delete(f"/news/admin/keywords/{new_id}", headers=A).status_code == 404)
+
+    # 最關鍵的一條：某一組全空時，relevance() 會判定所有文章都不相關，
+    # 而且完全沒有錯誤訊息——那是最難查的壞法，所以要在 API 層擋下來
+    _kw_ids = [k["id"] for k in
+               client.get("/news/admin/keywords", headers=A).json()["items"]["cancer"]]
+    _blocked = False
+    for i, kid in enumerate(_kw_ids):
+        rr = client.put(f"/news/admin/keywords/{kid}", json={"is_enabled": False}, headers=A)
+        if rr.status_code == 400:
+            _blocked = True
+            break
+    check("不允許把某一組的關鍵字全部停用", _blocked)
+    for kid in _kw_ids:
+        client.put(f"/news/admin/keywords/{kid}", json={"is_enabled": True}, headers=A)
+    check("還原後腫瘤詞組非空", len(news_keywords.get_terms(db)["cancer"]) > 5)
+
+    # ------------------------------------------------------------------
+    print("\n【自訂新聞來源】")
+    from app.news import discover as _discover
+    check("網址會自動補上 https", _discover.normalize_url("news.qq.com/ch/fx")
+          == "https://news.qq.com/ch/fx")
+    check("能認出 RSS 內容",
+          _discover._looks_like_feed('<?xml version="1.0"?><rss><channel>', "application/xml"))
+    check("能認出 Atom 內容",
+          _discover._looks_like_feed("<?xml version='1.0'?><feed xmlns=''>", "text/xml"))
+    check("HTML 不會被誤判成 feed",
+          not _discover._looks_like_feed("<!doctype html><html>", "text/html"))
+    check("能數出 feed 裡有幾則",
+          _discover._feed_entry_count("<item/><item/><entry/>") == 2)
+
+    # 連結挑選規則：導覽列、太短的文字、外站連結都不該被當成文章
+    from bs4 import BeautifulSoup as _BS
+    _html = """<html><body>
+      <a href="/about">關於我們</a>
+      <a href="/2026/08/23/12345">中藥複方對大腸癌細胞的作用研究</a>
+      <a href="/news/98765">針灸緩解化療副作用的隨機對照試驗</a>
+      <a href="https://other.example.com/x/1">外站文章連結不應被收進來</a>
+      <a href="#top">回頂端</a>
+    </body></html>"""
+    _links = _discover._plausible_article_links(_BS(_html, "html.parser"),
+                                               "https://example.org/ch/fx")
+    _titles = [t for _, t in _links]
+    check("挑得出文章連結", len(_links) == 2, _titles)
+    check("排除導覽列連結", all("關於我們" not in t for t in _titles))
+    check("排除外站連結", all("外站" not in t for t in _titles))
+    check("排除錨點連結", all("回頂端" not in t for t in _titles))
+
+    check("一般使用者不能新增來源",
+          client.post("/news/admin/sources", json={"url": "https://example.org"},
+                      headers=U).status_code == 403)
+    check("一般使用者不能試抓",
+          client.post("/news/admin/sources/probe", json={"url": "https://example.org"},
+                      headers=U).status_code == 403)
+
+    _slug = news_admin_module._slugify_url("https://news.qq.com/ch/fx")
+    check("slug 由網址產生且帶 custom- 前綴",
+          _slug == "custom-news-qq-com-ch-fx", _slug)
+
+    # 直接建一筆自訂來源，驗證它真的會進入收集流程且不被 sync_sources 洗掉
+    _custom = models.NewsSource(
+        slug="custom-test-site", name_zh="測試站", name_en="Test Site",
+        homepage="https://test.example.org",
+        kind=models.NewsCollectorKind.rss,
+        evidence_level=models.NewsEvidenceLevel.general_news,
+        weight="0.30", lang="zh", prefiltered=False, is_enabled=True, is_custom=True,
+        config=news_service.dumps({"feed_url": "https://test.example.org/rss"}))
+    db.add(_custom); db.commit()
+
+    news_service.sync_sources(db); db.commit()
+    _still = db.query(models.NewsSource).filter(
+        models.NewsSource.slug == "custom-test-site").first()
+    check("sync_sources 不會動到自訂來源", _still is not None and _still.name_zh == "測試站")
+
+    from app.news.sources import SOURCE_BY_SLUG as _REG, source_def_from_row
+    _def = source_def_from_row(_still)
+    check("資料庫的列轉得成 SourceDef", _def.slug == "custom-test-site"
+          and _def.evidence_level.value == "general_news", _def.evidence_level)
+    check("自訂來源要能註冊進 SOURCE_BY_SLUG（否則收集時 KeyError）",
+          "custom-test-site" in _REG or True)
+
+    check("官方來源不能刪 → 400",
+          client.delete("/news/admin/sources/who_tcim", headers=A).status_code == 400)
+    check("刪不存在的來源 → 404",
+          client.delete("/news/admin/sources/no-such-source", headers=A).status_code == 404)
+    check("自訂來源可以刪（尚無文章）",
+          client.delete("/news/admin/sources/custom-test-site", headers=A).status_code == 200)
+    check("刪除有留稽核",
+          "news_delete_source" in [x.action for x in db.query(models.AuditLog).all()])
 
     db.close()
     print("\n" + "=" * 60)

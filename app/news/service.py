@@ -20,8 +20,11 @@ from app import models
 from .collectors import collect_all, hamming, simhash64
 from .collectors.base import RawItem
 from .entity_linker import EntityIndex, article_text, build_index
-from .scoring import classify, rank_score, relevance, select_daily
-from .sources import SOURCES, SOURCE_BY_SLUG
+from .scoring import classify, rank_score, relevance, select_daily, set_active_terms
+from . import keywords
+from .sources import (
+    SOURCES, SOURCE_BY_SLUG, register_runtime_sources, source_def_from_row,
+)
 from . import short_summary
 from .summarizer import summarize
 
@@ -93,7 +96,10 @@ def sync_sources(db: Session) -> dict[str, str]:
 
     保留管理者在後台改過的 config（例如爬蟲選擇器修正、api_key）。
     """
-    existing = {s.slug: s for s in db.query(models.NewsSource).all()}
+    # 只同步程式碼定義的來源；管理者自訂的（is_custom）一律不碰，
+    # 否則後台改過的名稱／設定會在每次收集時被洗掉。
+    existing = {s.slug: s for s in db.query(models.NewsSource).all()
+                if not getattr(s, "is_custom", False)}
     for sd in SOURCES:
         row = existing.get(sd.slug)
         if row is None:
@@ -143,9 +149,30 @@ def run_daily_collection(
     db.flush()
 
     # ---- 1) 抓取（非同步收集器，用 asyncio.run 包起來）----
-    enabled = {s.slug for s in db.query(models.NewsSource)
-               .filter(models.NewsSource.is_enabled.is_(True)).all()}
-    active_sources = [s for s in SOURCES if s.slug in enabled] or SOURCES
+    rows = (db.query(models.NewsSource)
+            .filter(models.NewsSource.is_enabled.is_(True)).all())
+    enabled = {r.slug for r in rows}
+    active_sources = [s for s in SOURCES if s.slug in enabled] or list(SOURCES)
+
+    # 管理者在後台自行新增的來源只存在資料庫裡，要轉成 SourceDef 才進得了收集流程。
+    # 同時註冊進 SOURCE_BY_SLUG——scoring/summarizer/service 都靠那個字典查來源權重，
+    # 其中 service 用的是沒有預設值的 `SOURCE_BY_SLUG[slug]`，沒註冊會直接 KeyError。
+    custom_defs = []
+    for row in rows:
+        if not getattr(row, "is_custom", False):
+            continue
+        try:
+            custom_defs.append(source_def_from_row(row))
+        except Exception as exc:  # noqa: BLE001
+            logger.error("自訂來源 %s 設定有問題，這次收集略過：%s", row.slug, exc)
+    if custom_defs:
+        register_runtime_sources(custom_defs)
+        active_sources = active_sources + custom_defs
+
+    # 主題過濾詞以資料庫為準（後台可維護），第一次執行會先把程式碼預設值種進去
+    keywords.seed_defaults(db)
+    terms = keywords.get_terms(db)
+    set_active_terms(cancer=terms["cancer"], tcm=terms["tcm"])
 
     items, stats = asyncio.run(collect_all(
         contact_email=contact_email or os.environ.get("NEWS_CONTACT_EMAIL", "research@example.org"),

@@ -17,6 +17,29 @@ from .collectors.base import RawItem
 from .sources import CANCER_TERMS, SAFETY_TERMS, SOURCE_BY_SLUG, TCM_TERMS
 
 # ----------------------------------------------------------------------
+# 主題過濾詞：程式碼的 CANCER_TERMS／TCM_TERMS 是預設值，
+# 實際使用的以資料庫（news_keywords）為準，由 service 在每次收集開始前注入。
+#
+# 用模組層變數而不是把詞當參數一路傳下去，是因為 relevance() 會被
+# 每一篇文章呼叫，而同一次收集裡這組詞不會變；傳參數只會讓每個呼叫端
+# 都得多背一個它其實不關心的東西。
+# ----------------------------------------------------------------------
+_ACTIVE_TERMS = {"cancer": list(CANCER_TERMS), "tcm": list(TCM_TERMS)}
+
+
+def set_active_terms(cancer: list[str] | None = None, tcm: list[str] | None = None) -> None:
+    """注入這次收集要用的主題過濾詞。空清單會被忽略——
+    兩組任一為空時 relevance() 會判定所有文章都不相關，當天等於全軍覆沒。"""
+    if cancer:
+        _ACTIVE_TERMS["cancer"] = [t for t in cancer if t]
+    if tcm:
+        _ACTIVE_TERMS["tcm"] = [t for t in tcm if t]
+
+
+def active_terms() -> dict[str, list[str]]:
+    return {k: list(v) for k, v in _ACTIVE_TERMS.items()}
+
+# ----------------------------------------------------------------------
 # 癌別與介入方式辨識
 # ----------------------------------------------------------------------
 CANCER_TYPE_MAP: dict[str, list[str]] = {
@@ -94,8 +117,8 @@ def relevance(item: RawItem) -> float:
     """0..1 主題相關度：中藥/天然物 × 腫瘤。"""
     src = SOURCE_BY_SLUG.get(item.source_slug)
     text = _blob(item)
-    cancer = _hits(text, CANCER_TERMS)
-    tcm = _hits(text, TCM_TERMS)
+    cancer = _hits(text, _ACTIVE_TERMS["cancer"])
+    tcm = _hits(text, _ACTIVE_TERMS["tcm"])
 
     if src and src.prefiltered:
         # 來源本身鎖定主題（PubMed 查詢式、CT.gov 介入查詢、OCCAM、About Herbs）
@@ -113,7 +136,8 @@ def relevance(item: RawItem) -> float:
     score += min(len(tcm), 4) * 0.07
     # 標題就命中，比只在內文命中更相關
     title_low = item.title.lower()
-    if any(t in title_low for t in CANCER_TERMS) and any(t in title_low for t in TCM_TERMS):
+    if (any(t in title_low for t in _ACTIVE_TERMS["cancer"])
+            and any(t in title_low for t in _ACTIVE_TERMS["tcm"])):
         score += 0.15
     return min(score, 1.0)
 

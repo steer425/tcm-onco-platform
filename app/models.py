@@ -674,6 +674,9 @@ class NewsEvidenceLevel(str, enum.Enum):
     herb_safety = "herb_safety"              # 草藥安全與交互作用（About Herbs）
     national_policy = "national_policy"      # 國家衛生政策（中國衛健委）
     tcm_policy = "tcm_policy"                # 中醫藥國家政策（中醫藥管理局）
+    # 管理者自行新增的一般新聞來源。刻意獨立一個層級而不是硬塞進上面任何一個：
+    # 卡片上會顯示層級標籤，把商業新聞標成「癌症臨床與實證」會直接誤導讀者。
+    general_news = "general_news"            # 一般新聞（後台自行新增）
 
 
 class NewsEvidenceMaturity(str, enum.Enum):
@@ -723,6 +726,11 @@ class NewsSource(Base):
     # True 表示來源查詢式本身已鎖定主題，可略過關鍵字硬過濾
     prefiltered = Column(Boolean, nullable=False, default=False)
     is_enabled = Column(Boolean, nullable=False, default=True)
+    # True = 管理者在後台自行新增的來源（不在 sources.py 的註冊表裡）。
+    # sync_sources() 只同步程式碼定義的來源，看到 is_custom 一律不碰；
+    # 刪除也只允許刪 is_custom 的，避免有人在後台把官方來源刪掉之後
+    # 下次部署又被 sync 回來，造成「刪了又出現」的鬼打牆。
+    is_custom = Column(Boolean, nullable=False, default=False, index=True)
     config = Column(Text, nullable=True)          # JSON 字串
     notes = Column(Text, nullable=True)
     # 健康度追蹤：連續失敗次數超過門檻時後台亮警示
@@ -924,3 +932,35 @@ class NewsArticleSummary(Base):
     is_ai = Column(Boolean, nullable=False, default=False)  # False = 降級的規則式截斷
     model = Column(String, nullable=True)
     generated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class NewsKeyword(Base):
+    """主題過濾關鍵字（中藥詞 × 腫瘤詞），管理者可於後台維護。
+
+    為什麼要進資料庫：新增一個新聞來源之後，最常需要調整的就是這兩組詞——
+    來源換了，用語就換了（例如中文站講「中成藥」「驗方」，英文站講 botanical、
+    phytotherapy）。這件事不該每次都要改程式重新部署。
+
+    只收「主題過濾」這兩組。癌別對照、介入方式、臨床前判定詞刻意留在程式裡：
+    那幾組直接影響證據層級判斷與排序哲學，改壞了會讓臨床前研究排到人體試驗前面，
+    不是日常維護該碰的東西。
+
+    `group` 只有 'tcm' 與 'cancer' 兩種。一篇文章要同時命中兩組才算相關
+    （見 scoring.relevance()），所以兩組都不能是空的——刪到最後一筆會被擋下來。
+    """
+    __tablename__ = "news_keywords"
+    __table_args__ = (
+        UniqueConstraint("group", "term", name="uq_news_keyword_group_term"),
+    )
+
+    id = Column(String, primary_key=True, default=gen_id)
+    group = Column(String, nullable=False, index=True)   # 'tcm' / 'cancer'
+    term = Column(String, nullable=False)
+    is_enabled = Column(Boolean, nullable=False, default=True)
+    # True = 隨程式碼一起帶進來的預設詞。允許停用或刪除，但介面上會標示出來，
+    # 讓管理者知道這是原廠設定而不是自己加的。
+    is_default = Column(Boolean, nullable=False, default=False)
+    note = Column(String, nullable=True)
+    created_by = Column(String, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

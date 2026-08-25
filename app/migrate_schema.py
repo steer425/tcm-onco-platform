@@ -43,6 +43,8 @@ ALTER_STATEMENTS = [
     # 新聞模組：未解禁（embargo）內容標記，見 rules.md「新聞模組」章節
     "ALTER TABLE news_articles ADD COLUMN is_embargoed BOOLEAN DEFAULT FALSE NOT NULL",
     "ALTER TABLE news_articles ADD COLUMN embargo_until TIMESTAMP",
+    # 新聞模組：管理者於後台自行新增的來源標記（v1.37.0）
+    "ALTER TABLE news_sources ADD COLUMN is_custom BOOLEAN DEFAULT FALSE NOT NULL",
 ]
 
 
@@ -52,6 +54,16 @@ def run():
     try:
         with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
             conn.execute(text("ALTER TYPE oauthprovider ADD VALUE IF NOT EXISTS 'facebook'"))
+        print("  已新增（或本來就存在）")
+    except Exception as e:
+        print("  略過（可能是 SQLite 環境，或型別/數值已存在）：", str(e)[:150])
+
+    print("步驟 0b/3：為 newsevidencelevel enum 新增 'general_news'（管理者自訂新聞來源用）...")
+    # 同上：ALTER TYPE ... ADD VALUE 必須在 AUTOCOMMIT 下單獨執行，
+    # 不能放進下面 ALTER_STATEMENTS 的迴圈——那裡是包在 engine.begin() 交易裡跑的。
+    try:
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            conn.execute(text("ALTER TYPE newsevidencelevel ADD VALUE IF NOT EXISTS 'general_news'"))
         print("  已新增（或本來就存在）")
     except Exception as e:
         print("  略過（可能是 SQLite 環境，或型別/數值已存在）：", str(e)[:150])

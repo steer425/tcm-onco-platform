@@ -1,6 +1,6 @@
 # TCM 中藥腫瘤篩選平台 — 目標零後台系統
 
-**目前版本：v1.36.4**（詳見 [CHANGELOG.md](./CHANGELOG.md)）
+**目前版本：v1.37.0**（詳見 [CHANGELOG.md](./CHANGELOG.md)）
 
 本次交付內容：**目標零（帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄）** 後端 API + 對應前端頁面，以及登入後可見的 **Dashboard（施工中佔位頁）**。
 
@@ -45,6 +45,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 | F0-19 新聞後台管理（查詢／軟刪除+註記／還原／來源健康度／執行紀錄，v1.34.0） | `/news/admin/*` | `announcements.html`（分頁）+ `js/news-admin.js` |
 | F0-20 未解禁新聞存取（權限開關，非頁面，v1.34.0） | 由 `/news/daily`、`/news/archive` 依 `has_permission()` 過濾 | 無獨立頁面，於角色權限矩陣指派 |
 | 新聞多語系簡短摘要（v1.35.0） | `POST /news/summaries`、`/news/admin/summaries/backfill`、`/news/admin/summaries/stats` | 卡片內顯示；後台「公告 / 新聞管理 → 摘要與模組設定」分頁 |
+| 新聞來源與關鍵字管理（v1.37.0） | `/news/admin/sources`（POST/DELETE）、`/news/admin/sources/probe`、`/news/admin/keywords`（CRUD） | 「公告 / 新聞管理 → 新聞來源與關鍵字」分頁 |
 
 ## 三、重要設計說明與限制
 

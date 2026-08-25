@@ -23,6 +23,7 @@
     herb_safety: "草藥安全與交互作用",
     national_policy: "國家衛生政策",
     tcm_policy: "中醫藥國家政策",
+    general_news: "一般新聞",
   };
 
   // 對應追蹤指南「正確解讀方式」表，顯示為 title tooltip
@@ -37,6 +38,7 @@
     herb_safety: "主要用於安全與交互作用警示，不應自動轉換成處方建議。",
     national_policy: "政策支持與個別方劑的臨床療效證明必須分開解讀。",
     tcm_policy: "政策支持與個別方劑的臨床療效證明必須分開解讀。",
+    general_news: "一般新聞媒體報導，非同儕審查證據。引用前請回查原始研究或官方公告。",
   };
 
   const TAG_LABEL = {
@@ -164,7 +166,7 @@
 
     const right = translated
       ? `<div class="news-col-body">${escNews(translated)}</div>` +
-        (notAi ? `<div class="news-col-note">未經 AI 翻譯，這是直接截斷原文的結果（後台未設定 ANTHROPIC_API_KEY）。</div>` : "")
+        (notAi ? `<div class="news-col-note">此摘要在產生當下沒有 AI 金鑰可用，內容是直接截斷原文。管理者可於後台「摘要與模組設定 → 重產」更新。</div>` : "")
       : `<div class="news-col-body is-empty">尚未產生。請確認後台已設定 ANTHROPIC_API_KEY，並於「摘要與模組設定」按重產。</div>`;
 
     // 沒有原文可對照時（部分公告類來源沒有內文），就不要硬擠出一個空白左欄

@@ -41,6 +41,7 @@ class EvidenceLevel(str, Enum):
     HERB_SAFETY = "herb_safety"            # 草藥安全與交互作用
     NATIONAL_POLICY = "national_policy"    # 國家衛生政策
     TCM_POLICY = "tcm_policy"              # 中醫藥國家政策
+    GENERAL_NEWS = "general_news"          # 一般新聞（管理者於後台自行新增）
 
 
 @dataclass(frozen=True)
@@ -348,6 +349,52 @@ SOURCES: list[SourceDef] = [
 ]
 
 SOURCE_BY_SLUG: dict[str, SourceDef] = {s.slug: s for s in SOURCES}
+
+
+def register_runtime_sources(defs: list[SourceDef]) -> None:
+    """把管理者在後台新增的來源註冊進 SOURCE_BY_SLUG。
+
+    scoring／summarizer／service 都靠這個字典查來源的權重與證據層級，
+    其中 service 是 `SOURCE_BY_SLUG[slug]`（沒有預設值），
+    自訂來源沒註冊進來會直接 KeyError 讓整次收集掛掉。
+
+    只更新、不刪除既有項目：程式碼定義的 10 個官方來源永遠留著。
+    """
+    for d in defs:
+        SOURCE_BY_SLUG[d.slug] = d
+
+
+def source_def_from_row(row) -> SourceDef:
+    """把 news_sources 的一列轉成收集器吃的 SourceDef。
+
+    自訂來源只存在資料庫裡，收集流程卻是吃 SourceDef 的，這裡負責轉換。
+    型別欄位用 `.value` 取字串再轉回 enum，是因為資料庫存的是
+    SQLAlchemy 的 Enum 實例，跟這裡的 CollectorKind／EvidenceLevel 不是同一個類別。
+    """
+    import json
+
+    try:
+        config = json.loads(row.config) if row.config else {}
+    except (TypeError, ValueError):
+        config = {}
+    try:
+        weight = float(row.weight)
+    except (TypeError, ValueError):
+        weight = 0.30
+    return SourceDef(
+        slug=row.slug,
+        name_zh=row.name_zh,
+        name_en=row.name_en or row.name_zh,
+        homepage=row.homepage,
+        kind=CollectorKind(row.kind.value if hasattr(row.kind, "value") else row.kind),
+        evidence_level=EvidenceLevel(
+            row.evidence_level.value if hasattr(row.evidence_level, "value")
+            else row.evidence_level),
+        weight=weight,
+        prefiltered=bool(row.prefiltered),
+        lang=row.lang or "zh",
+        config=config,
+    )
 
 
 # --------------------------------------------------------------------------
