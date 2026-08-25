@@ -548,6 +548,15 @@ def backfill_summaries(db: Session, lang: str, *, days: int = 30, limit: int = 3
 
     有 limit 上限是刻意的——一次回補上千篇會讓請求逾時、費用也不受控。
     管理者按幾次就補幾批，回傳值會告訴他還剩幾篇。
+
+    `include_stale=True` 時要重產的有兩種，缺一不可（v1.35.3）：
+
+    1. `char_limit` 與目前設定不同——管理者改過字數上限
+    2. **`is_ai=False`——這一列是降級產生的**（產生當下沒有 API key 或呼叫失敗）
+
+    第 2 種是實際踩到的坑：先在沒有金鑰的狀態下產了一批截斷版，
+    之後補上金鑰，卻發現「回補」說沒有缺、「重產」說沒有 stale，
+    那批降級摘要就永遠卡在那裡，沒有任何辦法換成 AI 版本。
     """
     if lang not in short_summary.SUMMARY_LANGS:
         raise ValueError(f"不支援的摘要語系：{lang}")
@@ -557,7 +566,8 @@ def backfill_summaries(db: Session, lang: str, *, days: int = 30, limit: int = 3
     have = db.query(models.NewsArticleSummary.article_id).filter(
         models.NewsArticleSummary.lang == lang)
     if include_stale:
-        have = have.filter(models.NewsArticleSummary.char_limit == char_limit)
+        have = have.filter(models.NewsArticleSummary.char_limit == char_limit,
+                           models.NewsArticleSummary.is_ai.is_(True))
 
     todo_q = (db.query(models.NewsArticle)
               .filter(models.NewsArticle.is_deleted.is_(False),

@@ -191,13 +191,15 @@
       <table>
         <thead>
           <tr><th style="width:110px;">語系</th><th style="width:90px;">已有摘要</th>
-              <th style="width:90px;">尚未產生</th><th style="width:110px;">非目前字數</th>
+              <th style="width:90px;">尚未產生</th><th style="width:130px;">需重產</th>
               <th style="width:90px;">AI 產生</th><th>動作</th></tr>
         </thead>
         <tbody id="nSummaryStatsBody"></tbody>
       </table>
       <p style="font-size:11.5px; color:#8a958f; margin-top:10px; line-height:1.7;">
-        「回補」只處理還沒有該語系摘要的文章；「重產」會把字數上限改過之後的舊摘要重新產生。
+        「回補」只處理還沒有該語系摘要的文章；「重產」處理兩種：<strong>降級產生的</strong>
+        （產生當下沒有 AI 金鑰，內容是截斷原文）與<strong>字數上限改過的</strong>。
+        補上 ANTHROPIC_API_KEY 之後，就是按「重產」把舊的降級摘要換成 AI 版本。
         兩者都是一次一批（最多 50 篇），按到「尚未產生」歸零為止——這樣才不會一次觸發大量 API 呼叫。
       </p>
     </div>

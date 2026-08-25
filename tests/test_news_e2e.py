@@ -445,9 +445,20 @@ def main():
     r = client.post("/news/admin/summaries/backfill",
                     json={"lang": "en", "limit": 50, "include_stale": True}, headers=A)
     check("include_stale 會重產舊長度的摘要", r.json()["written"] == stale_before, r.json())
-    check("重產後不再有 stale",
+
+    # v1.35.3 的關鍵修正：降級產生的摘要（is_ai=False）也要算「需重產」。
+    # 否則先在沒有金鑰時產了一批截斷版，之後補上金鑰，會發現「回補」說沒有缺、
+    # 「重產」說沒有 stale，那批降級摘要永遠換不掉。
+    en_now = next(x for x in
+                  client.get("/news/admin/summaries/stats", headers=A).json()["by_lang"]
+                  if x["lang"] == "en")
+    check("降級產生的摘要被計入 degraded", en_now["degraded"] == en_now["have"], en_now)
+    check("降級產生的摘要被計入需重產", en_now["stale"] == en_now["have"], en_now)
+    check("字數過期與降級分開統計", en_now["outdated_length"] == 0, en_now)
+    check("有降級摘要時重產按鈕不會是灰的（stale > 0）", en_now["stale"] > 0)
+    check("重產後字數已對齊目前設定",
           next(x for x in client.get("/news/admin/summaries/stats", headers=A).json()["by_lang"]
-               if x["lang"] == "en")["stale"] == 0)
+               if x["lang"] == "en")["outdated_length"] == 0)
     check("重產後總筆數不變（是更新不是新增）",
           next(x for x in client.get("/news/admin/summaries/stats", headers=A).json()["by_lang"]
                if x["lang"] == "en")["have"] == en_stat["have"])

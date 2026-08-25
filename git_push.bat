@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.35.2 add an admin button that really calls the Anthropic API to verify ANTHROPIC_API_KEY, instead of only checking the env var exists"
+set "DEFAULT_MSG=v1.35.3 let regenerate also pick up degraded (non-AI) summaries, so summaries produced before the API key existed can be replaced"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

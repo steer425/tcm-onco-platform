@@ -495,10 +495,16 @@ def summary_stats(current_user: models.User = Depends(require_admin),
         rows = db.query(models.NewsArticleSummary).filter(
             models.NewsArticleSummary.lang == lang)
         have = rows.count()
-        stale = rows.filter(models.NewsArticleSummary.char_limit != char_limit).count()
+        # 「字數上限改過」與「降級產生的」都算需要重產，分開統計讓管理者知道原因
+        outdated = rows.filter(models.NewsArticleSummary.char_limit != char_limit).count()
+        degraded = rows.filter(models.NewsArticleSummary.is_ai.is_(False)).count()
         ai = rows.filter(models.NewsArticleSummary.is_ai.is_(True)).count()
+        needs_regen = rows.filter(
+            (models.NewsArticleSummary.char_limit != char_limit)
+            | (models.NewsArticleSummary.is_ai.is_(False))).count()
         out.append({"lang": lang, "have": have, "missing": max(0, total - have),
-                    "stale": stale, "ai_generated": ai})
+                    "stale": needs_regen, "outdated_length": outdated,
+                    "degraded": degraded, "ai_generated": ai})
     return {"total_articles": total, "char_limit": char_limit,
             "summary_enabled": bool(cfg.get("summary_enabled", True)),
             "has_api_key": bool(os.environ.get("ANTHROPIC_API_KEY")), "by_lang": out}
