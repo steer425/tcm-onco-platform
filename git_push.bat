@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.35.3 let regenerate also pick up degraded (non-AI) summaries, so summaries produced before the API key existed can be replaced"
+set "DEFAULT_MSG=v1.35.4 report key length, vendor prefix and stray whitespace on a 401, and strip the API key before use"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

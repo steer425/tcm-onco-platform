@@ -507,7 +507,8 @@ def summary_stats(current_user: models.User = Depends(require_admin),
                     "degraded": degraded, "ai_generated": ai})
     return {"total_articles": total, "char_limit": char_limit,
             "summary_enabled": bool(cfg.get("summary_enabled", True)),
-            "has_api_key": bool(os.environ.get("ANTHROPIC_API_KEY")), "by_lang": out}
+            "has_api_key": bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip()),
+            "by_lang": out}
 
 
 @router.get("/summaries/test-key", summary="（後台）實際打一次 API，檢測 ANTHROPIC_API_KEY 是否可用")

@@ -402,6 +402,21 @@ def main():
     check("錯誤金鑰不會被判定為有效",
           r2.status_code == 200 and r2.json()["ok"] is False, r2.json().get("reason"))
     check("檢測結果不會外洩金鑰本身", _SENTINEL not in r2.text, r2.json().get("reason"))
+    d = r2.json()
+    check("回報金鑰長度供判斷是否被截斷", d.get("key_length") == len(_SENTINEL), d.get("key_length"))
+    check("回報的前綴只有廠商公開前綴那一段",
+          d.get("key_prefix") == _SENTINEL[:14] and len(d.get("key_prefix", "")) == 14)
+
+    # 環境變數夾帶換行是最常見的貼上意外，光看遮蔽過的欄位完全看不出來
+    _os.environ["ANTHROPIC_API_KEY"] = "  " + _SENTINEL + "\n"
+    d2 = client.get("/news/admin/summaries/test-key", headers=A).json()
+    check("偵測到前後夾帶空白/換行", d2.get("had_surrounding_whitespace") is True, d2.get("reason"))
+    check("夾帶空白時長度以去除後計算", d2.get("key_length") == len(_SENTINEL), d2.get("key_length"))
+    _os.environ.pop("ANTHROPIC_API_KEY", None)
+
+    _os.environ["ANTHROPIC_API_KEY"] = "   \n  "
+    check("只有空白等同未設定",
+          client.get("/news/admin/summaries/test-key", headers=A).json()["reason"] == "not_set")
     _os.environ.pop("ANTHROPIC_API_KEY", None)
     check("一般使用者不能檢測金鑰 → 403",
           client.get("/news/admin/summaries/test-key", headers=U).status_code == 403)
