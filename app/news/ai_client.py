@@ -169,13 +169,19 @@ def check_key() -> dict:
 
     url, headers, payload = _build_request(provider, "You are a test.", "hi", 8)
     try:
-        resp = httpx.post(url, headers=headers, json=payload, timeout=45.0)
+        # 逾時刻意設得短：這是「診斷」端點，最重要的是無論如何都要很快給出答案。
+        # 設 45 秒的話，對方若不回應，整個 HTTP 請求會被拖到瀏覽器或反向代理先斷線，
+        # 使用者只會看到 "Failed to fetch"——比拿到「12 秒內無回應」更沒有資訊。
+        # 真的能用的金鑰，這個 max_output_tokens=8 的請求 1~2 秒就回來了。
+        resp = httpx.post(url, headers=headers, json=payload, timeout=12.0)
     except Exception as exc:  # noqa: BLE001
         logger.error("AI 金鑰檢測連線失敗（%s）：%s", provider, exc)
         return {"ok": False, "reason": "network", **diag,
-                "message": (f"連不到 {provider} API（端點 {url}）：{str(exc)[:200]}。"
-                            "若是逾時，多半是端點網址不對或對外連線被擋；"
-                            "端點可用 NEWS_GEMINI_URL／NEWS_GEMINI_BASE 環境變數覆寫。")}
+                "message": (f"12 秒內連不到 {provider} API。端點：{url}。"
+                            f"錯誤：{str(exc)[:160]}。"
+                            "可用的金鑰通常 1~2 秒就會回應，逾時代表端點網址不對、"
+                            "或這台伺服器對外連到該網域被擋住。"
+                            "端點可用 NEWS_GEMINI_BASE／NEWS_GEMINI_URL 環境變數覆寫。")}
 
     if resp.status_code == 200:
         return {"ok": True, "reason": "ok", **diag,
@@ -187,7 +193,7 @@ def check_key() -> dict:
     if provider == "gemini" and resp.status_code in (400, 404):
         try:
             lst = httpx.get(f"{GEMINI_BASE}/models",
-                            headers={"x-goog-api-key": key}, timeout=20.0)
+                            headers={"x-goog-api-key": key}, timeout=8.0)
             if lst.status_code == 200:
                 names = [m.get("name", "").replace("models/", "")
                          for m in lst.json().get("models", [])

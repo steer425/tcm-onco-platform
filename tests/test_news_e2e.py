@@ -444,6 +444,10 @@ def main():
     check("模型名稱組進網址", "/models/" in u, u)
     check("金鑰走標頭不走查詢字串",
           "x-goog-api-key" in h and "key=" not in u, sorted(h))
+    import inspect as _inspect
+    _src = _inspect.getsource(ai_client.check_key)
+    check("診斷端點逾時設定夠短（不會把請求拖到瀏覽器斷線）",
+          "timeout=12.0" in _src and "timeout=45.0" not in _src)
     check("請求含 systemInstruction / contents",
           "systemInstruction" in b and "contents" in b, sorted(b))
 

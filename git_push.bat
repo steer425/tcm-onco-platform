@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.36.1 fix the Gemini endpoint to the documented generateContent REST path, and list the models the key can actually use"
+set "DEFAULT_MSG=v1.36.2 make the API-key diagnostic always answer fast (12s cap) so a hanging provider cannot turn into a browser-level Failed to fetch"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

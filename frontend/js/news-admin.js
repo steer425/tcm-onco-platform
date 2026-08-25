@@ -554,7 +554,13 @@
         box.style.display = "";
         box.style.borderLeftColor = "#b4463c";
         box.style.background = "#fdf1f0";
-        box.textContent = "❌ 檢測失敗：" + err.message;
+        // "Failed to fetch" 是瀏覽器層級的錯誤，代表請求根本沒回來，
+        // 光把它原樣顯示出來，使用者完全不知道下一步要做什麼。
+        const hint = /failed to fetch|networkerror|load failed/i.test(err.message || "")
+          ? "（請求沒有回到瀏覽器。後端可能正在部署或從休眠中喚醒——"
+            + "先開一次後端的 /docs 頁面把它叫醒，等幾秒後再按一次。）"
+          : "";
+        box.textContent = "❌ 檢測失敗：" + err.message + hint;
       }
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = original; }
