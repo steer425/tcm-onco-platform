@@ -441,6 +441,13 @@ def main():
     # 金鑰走標頭不走查詢字串（查詢字串會被存取日誌與代理記錄下來）
     u, h, b = ai_client._build_request("gemini", "sys", "hi", 8)
     check("Gemini 用 generateContent 端點", u.endswith(":generateContent"), u)
+    # 模型退役過兩次，錯誤訊息裡 Google 會直說該換哪一個——那句要抓出來放最前面
+    import re as _re
+    _m = _re.search(r"use\s+models/([A-Za-z0-9._-]+)",
+                    "This model models/gemini-2.5-flash is no longer available to new users. "
+                    "Please update your code to use models/gemini-3.6-flash for the latest features.")
+    check("能從錯誤訊息抽出建議的替代模型", _m and _m.group(1) == "gemini-3.6-flash",
+          _m.group(1) if _m else None)
     check("模型名稱組進網址", "/models/" in u, u)
     check("金鑰走標頭不走查詢字串",
           "x-goog-api-key" in h and "key=" not in u, sorted(h))

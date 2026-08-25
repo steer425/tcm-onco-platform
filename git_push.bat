@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.36.3 default Gemini model to gemini-2.5-flash; gemini-2.0-flash has been retired"
+set "DEFAULT_MSG=v1.36.4 default to the gemini-flash-latest alias and surface the replacement model Google names in the error"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

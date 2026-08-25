@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 
 import httpx
 
@@ -34,7 +35,11 @@ GEMINI_BASE = os.environ.get("NEWS_GEMINI_BASE",
 # 預設模型會退役（gemini-2.0-flash 就是實際遇到的：檢測回 404 並附上「已不再提供」）。
 # 因此 (1) 預設值要跟得上，(2) 一定要能用環境變數覆寫，(3) 檢測遇到 404 時
 # 會用同一把金鑰列出實際可用的模型名稱——管理者不必等改程式就能自己換掉。
-GEMINI_MODEL = os.environ.get("NEWS_GEMINI_MODEL", "gemini-2.5-flash")
+# 預設用 *-latest 別名而不是固定版本號：實測在同一天內就連續遇到兩次模型退役
+# （gemini-2.0-flash「已下架」、gemini-2.5-flash「不再開放新用戶」）。
+# 別名會自動跟著目前的 flash 模型走，代價是模型可能無預警換版；
+# 要固定版本的話用 NEWS_GEMINI_MODEL 指定即可。
+GEMINI_MODEL = os.environ.get("NEWS_GEMINI_MODEL", "gemini-flash-latest")
 GEMINI_URL = os.environ.get("NEWS_GEMINI_URL") or \
     f"{GEMINI_BASE}/models/{GEMINI_MODEL}:generateContent"
 
@@ -193,6 +198,7 @@ def check_key() -> dict:
     # 模型名稱會改版，光說「找不到模型」對管理者沒有幫助。
     # Gemini 可以用金鑰列出實際可用的模型，直接把名字告訴他。
     available = ""
+    suggested = ""
     if provider == "gemini" and resp.status_code in (400, 404):
         try:
             lst = httpx.get(f"{GEMINI_BASE}/models",
@@ -202,12 +208,21 @@ def check_key() -> dict:
                          for m in lst.json().get("models", [])
                          if "generateContent" in (m.get("supportedGenerationMethods") or [])]
                 if names:
-                    available = ("　可用的模型："
+                    # 刻意不寫「可用的模型」：ListModels 列的是**存在**的模型，
+                    # 不代表這個帳號叫得動（實測 gemini-2.5-flash 在清單裡，
+                    # 但呼叫時回「no longer available to new users」）。
+                    available = ("　此金鑰列出的模型（未必每個都能用）："
                                  + "、".join(names[:8])
                                  + ("…" if len(names) > 8 else "")
-                                 + "（用環境變數 NEWS_GEMINI_MODEL 指定）")
+                                 + "。用環境變數 NEWS_GEMINI_MODEL 指定。")
         except Exception:  # noqa: BLE001
             pass
+
+        # Google 遇到退役模型時，會在錯誤訊息裡直接寫出該換成哪一個。
+        # 那是整段訊息裡最有用的一句，要拉到最前面，不要讓它埋在中間。
+        m = re.search(r"use\s+models/([A-Za-z0-9._-]+)", detail)
+        if m:
+            suggested = f"　→ Google 建議改用：{m.group(1)}（設到 NEWS_GEMINI_MODEL）。"
 
     try:
         body = resp.json()
@@ -230,4 +245,4 @@ def check_key() -> dict:
 
     return {"ok": False, "reason": reason, **diag,
             "message": (f"HTTP {resp.status_code}：{_HINTS.get(reason, '')} {detail} "
-                        + " ".join(extra) + available).strip()}
+                        + suggested + " ".join(extra) + available).strip()}

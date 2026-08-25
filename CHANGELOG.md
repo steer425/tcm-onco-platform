@@ -1,5 +1,32 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.36.4 — 2026-08-23（改用 *-latest 別名；把 Google 指名的替代模型拉到訊息最前面）
+
+### 同一天連續踩兩次模型退役
+
+- `gemini-2.0-flash` → 「This model is no longer available.」
+- `gemini-2.5-flash` → 「This model is no longer available **to new users**.」
+
+第二次特別值得記：`gemini-2.5-flash` **確實出現在 ListModels 的清單裡**，
+但呼叫時仍被拒。也就是說 **ListModels 列的是「存在的」模型，不是「這個帳號叫得動的」模型**。
+v1.36.1 把那份清單標成「可用的模型」是過度承諾，實際害使用者照著選了一個一樣不能用的。
+
+### 修正三件事
+
+1. **預設改成 `gemini-flash-latest`**（別名，自動跟著目前的 flash 模型走）。
+   固定版本號一定會退役，別名不會。要釘版本的人用 `NEWS_GEMINI_MODEL` 指定即可。
+2. **清單標題改成「此金鑰列出的模型（未必每個都能用）」**，不再假裝那是保證可用清單。
+3. **把 Google 指名的替代模型抓出來放到訊息最前面**：退役訊息裡本來就寫著
+   「Please update your code to use models/X」，那是整段裡最有用的一句，
+   卻埋在中間容易被忽略。現在會顯示「→ Google 建議改用：X（設到 NEWS_GEMINI_MODEL）」。
+
+**外部服務給的錯誤訊息裡常常已經包含正確答案。與其自己另外湊一份可能過時的建議清單，
+不如把對方指名的那一句解析出來、放到最顯眼的位置。**
+
+### 已測試驗證
+
+`python -m tests.test_news_e2e` — **129 項斷言全過**，新增一項守住「能從錯誤訊息抽出建議的替代模型」。
+
 ## v1.36.3 — 2026-08-23（預設 Gemini 模型改為 gemini-2.5-flash，2.0-flash 已退役）
 
 實測結果：`gemini-2.0-flash` 已經下架，檢測回
