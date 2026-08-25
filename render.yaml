@@ -31,6 +31,10 @@ services:
       # ---- 每日重點新聞模組（v1.34.0）----
       - key: NEWS_COLLECT_SECRET
         sync: false  # 必填。外部排程觸發 POST /news/admin/collect/scheduled 的共享密鑰；未設定時該端點回 503 停用
+      - key: GEMINI_API_KEY
+        sync: false  # 選填但建議。新聞 AI 中文標題／摘要；Google AI Studio 免費層不需信用卡。兩家都設時優先用這個
+      - key: NEWS_AI_PROVIDER
+        sync: false  # 選填。強制指定 gemini / anthropic / none，不設則自動偵測（Gemini 優先）
       - key: ANTHROPIC_API_KEY
         sync: false  # 選填。新聞 AI 中文摘要；未設定會自動降級為規則式摘要，收集流程不中斷
       - key: PUBMED_API_KEY

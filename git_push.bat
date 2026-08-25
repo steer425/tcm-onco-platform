@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.35.4 report key length, vendor prefix and stray whitespace on a 401, and strip the API key before use"
+set "DEFAULT_MSG=v1.36.0 support Gemini as the AI provider for news summaries (free tier, no credit card) with Anthropic as an alternative"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

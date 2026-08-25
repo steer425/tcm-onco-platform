@@ -24,6 +24,7 @@ from app.database import SessionLocal
 from app.main import app
 from app.news import service as news_service
 from app.news.collectors.base import RawItem
+from app.news.short_summary import generate as short_summary_generate
 from app.security import hash_password
 
 NOW = datetime.now(timezone.utc)
@@ -418,6 +419,27 @@ def main():
     check("只有空白等同未設定",
           client.get("/news/admin/summaries/test-key", headers=A).json()["reason"] == "not_set")
     _os.environ.pop("ANTHROPIC_API_KEY", None)
+
+    # 供應商選擇：Gemini 優先（免費層不需信用卡），可用 NEWS_AI_PROVIDER 強制
+    from app.news import ai_client
+    _os.environ["ANTHROPIC_API_KEY"] = "sk-ant-x"
+    check("只有 Anthropic 時選 anthropic", ai_client.active_provider() == "anthropic")
+    _os.environ["GEMINI_API_KEY"] = "AIzaTESTKEY"
+    check("兩者都有時 Gemini 優先", ai_client.active_provider() == "gemini")
+    d3 = client.get("/news/admin/summaries/test-key", headers=A).json()
+    check("檢測會回報目前用哪一家", d3.get("provider") == "gemini", d3.get("provider"))
+    check("檢測會回報讀的是哪個環境變數", d3.get("key_env") == "GEMINI_API_KEY", d3.get("key_env"))
+    check("Gemini 金鑰前綴檢查用 AIza",
+          d3.get("looks_like_expected_key") is True, d3.get("key_prefix"))
+    _os.environ["NEWS_AI_PROVIDER"] = "anthropic"
+    check("可強制指定供應商", ai_client.active_provider() == "anthropic")
+    _os.environ["NEWS_AI_PROVIDER"] = "none"
+    check("可強制停用 AI", ai_client.active_provider() is None)
+    check("停用時摘要走降級",
+          all(r["is_ai"] is False for r in
+              short_summary_generate([{"abstract": "x" * 400}], "en", 120)))
+    for _k in ("NEWS_AI_PROVIDER", "GEMINI_API_KEY", "ANTHROPIC_API_KEY"):
+        _os.environ.pop(_k, None)
     check("一般使用者不能檢測金鑰 → 403",
           client.get("/news/admin/summaries/test-key", headers=U).status_code == 403)
     check("檢測有留稽核",

@@ -21,10 +21,9 @@ import re
 
 import httpx
 
-logger = logging.getLogger(__name__)
+from . import ai_client
 
-API_URL = "https://api.anthropic.com/v1/messages"
-MODEL = os.environ.get("NEWS_SUMMARY_MODEL", "claude-sonnet-4-5")
+logger = logging.getLogger(__name__)
 
 SUMMARY_LANGS = ("zh-TW", "en", "ko")
 
@@ -157,30 +156,13 @@ def fallback(art: dict, lang: str, char_limit: int) -> str | None:
 async def _call(client: httpx.AsyncClient, api_key: str, lang: str, char_limit: int,
                 indices: list[int], arts: list[dict]) -> dict[int, str]:
     rendered = "\n\n".join(_render(i, arts[i]) for i in indices)
-    resp = await client.post(
-        API_URL,
-        headers={
-            "content-type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-        },
-        json={
-            "model": MODEL,
-            # 一篇約 char_limit 字，估 3 token/字再加 JSON 骨架，抓寬一點避免被截斷
-            "max_tokens": min(8192, 400 + len(indices) * (char_limit * 3 + 80)),
-            "system": _system_prompt(lang, char_limit),
-            "messages": [
-                {"role": "user",
-                 "content": f"請處理以下 {len(indices)} 篇。\n\n{rendered}\n\n只輸出 JSON 陣列。"},
-                {"role": "assistant", "content": "["},   # prefill 逼出純 JSON
-            ],
-        },
-        timeout=120.0,
+    text = await ai_client.complete(
+        client,
+        _system_prompt(lang, char_limit),
+        f"請處理以下 {len(indices)} 篇。\n\n{rendered}\n\n只輸出 JSON 陣列。",
+        # 一篇約 char_limit 字，估 3 token/字再加 JSON 骨架，抓寬一點避免被截斷
+        max_output_tokens=min(8192, 400 + len(indices) * (char_limit * 3 + 80)),
     )
-    resp.raise_for_status()
-    data = resp.json()
-    text = "[" + "".join(b.get("text", "") for b in data.get("content", [])
-                         if b.get("type") == "text")
     out: dict[int, str] = {}
     for d in _parse_json_array(text):
         if isinstance(d, dict) and "id" in d and d.get("summary"):
@@ -211,7 +193,7 @@ async def _generate_async(arts: list[dict], lang: str, char_limit: int, api_key:
                 for i, text in got.items():
                     if 0 <= i < len(results) and text:
                         results[i] = {"summary": truncate(text, char_limit),
-                                      "is_ai": True, "model": MODEL}
+                                      "is_ai": True, "model": ai_client.provider_model()}
 
         await asyncio.gather(*(run(b) for b in batches))
     return results
@@ -229,12 +211,11 @@ def generate(arts: list[dict], lang: str, char_limit: int = DEFAULT_CHAR_LIMIT, 
     char_limit = max(MIN_CHAR_LIMIT, min(MAX_CHAR_LIMIT, int(char_limit)))
     if not arts:
         return []
-    api_key = (api_key or os.environ.get("ANTHROPIC_API_KEY") or "").strip() or None
-    if not api_key:
+    if not ai_client.active_provider():
         return [{"summary": fallback(a, lang, char_limit), "is_ai": False, "model": None}
                 for a in arts]
     try:
-        return asyncio.run(_generate_async(arts, lang, char_limit, api_key,
+        return asyncio.run(_generate_async(arts, lang, char_limit, api_key or "",
                                            batch_size, concurrency))
     except Exception as exc:  # noqa: BLE001
         logger.error("簡短摘要整體失敗（%s），全部降級：%s", lang, exc)
@@ -243,75 +224,5 @@ def generate(arts: list[dict], lang: str, char_limit: int = DEFAULT_CHAR_LIMIT, 
 
 
 def check_api_key(api_key: str | None = None) -> dict:
-    """實際打一次 Anthropic API，確認金鑰真的能用。
-
-    為什麼需要這個：只檢查環境變數存不存在（`os.environ.get`）沒有意義——
-    金鑰打錯、過期、額度用盡時變數一樣存在，但每次生成都會失敗然後靜靜退回降級，
-    畫面上的症狀跟「沒設」一模一樣，管理者無從分辨。
-
-    刻意用 max_tokens=1 的最小請求：只要能通過驗證就夠了，不需要真的產出內容。
-    回傳絕不包含金鑰本身，只有狀態與對方的錯誤訊息（截短）。
-    """
-    raw = api_key if api_key is not None else os.environ.get("ANTHROPIC_API_KEY")
-    if not raw or not raw.strip():
-        return {"ok": False, "reason": "not_set",
-                "message": "後端未設定 ANTHROPIC_API_KEY 環境變數（或值是空白）。"}
-
-    # 診斷資訊：只包含長度、廠商固定前綴與「有沒有夾帶空白」，不含任何機密部分。
-    # 401 最常見的兩個原因是「貼上時被截斷」與「前後夾帶換行」，
-    # 這兩件事光看遮蔽過的欄位完全看不出來，必須由後端回報。
-    api_key = raw.strip()
-    diag = {
-        "key_length": len(api_key),
-        "key_prefix": api_key[:14],          # sk-ant-api03- 是公開前綴，不是機密
-        "had_surrounding_whitespace": raw != api_key,
-        "looks_like_anthropic_key": api_key.startswith("sk-ant-"),
-    }
-
-    try:
-        resp = httpx.post(
-            API_URL,
-            headers={"content-type": "application/json", "x-api-key": api_key,
-                     "anthropic-version": "2023-06-01"},
-            json={"model": MODEL, "max_tokens": 1,
-                  "messages": [{"role": "user", "content": "hi"}]},
-            timeout=30.0,
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.error("API 金鑰檢測連線失敗：%s", exc)
-        return {"ok": False, "reason": "network", "model": MODEL, **diag,
-                "message": f"連不到 Anthropic API：{str(exc)[:200]}"}
-
-    if resp.status_code == 200:
-        return {"ok": True, "reason": "ok", "model": MODEL, **diag,
-                "message": f"金鑰有效，模型 {MODEL} 可正常呼叫。"}
-
-    detail = ""
-    try:
-        detail = str(resp.json().get("error", {}).get("message", ""))[:300]
-    except Exception:  # noqa: BLE001
-        detail = resp.text[:300]
-
-    reason = {401: "invalid", 403: "forbidden", 404: "model_not_found",
-              429: "rate_limited"}.get(resp.status_code, "http_error")
-    hint = {
-        "invalid": "金鑰不正確或已撤銷，請到 console.anthropic.com 重新產生後更新 Render 環境變數。",
-        "forbidden": "金鑰有效但沒有這個模型的權限。",
-        "model_not_found": f"找不到模型 {MODEL}，可用 NEWS_SUMMARY_MODEL 環境變數指定其他模型。",
-        "rate_limited": "額度或速率上限已達，稍後再試。",
-    }.get(reason, "")
-    # 401 時把「長度／前綴／有無夾帶空白」一起講出來，管理者才有辦法自己判斷
-    # 是貼貼上被截斷、夾到換行，還是金鑰真的被撤銷了。
-    extra = ""
-    if reason == "invalid":
-        parts = [f"目前這把金鑰長度 {diag['key_length']} 字元，開頭 {diag['key_prefix']}…"]
-        if not diag["looks_like_anthropic_key"]:
-            parts.append("開頭不是 sk-ant-，可能貼錯了別的服務的金鑰。")
-        if diag["had_surrounding_whitespace"]:
-            parts.append("原始值前後夾帶了空白或換行（本次檢測已自動去除後才送出，"
-                         "但請在 Render 把它清乾淨）。")
-        parts.append("Anthropic 的金鑰約 100 字元以上，明顯偏短就是貼上時被截斷了。")
-        extra = " " + " ".join(parts)
-
-    return {"ok": False, "reason": reason, "model": MODEL, **diag,
-            "message": (f"HTTP {resp.status_code}：{hint} {detail}".strip() + extra).strip()}
+    """保留這個名字給既有呼叫端；實作已移到 ai_client，兩家供應商共用一套檢測。"""
+    return ai_client.check_key()

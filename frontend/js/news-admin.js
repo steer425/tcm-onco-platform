@@ -456,10 +456,12 @@
         } else {
           warn.style.display = "";
           warn.innerHTML =
-            "<strong>目前未設定 <code>ANTHROPIC_API_KEY</code></strong>（Render 環境變數）。" +
-            "此時摘要會降級為「直接截斷原文」：繁體中文與英文仍會有內容，" +
-            "<strong>但韓文不會產生</strong>——沒有翻譯能力時硬塞中文並標成韓文摘要，" +
-            "比留白更容易讓人誤判。設定 API key 後再按「重產」即可換成 AI 摘要。";
+            "<strong>目前沒有可用的 AI 供應商</strong>（Render 環境變數未設 " +
+            "<code>GEMINI_API_KEY</code> 或 <code>ANTHROPIC_API_KEY</code>）。" +
+            "此時摘要會降級：英文來源可截斷英文原文，<strong>但中文與韓文不會產生</strong>——" +
+            "沒有翻譯能力時拿英文冒充中文，比留白更容易讓人誤判成系統壞掉。" +
+            "建議用 <code>GEMINI_API_KEY</code>（Google AI Studio 免費層，不需信用卡）；" +
+            "設定後按「檢測 API 金鑰」確認，再按「重產」把既有的降級摘要換成 AI 版本。";
         }
       }
 
@@ -470,7 +472,13 @@
           <td>${label}<div style="font-size:11px; color:#8a958f;">${lang}</div></td>
           <td>${row.have}</td>
           <td>${row.missing > 0 ? `<strong>${row.missing}</strong>` : 0}</td>
-          <td>${row.stale > 0 ? `<strong>${row.stale}</strong>` : 0}</td>
+          <td>${row.stale > 0 ? `<strong>${row.stale}</strong>` : 0}${
+            row.stale > 0
+              ? `<div style="font-size:11px; color:#8a958f;">${
+                  [row.degraded ? `降級 ${row.degraded}` : "",
+                   row.outdated_length ? `字數過期 ${row.outdated_length}` : ""]
+                    .filter(Boolean).join("、")}</div>`
+              : ""}</td>
           <td>${row.ai_generated}</td>
           <td>
             <button onclick="newsAdminBackfill('${lang}', false, this)"

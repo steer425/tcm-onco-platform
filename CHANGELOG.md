@@ -1,5 +1,60 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.36.0 — 2026-08-23（新聞 AI 摘要改可用 Gemini 免費層，不再綁單一供應商）
+
+### 為什麼
+
+原本綁死 Anthropic API，而它要儲值才能用。查過之後：
+
+- **DeepL API Free** 官方已不再開放新用戶申請，這條路斷了
+- **免費機器翻譯**（MyMemory 等）額度小、醫學與中藥名詞品質差
+- **Gemini API 免費層**仍在，**不需要信用卡**，而且能做完整的「摘要＋翻譯＋證據層級判斷」，
+  跟原本的功能一模一樣
+
+要注意這個模組要的不是單純翻譯：提示詞要求反映證據層級、禁止療效宣稱、不得杜撰數據。
+純機器翻譯只會把英文摘要逐字翻過來，不會壓成 200 字，也不會做證據判斷。
+
+### 新增 `app/news/ai_client.py`
+
+摘要與翻譯這件事跟「找誰做」無關，但兩家的端點、標頭、請求與回應結構完全不同。
+把差異收在這一層，`summarizer.py`（收集時的中文標題／摘要）與 `short_summary.py`
+（多語系簡短摘要）就只處理提示詞與解析，不必各自散落一份 HTTP 細節。
+
+| 供應商 | 端點 | 金鑰標頭 | 結果位置 |
+|---|---|---|---|
+| Gemini | `/v1beta/interactions` | `x-goog-api-key` | `output_text`（也相容舊的 `candidates[].content.parts[]`）|
+| Anthropic | `/v1/messages` | `x-api-key` | `content[].text` |
+
+**選擇順序**：`NEWS_AI_PROVIDER` 可強制指定（gemini／anthropic／none），
+否則自動偵測——`GEMINI_API_KEY` 優先，其次 `ANTHROPIC_API_KEY`，都沒有就走降級。
+
+端點與模型名稱都能用環境變數覆寫（`NEWS_GEMINI_URL`／`NEWS_GEMINI_MODEL` 等）。
+這是刻意的：兩家 API 都還在演進，真的改版時可以先改環境變數擋著，不必等重新部署程式。
+
+### 連帶好處：中文標題也會有了
+
+`summarizer.py` 一起換到共用層，所以**收集時產的 `title_zh` 也會跟著出現**——
+先前只有摘要能靠「重產」補救，標題永遠是英文。設好金鑰後新收的文章標題就是中文。
+
+### 環境變數
+
+`render.yaml` 補上 `GEMINI_API_KEY` 與 `NEWS_AI_PROVIDER` 的宣告（`sync: false`，值在後台填）。
+後台警示文案也改成兩家並列，並標明 Gemini 免費層不需信用卡。
+
+### 已測試驗證
+
+`python -m tests.test_news_e2e` — **120 項斷言全過**（v1.35.4 的 112 項 + 本次 8 項）。
+
+新增：只有 Anthropic 時選 anthropic、兩者都有時 Gemini 優先、檢測回報目前用哪一家、
+回報讀的是哪個環境變數、Gemini 前綴檢查用 `AIza`、可強制指定供應商、可強制停用、
+停用時摘要走降級。
+
+### 尚未實測
+
+Gemini 這條路徑是照官方文件實作的，**但我手上沒有 Gemini 金鑰，無法端對端實測**。
+後台的「檢測 API 金鑰」會把對方的真實回應原文帶出來，第一次設定時請以它為準；
+若端點格式與文件不符，可先用 `NEWS_GEMINI_URL`／`NEWS_GEMINI_MODEL` 調整。
+
 ## v1.35.4 — 2026-08-23（金鑰檢測回報長度與夾帶空白，401 才有辦法自己查）
 
 ### 為什麼

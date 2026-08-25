@@ -16,13 +16,13 @@ import re
 
 import httpx
 
+from . import ai_client
 from .collectors.base import RawItem
 from .sources import SOURCE_BY_SLUG
 
 logger = logging.getLogger(__name__)
 
-API_URL = "https://api.anthropic.com/v1/messages"
-MODEL = os.environ.get("NEWS_SUMMARY_MODEL", "claude-sonnet-4-5")
+# 端點與模型改由 ai_client 統一管理（支援 Gemini／Anthropic），這裡不再各自持有。
 
 SYSTEM_PROMPT = """\
 你是中醫藥系統藥理學研究平台的科研情報編輯，服務對象是中醫藥研究人員、
@@ -120,29 +120,11 @@ def _parse_json_array(text: str) -> list:
 async def _call_batch(client: httpx.AsyncClient, api_key: str,
                       indices: list[int], pairs: list[tuple[RawItem, dict]]) -> dict[int, dict]:
     rendered = "\n\n".join(_render(i, pairs[i][0], pairs[i][1]) for i in indices)
-    resp = await client.post(
-        API_URL,
-        headers={
-            "content-type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-        },
-        json={
-            "model": MODEL,
-            "max_tokens": 4096,
-            "system": SYSTEM_PROMPT,
-            "messages": [
-                {"role": "user",
-                 "content": f"請處理以下 {len(indices)} 篇研究情報。\n\n{rendered}\n\n只輸出 JSON 陣列。"},
-                {"role": "assistant", "content": "["},   # prefill 逼出純 JSON
-            ],
-        },
-        timeout=120.0,
+    text = await ai_client.complete(
+        client, SYSTEM_PROMPT,
+        f"請處理以下 {len(indices)} 篇研究情報。\n\n{rendered}\n\n只輸出 JSON 陣列。",
+        max_output_tokens=4096,
     )
-    resp.raise_for_status()
-    data = resp.json()
-    text = "[" + "".join(b.get("text", "") for b in data.get("content", [])
-                         if b.get("type") == "text")
     return {int(d["id"]): d for d in _parse_json_array(text)
             if isinstance(d, dict) and "id" in d}
 
@@ -180,11 +162,10 @@ async def _summarize_async(pairs: list[tuple[RawItem, dict]], api_key: str,
 def summarize(pairs: list[tuple[RawItem, dict]], *, api_key: str | None = None,
               batch_size: int = 8, concurrency: int = 3) -> list[dict]:
     """同步介面（供 service.py 呼叫）。無 key 時直接回規則式摘要。"""
-    api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key or not pairs:
+    if not ai_client.active_provider() or not pairs:
         return [_fallback(it, mt) for it, mt in pairs]
     try:
-        return asyncio.run(_summarize_async(pairs, api_key, batch_size, concurrency))
+        return asyncio.run(_summarize_async(pairs, api_key or "", batch_size, concurrency))
     except Exception as exc:  # noqa: BLE001
         logger.error("AI 摘要整體失敗，全部改用規則式：%s", exc)
         return [_fallback(it, mt) for it, mt in pairs]
