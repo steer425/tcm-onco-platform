@@ -133,6 +133,11 @@ FEATURE_CONFIG = [
     {"code": "F1-3", "module": "目標一/二", "name": "疾病中文名稱管理",
      "nav_label": "疾病中文名稱管理", "page_url": "tcmsp-diseases.html",
      "show_frontend": False, "show_backend": True, "sort_order": 72},
+    # 靶點標準化：把 TCMSP 的蛋白全名對到 UniProt 的基因符號。
+    # 暗黑基因、GenCC、新聞實體連結三個功能的比對準確度都靠這個。
+    {"code": "F1-4", "module": "目標一/二", "name": "靶點標準化（UniProt）",
+     "nav_label": "靶點標準化", "page_url": "target-mapping.html",
+     "show_frontend": False, "show_backend": True, "sort_order": 73},
 
     # ---- 其餘目標零基礎建設項目：現在都有對應頁面可查看/設定 ----
     {"code": "F0-1", "module": "目標零", "name": "前後台架構規劃",

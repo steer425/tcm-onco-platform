@@ -84,7 +84,7 @@ Dashboard 頁面的六張卡片（主機資訊／版本資訊／專案文件／2
 
 ### 統計欄位一律預先算好存資料庫，不要在查詢端點裡即時運算（v1.30.0 起）
 
-以下四個統計數字**不是**每次 API 請求即時運算，而是預先計算好存在資料庫欄位裡，查詢時直接讀欄位：
+以下六個統計數字**不是**每次 API 請求即時運算，而是預先計算好存在資料庫欄位裡，查詢時直接讀欄位：
 
 | 統計項目 | 欄位 | 說明 |
 |---|---|---|
@@ -92,10 +92,49 @@ Dashboard 頁面的六張卡片（主機資訊／版本資訊／專案文件／2
 | 藥材關聯查詢站的靶點統計 | `TcmspHerb.target_count` | 這個藥材（透過成分）連結到幾個不重複的 TCMSP 靶點 |
 | 暗黑基因關聯查詢站的中藥靶點統計 | `DarkGene.has_tcmsp_target` | 這個基因是否比對到任何 TCMSP 靶點 |
 | 藥材與暗黑基因關聯的基因關聯統計 | `TcmspHerb.dark_gene_count` | 這個藥材連結到幾個不重複的暗黑基因 |
+| 可編碼蛋白區疾病的中藥靶點統計 | `GenccDisease.has_tcmsp_target` | 這個疾病的基因是否比對到任何 TCMSP 靶點 |
+| 藥材與 GenCC 疾病關聯統計 | `TcmspHerb.gencc_disease_count` | 這個藥材連結到幾個不重複的 GenCC 疾病 |
 
 - 統一由 `app/recompute_stats.py` 的 `recompute_all_stats()` 重新計算，**匯入 TCMSP 資料或暗黑基因資料時會自動觸發**（見 `import_tcmsp_data.py`／`import_dark_genes.py` 結尾），`migrate_schema.py` 的最後一步也會自動觸發一次（正式環境的舊資料庫欄位剛被 `ALTER TABLE` 新增時，值會停留在預設的 0/False，一定要跑一次重算才會變成正確數字）
 - 後台「系統設定」頁面有手動觸發按鈕（`POST /system-settings/recompute-stats`），供只是透過後台介面手動編輯了少量資料、不想重新匯入整批檔案時使用
 - **之後如果又要新增一個「查詢站清單要顯示的統計數字」，一律照這個模式做**：加資料庫欄位 → 寫進 `recompute_stats.py` → 兩個匯入腳本與 `migrate_schema.py` 都要記得觸發 → 端點直接讀欄位回傳。不要為了圖方便，又寫一段「每次請求都重新掃一次全部關聯資料」的即時運算邏輯，那樣會讓查詢站的清單載入變慢（這正是這次改版要解決的問題本身）
+
+### 靶點與基因符號的比對邏輯只有一份：`app/target_index.py`（v1.38.0 起）
+
+**背景。** TCMSP 的靶點欄位存的是蛋白質全名（`Androgen receptor`），
+1751 個靶點裡 1573 個帶空白，只有 4 個長得像基因符號。
+但暗黑基因、GenCC 疾病、新聞實體連結全都是拿基因符號（`AR`）去比對靶點名稱字串——
+`Androgen receptor` 這串字裡永遠不會出現 `AR`。實測 1245 個癌症基因只比中 32 個（**2.6%**），
+AR／AKT1／TP53／APC／EGFR／ESR1／PTGS2 全都在 TCMSP 裡、全都比不到。
+**而且失真是靜默的**：畫面不會說「比對失敗」，只會顯示「沒有關聯」，看起來就像研究結論。
+
+**規則。** 任何「基因符號 ↔ TCMSP 靶點」的比對，一律呼叫 `app/target_index.py`：
+
+| 函式 | 方向 | 用在哪 |
+|---|---|---|
+| `symbol_to_targets(db)` | 符號 → 靶點集合 | 統計重算、查詢站清單、藥材反查 |
+| `target_to_symbols(db)` | 靶點 → 符號集合 | 關聯圖、GenCC 反查 |
+| `symbol_set(db)` | 只要判斷有沒有比對到 | 統計數字 |
+
+比對規則是兩層，順序有意義：
+
+1. 已標準化的靶點（`tcmsp_target_uniprot` 裡 `status` 為 `auto`／`confirmed`）
+   → UniProt 的 `gene_symbol` ＋ **同義詞**精確比對。
+2. 尚未標準化的靶點 → 退回原本的「蛋白名稱英數字詞」比對。
+
+第 2 層是刻意保留的退路（UniProt 解析要連外網、要分批跑，跑完之前統計不能歸零）；
+但**已標準化的靶點不再走第 2 層**——它已經有精確的基因符號，再拿名稱字詞去猜只會多出誤中。
+`pending`／`rejected`／`unresolved` 一律不採用：待人工確認的東西還不是結論。
+
+**為什麼要集中。** v1.38.0 之前有**八個地方**各自就地寫同一段字詞索引
+（暗黑基因統計、逐基因統計、藥材反查、基因詳情、關聯圖、GenCC 比對與反查、離線重算）。
+邏輯一樣所以答案一樣，沒出過事；標準化上線後就不是這樣了——
+漏改一處就會出現「查詢站說這個基因有比對到靶點，統計欄位說沒有」這種
+自相矛盾又極難追查的畫面。**之後要改比對規則，只改 `target_index.py` 一支。**
+
+**解析必須在有外網的環境跑。** UniProt 解析（後台 F1-4 頁面的「執行一批」）
+要連 `rest.uniprot.org`。請在 Render 上操作，或在本機帶 `DATABASE_URL` 跑；
+Cowork 沙箱與本機 VM 都連不到（代理回 403），在那裡跑會整批回報「連線失敗」。
 
 ## 五之二、全站語系機制（繁中/簡中/英文/韓文）
 
@@ -443,6 +482,7 @@ TCMSP 藥材查詢站、疾病查詢站、暗黑基因查詢站都用「左側�
 | `dna-test-data.html` | F3-8 | DNA 測試資料產生（可選多位病患，可勾選是否含暗黑基因變異） |
 | `dna-report.html` | F3-9 | DNA 檢測報告（單一病患報告，含醒目的非醫療建議警語） |
 | `patient-dark-gene-ranking.html` | F3-10 | 病患基因統計排行（哪位病患命中最多不重複暗黑基因） |
+| `target-mapping.html` | F1-4 | 靶點標準化（UniProt）：覆蓋率、分批解析、人工審核、以基因符號反查靶點 |
 
 > 有些功能代碼共用同一個頁面（例如 F0-10/F0-12 都指向 `logs.html`），這是刻意設計：避免導覽選單出現好幾個連到同一頁的重複連結。共用頁面的功能代碼會把 `show_frontend`/`show_backend` 都設為 `false`，只有「主要代表」該頁面的那個功能代碼會顯示在導覽選單裡，其餘的僅在權限矩陣表格裡顯示頁面路徑供對照。
 
@@ -500,7 +540,7 @@ python -m app.seed_gencc_translations
 ### 上版前的檢查
 
 - 四種語系全測（見第五之二章「上版前的強制檢查規則」）
-- `python -m tests.test_news_e2e` 全過（**不是** `python -m pytest tests/ -q`——`test_news_e2e.py`
+- `python -m tests.test_news_e2e` 與 `python -m tests.test_target_mapping` 全過（**不是** `python -m pytest tests/ -q`——`test_news_e2e.py`
   是手寫的端對端驗證腳本，函式名稱不是 pytest 慣例的 `test_*`，`pytest` 指令會直接回報
   「collected 0 items」、結束碼 5，**看起來像失敗，但其實根本沒有跑到任何一項驗證**，
   這是這次開發中實際發現的認知陷阱，不是理論疑慮）
@@ -508,6 +548,8 @@ python -m app.seed_gencc_translations
 - 這支端對端腳本**必須從空資料庫跑起**，否則第二次執行會沿用上一輪的每日精選、
   在依索引取文章的地方 `IndexError`。腳本開頭已經會自動刪掉預設的 `test.db`，
   但如果你自己指定了 `DATABASE_URL`，就要自行確保那是乾淨的庫
+- `test_target_mapping.py` 同理，開頭會自動刪掉預設的 `test_target_mapping.db`；
+  它不連外網，UniProt 的 HTTP 那一層以 fixture 取代
 - `git status` 看一次，確認沒有把本機檔（`.db`、`.env`、暫存檔）帶上去
 
 ### 已知環境限制：git 不能透過遠端工具跑

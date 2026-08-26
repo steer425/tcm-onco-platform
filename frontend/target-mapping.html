@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ccircle cx=%2750%27 cy=%2750%27 r=%2745%27 fill=%27%232f5c8a%27/%3E%3Ctext x=%2750%27 y=%2768%27 font-size=%2760%27 text-anchor=%27middle%27 fill=%27white%27%3E%E8%97%A5%3C/text%3E%3C/svg%3E" />
+<title>靶點標準化（UniProt） - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<style>
+  .stat-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; }
+  .stat-box { background:var(--card-bg, #fff); border:1px solid var(--border-color, #e2e6ea); border-radius:8px; padding:12px 14px; }
+  .stat-box .num { font-size:22px; font-weight:700; }
+  .stat-box .lbl { font-size:12px; color:#777; margin-top:2px; }
+  .bar { height:10px; border-radius:999px; background:#eceff3; overflow:hidden; margin-top:10px; }
+  .bar > span { display:block; height:100%; background:#2f5c8a; width:0; transition:width .3s; }
+  .st-pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:600; }
+  .st-auto, .st-confirmed { background:#e8f3ec; color:#1f4f37; }
+  .st-pending { background:#f5ecdc; color:#7a5420; }
+  .st-unresolved { background:#f0f0f0; color:#777; }
+  .st-rejected, .st-error { background:#fdecea; color:#a83232; }
+  .cand { border:1px solid var(--border-color, #e2e6ea); border-radius:6px; padding:8px 10px; margin-bottom:8px; }
+  .cand.sel { border-color:#2f5c8a; background:#f2f6fb; }
+  .cand b { font-size:13px; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+  .tabs button { background:#eceff3; color:#444; }
+  .tabs button.on { background:#2f5c8a; color:#fff; }
+  .mono { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:12px; }
+</style>
+</head>
+<body data-current-page="target-mapping.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">靶點標準化（UniProt）</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <p class="hint-msg" style="margin-top:0;">
+        TCMSP 的靶點只有蛋白質全名（例如 <span class="mono">Androgen receptor</span>），沒有標準基因代號。
+        暗黑基因、GenCC 疾病都是用 HGNC 基因符號（<span class="mono">AR</span>）記錄的，兩邊對不起來——
+        標準化之前只有 <b>2.6%</b>（1245 個暗黑基因裡 32 個）比對得到靶點，而 AR、TP53、EGFR、ESR1 明明都在 TCMSP 裡。
+        這個頁面把每個靶點名稱送去 <a href="https://www.uniprot.org/" target="_blank" rel="noopener">UniProt</a> 查出
+        accession、基因符號、同義詞與 KEGG／Reactome 交叉引用，存成獨立的映射表（不改動任何原始 TCMSP 資料）。
+      </p>
+      <p class="hint-msg">
+        比對規則：已標準化的靶點走 UniProt 基因符號＋同義詞精確比對；尚未標準化的仍走原本的名稱字詞比對，
+        所以解析可以分批進行，統計不會中途歸零。<b>只有 auto／已確認 的映射會被採用</b>，待確認的不列入統計。
+      </p>
+      <p class="hint-msg" style="color:#a83232;">
+        ⚠️ 解析需要對外連線到 rest.uniprot.org。請在已部署的 Render 環境操作；本機若無外網會全部回報「連線失敗」。
+      </p>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="margin:0;">覆蓋率</h3>
+        <button class="secondary" id="refreshBtn">重新整理</button>
+      </div>
+      <div class="stat-grid" id="statGrid"></div>
+      <div class="bar"><span id="coverageBar"></span></div>
+      <p class="hint-msg" id="coverageHint"></p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">批次解析</h3>
+      <p class="hint-msg" style="margin-top:0;">
+        一次處理一批，可重複執行到「尚未處理」歸零。每筆之間會間隔 0.15 秒，避免對 UniProt 的公共服務造成負擔；
+        50 筆大約需要 15～30 秒。已人工確認或已否決的紀錄不會被重跑覆蓋。
+      </p>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <label style="margin:0;">每批筆數</label>
+        <select id="batchLimit" style="max-width:110px;">
+          <option value="20">20</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+        </select>
+        <label style="margin:0; display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="retryErrors" style="width:auto; margin:0;" /> 連上次連線失敗的一起重跑
+        </label>
+        <button id="resolveBtn">執行一批</button>
+        <span class="hint-msg" id="resolveMsg"></span>
+      </div>
+      <div id="resolveLog" class="hint-msg" style="margin-top:10px; white-space:pre-wrap;"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">人工審核</h3>
+      <div class="tabs" id="queueTabs">
+        <button data-status="pending" class="on">待確認</button>
+        <button data-status="unresolved">查無結果</button>
+        <button data-status="error">連線失敗</button>
+        <button data-status="rejected">已否決</button>
+      </div>
+      <p class="hint-msg" style="margin-top:0;" id="queueHint"></p>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:90px;">tar_id</th><th>TCMSP 靶點名稱</th><th>解析結果</th>
+            <th style="width:80px;">方式</th><th style="width:80px;">狀態</th><th style="width:150px;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="queueBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">以基因符號反查靶點</h3>
+      <p class="hint-msg" style="margin-top:0;">驗證標準化成果用：輸入 HGNC 基因符號，看它現在能不能對到 TCMSP 靶點（同時比對主要符號與同義詞）。</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <input id="lookupInput" placeholder="例如 AR、TP53、EGFR" style="max-width:220px;" />
+        <button id="lookupBtn">反查</button>
+      </div>
+      <div id="lookupResult" style="margin-top:12px;"></div>
+    </div>
+  </main>
+</div>
+
+<div id="reviewModal" class="modal-backdrop" style="display:none;">
+  <div class="modal" style="max-width:640px;">
+    <h3 id="reviewModalTitle">確認靶點映射</h3>
+    <input type="hidden" id="reviewTarId" />
+    <p class="hint-msg" id="reviewTargetName" style="margin-top:0;"></p>
+    <div id="reviewCandidates"></div>
+    <div><label>UniProt Accession</label><input id="reviewAccession" placeholder="例如 P10275" /></div>
+    <div><label>基因符號</label><input id="reviewGeneSymbol" placeholder="例如 AR（從候選挑選時會自動帶入）" /></div>
+    <label>備註</label>
+    <textarea id="reviewNote" rows="2" placeholder="人工判斷的依據，之後看得懂為什麼這樣決定"></textarea>
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="secondary" id="reviewCancel">關閉</button>
+      <button class="secondary" id="reviewReject" style="color:#a83232;">否決（沒有合適對應）</button>
+      <button id="reviewConfirm">確認映射</button>
+    </div>
+    <div id="reviewMsg" class="hint-msg"></div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/i18n-dict.js"></script>
+<script src="js/site-lang.js"></script>
+<script src="js/target-mapping.js"></script>
+</body>
+</html>

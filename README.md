@@ -1,6 +1,6 @@
 # TCM 中藥腫瘤篩選平台 — 目標零後台系統
 
-**目前版本：v1.37.0**（詳見 [CHANGELOG.md](./CHANGELOG.md)）
+**目前版本：v1.38.0**（詳見 [CHANGELOG.md](./CHANGELOG.md)）
 
 本次交付內容：**目標零（帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄）** 後端 API + 對應前端頁面，以及登入後可見的 **Dashboard（施工中佔位頁）**。
 
@@ -46,6 +46,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 | F0-20 未解禁新聞存取（權限開關，非頁面，v1.34.0） | 由 `/news/daily`、`/news/archive` 依 `has_permission()` 過濾 | 無獨立頁面，於角色權限矩陣指派 |
 | 新聞多語系簡短摘要（v1.35.0） | `POST /news/summaries`、`/news/admin/summaries/backfill`、`/news/admin/summaries/stats` | 卡片內顯示；後台「公告 / 新聞管理 → 摘要與模組設定」分頁 |
 | 新聞來源與關鍵字管理（v1.37.0） | `/news/admin/sources`（POST/DELETE）、`/news/admin/sources/probe`、`/news/admin/keywords`（CRUD） | 「公告 / 新聞管理 → 新聞來源與關鍵字」分頁 |
+| F1-4 靶點標準化（UniProt，v1.38.0） | `/tcmsp/target-mapping/stats`、`/resolve`、`/review`、`/confirm`、`/reject`、`/lookup` | `target-mapping.html` + `js/target-mapping.js` |
 
 ## 三、重要設計說明與限制
 
@@ -53,7 +54,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 2. **登入紀錄的「網卡編號」**：瀏覽器基於隱私限制，**無法取得使用者裝置的真實 MAC 位址**。目前以前端產生的裝置指紋字串（`device_id`）替代，作為同一裝置的識別依據，並非真實網卡編號，這點請留意與原始需求的落差，待確認是否有其他可接受的替代方案（例如企業內網才有的裝置管理系統）。
 3. **第三方登入（Google/小紅書/WeChat）**：目前僅完成「綁定關係」的資料表與 CRUD 骨架（`/oauth-accounts`）。真正的 OAuth 授權流程（跳轉、取得 code、換 token）需要各平台的 client id/secret 與已核准的回呼網址，這部分仍在先前列出的「待確認事項」中（小紅書/WeChat 開發者資格尚待查證）。
 4. **資料庫備份**：目前僅提供備份「紀錄」的查詢與手動登錄 API，尚未串接實際的自動備份程序（例如排程 + 資料庫匯出 + 異地備援），待技術選型確認後再串接。
-5. **權限矩陣的判斷邏輯**：帳號若擁有「管理者」角色，一律視為擁有全部權限；一般角色則依 `role_permissions` 表中的 `can_view` / `can_execute` 判斷。此判斷邏輯目前只用在後端 `require_permission()` 這個共用 dependency 上，尚未套用到所有既有 API（本次僅示範於帳號/角色/權限相關 API 皆為「僅限管理者」）——後續其他模組開發時，可依此框架依 F-code 掛上對應的權限檢查。
+5. **靶點名稱不是基因符號**：TCMSP 的靶點欄位存的是蛋白質全名（`Androgen receptor`），而暗黑基因、GenCC 疾病都是以基因符號（`AR`）記錄，兩者直接比字串**永遠對不到**——標準化之前 1245 個癌症基因只比中 32 個（2.6%），而且失真是靜默的（畫面只顯示「沒有關聯」）。v1.38.0 起以 `tcmsp_target_uniprot` 映射表補上 UniProt 基因符號與同義詞，全站比對統一走 `app/target_index.py`。**解析需要對外連 `rest.uniprot.org`，請在 Render 上執行後台的「執行一批」**。
+6. **權限矩陣的判斷邏輯**：帳號若擁有「管理者」角色，一律視為擁有全部權限；一般角色則依 `role_permissions` 表中的 `can_view` / `can_execute` 判斷。此判斷邏輯目前只用在後端 `require_permission()` 這個共用 dependency 上，尚未套用到所有既有 API（本次僅示範於帳號/角色/權限相關 API 皆為「僅限管理者」）——後續其他模組開發時，可依此框架依 F-code 掛上對應的權限檢查。
 
 ## 四、待辦（下一步建議）
 

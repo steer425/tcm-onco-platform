@@ -45,6 +45,8 @@ ALTER_STATEMENTS = [
     "ALTER TABLE news_articles ADD COLUMN embargo_until TIMESTAMP",
     # 新聞模組：管理者於後台自行新增的來源標記（v1.37.0）
     "ALTER TABLE news_sources ADD COLUMN is_custom BOOLEAN DEFAULT FALSE NOT NULL",
+    # v1.38.0 的 tcmsp_target_uniprot 是全新資料表，create_all() 會自動建立，
+    # 不需要在這裡加 ALTER——只有「既有資料表新增欄位」才需要。
 ]
 
 

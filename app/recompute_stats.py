@@ -1,11 +1,16 @@
 """
 重新計算並寫入資料庫的統計欄位，取代原本「每次查詢站列表載入時即時運算」的做法。
 
-涵蓋四個地方：
+涵蓋六個地方：
     1. 疾病關聯查詢站：TcmspDisease.target_count（這個疾病連結到幾個不重複的 TCMSP 靶點）
     2. 藥材關聯查詢站：TcmspHerb.target_count（這個藥材連結到幾個不重複的 TCMSP 靶點）
     3. 暗黑基因關聯查詢站：DarkGene.has_tcmsp_target（這個基因是否比對到任何 TCMSP 靶點）
     4. 藥材與暗黑基因關聯：TcmspHerb.dark_gene_count（這個藥材連結到幾個不重複的暗黑基因）
+    5. GenCC 疾病查詢站：GenccDisease.has_tcmsp_target（這個疾病的基因是否比對到任何 TCMSP 靶點）
+    6. 藥材與 GenCC 疾病關聯：TcmspHerb.gencc_disease_count
+
+基因符號與靶點的比對邏輯不在這裡，一律走 app/target_index.py——
+查詢站的即時 API 也走同一支，避免「統計欄位說有、查詢站說沒有」的矛盾。
 
 使用方式：
     python -m app.recompute_stats
@@ -17,24 +22,15 @@
       （例如只是手動編輯了少量資料，不想重跑整個匯入流程時）
 
 這支腳本本身不會修改任何原始資料（藥材/疾病/基因/成分/靶點的內容都不動），
-只更新上面四個統計欄位，可以重複執行，執行順序不影響結果。
+只更新上面六個統計欄位，可以重複執行，執行順序不影響結果。
 """
-import re
 import sys
 
 from sqlalchemy.orm import Session
 
 from app import models
 from app.database import SessionLocal, engine, Base
-
-
-def _build_target_word_index(db: Session):
-    """建立「單詞 -> 是否有任何 TCMSP 靶點名稱包含這個詞」的索引，供暗黑基因比對使用。"""
-    all_targets = db.query(models.TcmspTarget.target_name).all()
-    word_set = set()
-    for (name,) in all_targets:
-        word_set |= set(re.findall(r"[A-Za-z0-9]+", (name or "").upper()))
-    return word_set
+from app.target_index import symbol_to_targets
 
 
 def _gene_symbols_for_match(gene: models.DarkGene):
@@ -83,12 +79,13 @@ def recompute_disease_target_counts(db: Session):
 def recompute_dark_gene_has_target(db: Session):
     """暗黑基因是否比對到任何 TCMSP 靶點（基因符號/別名 vs 靶點名稱的單詞比對）。"""
     print("步驟 3/6：重算暗黑基因的中藥靶點比對結果（DarkGene.has_tcmsp_target）...")
-    target_word_set = _build_target_word_index(db)
+    sym_to_tar, mapped_count = symbol_to_targets(db)
+    print(f"  （已標準化靶點 {mapped_count} 個，其餘退回名稱字詞比對）")
     genes = db.query(models.DarkGene).all()
     matched_count = 0
     for g in genes:
         symbols = _gene_symbols_for_match(g)
-        has_target = any(s in target_word_set for s in symbols)
+        has_target = any(s in sym_to_tar for s in symbols)
         g.has_tcmsp_target = has_target
         if has_target:
             matched_count += 1
@@ -100,18 +97,14 @@ def recompute_herb_dark_gene_counts(db: Session):
     """藥材 -> 成分 -> 靶點 -> 暗黑基因，統計每個藥材連結到幾個不重複的暗黑基因。"""
     print("步驟 4/6：重算藥材的暗黑基因關聯統計（TcmspHerb.dark_gene_count）...")
     genes = db.query(models.DarkGene).filter(models.DarkGene.status == "active").all()
-    all_targets = db.query(models.TcmspTarget).all()
-
-    word_to_target_ids = {}
-    for t in all_targets:
-        words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
-        for w in words:
-            word_to_target_ids.setdefault(w, set()).add(t.tar_id)
+    # 跟步驟 3 用同一份索引，否則兩個統計會出現「這個基因有比對到靶點，
+    # 但沒有任何藥材連得到它」這種自相矛盾的結果
+    sym_to_tar, _ = symbol_to_targets(db)
 
     target_to_gene_ids = {}
     for g in genes:
         for sym in _gene_symbols_for_match(g):
-            for tar_id in word_to_target_ids.get(sym, set()):
+            for tar_id in sym_to_tar.get(sym, set()):
                 target_to_gene_ids.setdefault(tar_id, set()).add(g.id)
 
     herbs = db.query(models.TcmspHerb).all()
@@ -145,12 +138,15 @@ def recompute_gencc_disease_has_target(db: Session):
     資料量遠大於暗黑基因（可能 1.5~2 萬筆），這裡的迴圈本身仍是 O(n) 的 set 查找，不會太慢，
     但要注意如果之後資料量再往上一個量級，可能需要考慮批次處理或非同步背景任務。"""
     print("步驟 5/6：重算 GenCC 可編碼蛋白區疾病的中藥靶點比對結果（GenccDisease.has_tcmsp_target）...")
-    target_word_set = _build_target_word_index(db)
+    # 跟步驟 3/4 用同一份索引（app/target_index.py），否則暗黑基因說「AR 有比對到靶點」、
+    # GenCC 卻說沒有，同一個符號在兩個頁面得到相反答案
+    sym_to_tar, mapped_count = symbol_to_targets(db)
+    print(f"  （已標準化靶點 {mapped_count} 個，其餘退回名稱字詞比對）")
     diseases = db.query(models.GenccDisease).filter(models.GenccDisease.status == "active").all()
     matched_count = 0
     for d in diseases:
         symbol = (d.gene_symbol or "").upper()
-        has_target = symbol in target_word_set
+        has_target = symbol in sym_to_tar
         d.has_tcmsp_target = has_target
         if has_target:
             matched_count += 1
@@ -162,18 +158,12 @@ def recompute_herb_gencc_disease_counts(db: Session):
     """藥材 -> 成分 -> 靶點 -> GenCC 疾病（透過 gene_symbol），統計每個藥材連結到幾個不重複的可編碼蛋白區疾病。"""
     print("步驟 6/6：重算藥材的 GenCC 可編碼蛋白區疾病關聯統計（TcmspHerb.gencc_disease_count）...")
     diseases = db.query(models.GenccDisease).filter(models.GenccDisease.status == "active").all()
-    all_targets = db.query(models.TcmspTarget).all()
-
-    word_to_target_ids = {}
-    for t in all_targets:
-        words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
-        for w in words:
-            word_to_target_ids.setdefault(w, set()).add(t.tar_id)
+    sym_to_tar, _ = symbol_to_targets(db)
 
     target_to_disease_ids = {}
     for d in diseases:
         symbol = (d.gene_symbol or "").upper()
-        for tar_id in word_to_target_ids.get(symbol, set()):
+        for tar_id in sym_to_tar.get(symbol, set()):
             target_to_disease_ids.setdefault(tar_id, set()).add(d.id)
 
     herbs = db.query(models.TcmspHerb).all()

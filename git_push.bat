@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.37.0 add a news source by URL alone (auto-detect RSS, trial fetch before saving) and manage topic-filter keywords in the admin"
+set "DEFAULT_MSG=v1.38.0 standardise TCMSP targets against UniProt (gene symbols + synonyms) so cancer-gene matching stops silently failing at 2.6%"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

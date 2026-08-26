@@ -1,4 +1,3 @@
-import re
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,6 +6,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.database import get_db, get_query_db
 from app.deps import get_current_user, require_admin, write_audit_log
+from app.target_index import symbol_to_targets, target_to_symbols
 
 router = APIRouter(prefix="/gencc-diseases", tags=["可編碼蛋白區中藥與疾病關聯（GenCC 基因-疾病關聯資料）"])
 
@@ -64,12 +64,11 @@ def get_disease_tcmsp_links(disease_id: str, current_user: models.User = Depends
         raise HTTPException(status_code=404, detail="找不到疾病資料")
 
     symbol = (disease.gene_symbol or "").upper()
-    all_targets = db.query(models.TcmspTarget).all()
-    matched_targets = []
-    for t in all_targets:
-        words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
-        if symbol in words:
-            matched_targets.append(t)
+    sym_to_tar, _ = symbol_to_targets(db)
+    matched_tar_ids = sym_to_tar.get(symbol, set())
+    matched_targets = (db.query(models.TcmspTarget)
+                       .filter(models.TcmspTarget.tar_id.in_(matched_tar_ids)).all()
+                       if matched_tar_ids else [])
 
     if not matched_targets:
         return {
@@ -148,10 +147,12 @@ def get_herb_gencc_links(herb_id: int, current_user: models.User = Depends(get_c
     for d in all_diseases:
         symbol_to_diseases.setdefault((d.gene_symbol or "").upper(), []).append(d)
 
+    tar_to_sym = target_to_symbols(db)
+
     target_disease_matches = {}  # tar_id -> [disease, ...]
     all_matched_diseases = {}  # disease.id -> {disease info, matched_target_ids: set()}
     for t in targets:
-        words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
+        words = tar_to_sym.get(t.tar_id, set())
         matched = []
         for w in words:
             matched.extend(symbol_to_diseases.get(w, []))

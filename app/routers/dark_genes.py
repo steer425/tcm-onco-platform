@@ -1,6 +1,5 @@
 import csv
 import io
-import re
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -9,6 +8,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.database import get_db, get_query_db
 from app.deps import get_current_user, require_admin, write_audit_log
+from app.target_index import symbol_set, symbol_to_targets, target_to_symbols
 
 router = APIRouter(prefix="/dark-genes", tags=["暗黑基因管理（癌症基因參考資料，目標三）"])
 
@@ -21,32 +21,21 @@ def _yn_to_bool(v: Optional[str]) -> bool:
 # 前台／一般登入使用者：查詢
 # ---------------------------------------------------------------------------
 
-def _build_target_word_index(db: Session):
-    """建立「單詞 → 是否有任何 TCMSP 靶點名稱包含這個詞」的索引，
-    這樣判斷「1245 個基因裡哪些比對得到靶點」時，每個基因只需要查表，
-    不需要每個基因都重新掃過一次全部 1751 個靶點名稱。"""
-    all_targets = db.query(models.TcmspTarget.target_name).all()
-    word_set = set()
-    for (name,) in all_targets:
-        word_set |= set(re.findall(r"[A-Za-z0-9]+", (name or "").upper()))
-    return word_set
-
-
-def _gene_has_tcmsp_target(gene: models.DarkGene, target_word_set) -> bool:
+def _gene_has_tcmsp_target(gene: models.DarkGene, target_symbol_set) -> bool:
     symbols = _gene_symbols_for_match(gene)
-    return any(s in target_word_set for s in symbols)
+    return any(s in target_symbol_set for s in symbols)
 
 
 @router.get("/public/stats", summary="（前台）暗黑基因統計：依 Gene Type 分組，統計有/沒有比對到 TCMSP 靶點的基因數")
 def public_get_stats(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_query_db)):
     genes = db.query(models.DarkGene).filter(models.DarkGene.status == "active").all()
-    target_word_set = _build_target_word_index(db)
+    target_symbol_set = symbol_set(db)
 
     by_type = {}
     total_with_target = 0
     for g in genes:
         gtype = g.gene_type or "（未分類）"
-        has_target = _gene_has_tcmsp_target(g, target_word_set)
+        has_target = _gene_has_tcmsp_target(g, target_symbol_set)
         if gtype not in by_type:
             by_type[gtype] = {"gene_type": gtype, "total": 0, "with_target": 0, "without_target": 0}
         by_type[gtype]["total"] += 1
@@ -72,14 +61,9 @@ def public_get_stats(current_user: models.User = Depends(get_current_user), db: 
 def public_get_gene_stats(only_with_target: bool = True, current_user: models.User = Depends(get_current_user),
                            db: Session = Depends(get_query_db)):
     genes = db.query(models.DarkGene).filter(models.DarkGene.status == "active").all()
-    all_targets = db.query(models.TcmspTarget).all()
-
-    # 建立「單詞 -> 符合的靶點 tar_id 集合」索引，避免每個基因都重新掃一次全部 1751 個靶點
-    word_to_target_ids = {}
-    for t in all_targets:
-        words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
-        for w in words:
-            word_to_target_ids.setdefault(w, set()).add(t.tar_id)
+    # 符號 -> 靶點索引，避免每個基因都重新掃一次全部 1751 個靶點；
+    # 已標準化的靶點走 UniProt 基因符號，其餘退回名稱字詞（app/target_index.py）
+    word_to_target_ids, _ = symbol_to_targets(db)
 
     results = []
     for g in genes:
@@ -131,13 +115,7 @@ def public_get_herb_stats(only_with_gene: bool = True, current_user: models.User
     herb_ids = [h.id for h in herbs]
     genes = db.query(models.DarkGene).filter(models.DarkGene.status == "active").all()
     genes_by_id = {g.id: g for g in genes}
-    all_targets = db.query(models.TcmspTarget).all()
-
-    word_to_target_ids = {}
-    for t in all_targets:
-        words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
-        for w in words:
-            word_to_target_ids.setdefault(w, set()).add(t.tar_id)
+    word_to_target_ids, _ = symbol_to_targets(db)
 
     target_to_gene_ids = {}
     for g in genes:
@@ -322,12 +300,13 @@ def get_gene_tcmsp_links(gene_id: str, current_user: models.User = Depends(get_c
         raise HTTPException(status_code=404, detail="找不到基因資料")
 
     symbols = set(_gene_symbols_for_match(gene))
-    all_targets = db.query(models.TcmspTarget).all()
-    matched_targets = []
-    for t in all_targets:
-        words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
-        if words & symbols:
-            matched_targets.append(t)
+    sym_to_tar, _ = symbol_to_targets(db)
+    matched_tar_ids = set()
+    for sym in symbols:
+        matched_tar_ids |= sym_to_tar.get(sym, set())
+    matched_targets = (db.query(models.TcmspTarget)
+                       .filter(models.TcmspTarget.tar_id.in_(matched_tar_ids)).all()
+                       if matched_tar_ids else [])
 
     if not matched_targets:
         return {
@@ -414,10 +393,12 @@ def get_herb_dark_gene_links(herb_id: int, current_user: models.User = Depends(g
         for sym in _gene_symbols_for_match(g):
             word_to_genes.setdefault(sym, []).append(g)
 
+    tar_to_sym = target_to_symbols(db)
+
     target_gene_matches = {}  # tar_id -> [gene, ...]
     all_matched_genes = {}  # gene.id -> {gene info, matched_target_ids: set()}
     for t in targets:
-        words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
+        words = tar_to_sym.get(t.tar_id, set())
         matched = []
         for w in words:
             matched.extend(word_to_genes.get(w, []))
@@ -492,15 +473,13 @@ def get_patient_herb_suggestions(patient_id: str, db: Session = Depends(get_db),
         return {"patient_id": patient_id, "matched_genes": [], "herbs": []}
 
     matched_genes = [g for g in dark_genes_by_symbol.values() if g.id in matched_gene_ids]
-    all_targets = db.query(models.TcmspTarget).all()
+    sym_to_tar, _ = symbol_to_targets(db)
 
     target_to_gene_ids = {}
     for g in matched_genes:
         for sym in _gene_symbols_for_match(g):
-            for t in all_targets:
-                words = set(re.findall(r"[A-Za-z0-9]+", (t.target_name or "").upper()))
-                if sym in words:
-                    target_to_gene_ids.setdefault(t.tar_id, set()).add(g.id)
+            for tar_id in sym_to_tar.get(sym, set()):
+                target_to_gene_ids.setdefault(tar_id, set()).add(g.id)
 
     herb_to_gene_ids = {}
     if target_to_gene_ids:

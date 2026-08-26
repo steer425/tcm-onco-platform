@@ -1,5 +1,87 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.38.0 — 2026-08-26（TCMSP 靶點以 UniProt 標準化；癌症基因比對從 2.6% 解封）
+
+### 這一版在修的是什麼
+
+TCMSP 的靶點欄位存的是**蛋白質全名**（`Androgen receptor`、
+`RAC-alpha serine/threonine-protein kinase`），1751 個靶點裡有 1573 個帶空白，
+只有 4 個長得像基因符號。但暗黑基因（OncoKB）、GenCC 疾病關聯、新聞實體連結
+全都是拿**基因符號**（`AR`、`AKT1`）去比對靶點名稱字串。
+
+`Androgen receptor` 這串字裡永遠不會出現 `AR`，所以這三個功能一直在比對失敗。
+實測：1245 個癌症基因只比中 32 個（**2.6%**），而 AR、AKT1、TP53、APC、EGFR、
+ESR1、PTGS2 全都在 TCMSP 裡、全都比不到。最麻煩的是**失真是靜默的**——
+畫面不會說「比對失敗」，只會顯示「沒有關聯」，看起來就像研究結論。
+
+### 做法：獨立的映射表，不動原始資料
+
+新增資料表 `tcmsp_target_uniprot`（第 42 張），把每個靶點名稱送去 UniProt
+查出 accession、基因符號、同義詞、KEGG／Reactome 交叉引用。
+刻意不在 `tcmsp_targets` 加欄位：重新匯入 TCMSP 時映射不會被洗掉，
+映射自己的來源與可信度也才有地方放；而且一個靶點可能合法對到多筆
+（`Estrogen receptor` → ESR1／ESR2），那個取捨應該由人來做。
+
+解析分三級，**信心不足一律不自動採用**：
+
+| 級別 | 查詢方式 | 信心 | 結果 |
+| --- | --- | --- | --- |
+| 1 | 精確蛋白名稱 | 1.0 | 單一命中 → 自動採用 |
+| 2 | 拆詞 AND 查詢 | 0.8 | 單一命中 → 自動採用 |
+| 3 | 全文查詢 | 0.5 | **一律進待確認**，就算只回一筆 |
+
+第 3 級不自動採用是刻意的：全文命中代表「條目內文提到這個字串」，
+不代表就是同一個蛋白。這是科研平台，一個錯誤的基因映射會污染下游每一次分析，
+而且錯誤會被當成結論——寧可留白等人確認，也不要給一個看起來合理的錯答案。
+
+正規化**不剝除結尾數字**：`Prostaglandin G/H synthase 1` 與 `⋯ synthase 2`
+是 PTGS1 與 PTGS2 兩個不同的基因，把尾數當雜訊剝掉會讓兩者互相污染，
+而那正是這整件事最不能出的錯（測試裡有這條回歸斷言）。
+
+### 比對邏輯集中到一支：`app/target_index.py`
+
+原本有**八個地方**各自就地寫一段「把 target_name 拆成英數字詞」的索引
+（暗黑基因統計、逐基因統計、藥材反查、基因詳情、關聯圖、GenCC 疾病比對與反查、
+離線重算）。邏輯一樣所以答案一樣，沒出過事；但標準化上線後就不是這樣了——
+只要有一個地方沒改到，就會出現「查詢站說這個基因比對到靶點，統計欄位說沒有」
+這種自相矛盾且極難追查的畫面。八處全部改呼叫 `app/target_index.py`。
+
+比對規則（兩層，順序有意義）：
+
+1. 已標準化的靶點（`status` 為 `auto`／`confirmed`）→ UniProt 基因符號＋**同義詞**精確比對。
+2. 尚未標準化的靶點 → 維持原本的名稱字詞比對。
+
+第 2 層是刻意保留的退路，讓解析可以分批進行、統計不會中途歸零；
+但**已標準化的靶點不再走第 2 層**，否則精確符號之外又多出一堆字詞誤中。
+`pending`／`rejected`／`unresolved` 一律不採用——待人工確認的東西還不是結論。
+
+### 後台頁面（F1-4「靶點標準化」）
+
+`frontend/target-mapping.html`：覆蓋率、分批解析（可重複按到歸零）、
+人工審核（候選點選帶入／人工輸入／否決需填備註）、以基因符號反查靶點。
+已人工確認或否決的紀錄，重跑批次時不會被覆蓋。
+
+### 測試
+
+新增 `tests/test_target_mapping.py`（68 項斷言，`python -m tests.test_target_mapping`）。
+不連外網：UniProt 的 HTTP 那一層以固定 fixture 取代，fixture 內容照抄真實回應結構。
+回歸斷言用實際查證過的已知真值：AR→P10275、TP53→P04637、AKT1→P31749、
+PTGS1／PTGS2 不互相污染、同義詞 NR3C4 也要對得到 AR。
+
+### 執行方式（重要）
+
+解析需要對外連線到 `rest.uniprot.org`。**請在 Render 上操作後台頁面**，
+或在本機帶 `DATABASE_URL` 執行；Cowork 沙箱與本機 VM 都連不到（代理回 403），
+在那裡跑會整批回報「連線失敗」。
+
+### 檔案
+
+- 新增：`app/target_index.py`、`app/tcmsp_uniprot.py`、`app/routers/target_mapping.py`、
+  `frontend/target-mapping.html`、`frontend/js/target-mapping.js`、`tests/test_target_mapping.py`
+- 修改：`app/models.py`（新增 `TcmspTargetUniprot`）、`app/recompute_stats.py`、
+  `app/routers/dark_genes.py`、`app/routers/gencc_diseases.py`、`app/feature_config.py`、
+  `app/main.py`、`frontend/js/i18n-dict.js`（en／ko 各補 19 個詞條，兩語系維持對等）
+
 ## v1.37.0 — 2026-08-23（新增新聞來源只要貼網址；主題過濾關鍵字改為後台可維護）
 
 ### 新增來源：只輸入網址

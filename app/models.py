@@ -964,3 +964,61 @@ class NewsKeyword(Base):
     created_by = Column(String, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TcmspTargetUniprot(Base):
+    """TCMSP 靶點 → UniProt 標準化映射（目標一 Step 3）。
+
+    為什麼需要這張表：TCMSP 的 1751 個靶點裡有 1573 個是**蛋白全名**
+    （「Androgen receptor」「RAC-alpha serine/threonine-protein kinase」），
+    只有 4 個長得像基因符號。而暗黑基因、GenCC 疾病關聯、新聞實體連結
+    全都是拿「基因符號」去比對靶點名稱字串——「Androgen receptor」這串字裡
+    永遠不會出現 AR，所以那三個功能看到的都是嚴重失真的結果。
+
+    實測：1245 個癌症基因只比對到 32 個（2.6%），而 AR／AKT1／TP53／APC／
+    EGFR／ESR1／PTGS2 全都在 TCMSP 裡、全都比對不到。而且失真是靜默的——
+    畫面不會顯示「比對失敗」，只會顯示「沒有關聯」。
+
+    刻意獨立成表，不在 tcmsp_targets 加欄位：
+
+    1. **不動原始 TCMSP 資料**，跟 recompute_stats.py 同一個原則。
+       重新匯入 TCMSP 時映射不會被洗掉，也隨時可以整張丟掉重來。
+    2. 映射有**來源與可信度**（哪一級策略解出來的、有沒有人確認過），
+       這些是映射自己的屬性，不是靶點的屬性。
+    3. 一個靶點可能合法對到多筆（「Estrogen receptor」→ ESR1／ESR2），
+       塞進單一欄位就得做取捨，而那個取捨應該由人來做。
+
+    TCMSP 原本的 `drugbank_id` 其實是流水號（3、7、16…）不是 DrugBank ID，
+    `kegg` 欄位只有 11 筆有值——兩者都不能當外部識別碼，所以只能走名稱解析。
+    """
+    __tablename__ = "tcmsp_target_uniprot"
+    __table_args__ = (
+        UniqueConstraint("tar_id", "accession", name="uq_tcmsp_target_uniprot"),
+    )
+
+    id = Column(String, primary_key=True, default=gen_id)
+    tar_id = Column(String, ForeignKey("tcmsp_targets.tar_id"), nullable=False, index=True)
+
+    accession = Column(String, nullable=True, index=True)     # P10275
+    gene_symbol = Column(String, nullable=True, index=True)   # AR
+    gene_synonyms = Column(Text, nullable=True)               # JSON 陣列字串
+    protein_name = Column(Text, nullable=True)                # UniProt 的正式名稱
+    organism_id = Column(Integer, nullable=True)              # 9606 = 人類
+
+    # UniProt 回應裡本來就帶的交叉引用。順手存下來，
+    # 通路富集分析（A 組下一項）就不必再跑一次解析。
+    kegg_id = Column(String, nullable=True)                   # hsa:367
+    reactome_ids = Column(Text, nullable=True)                # JSON 陣列字串
+
+    # exact（精確名稱）/ stripped（去修飾語）/ fulltext（全文查詢）/ manual（人工指定）
+    method = Column(String, nullable=False, default="exact")
+    confidence = Column(String, nullable=False, default="0")  # 0..1，字串存以維持可攜
+    # auto（自動採用）/ pending（待人工確認）/ confirmed / rejected / unresolved（查無）
+    status = Column(String, nullable=False, default="auto", index=True)
+    candidates = Column(Text, nullable=True)                  # 待確認時的候選清單（JSON）
+    note = Column(Text, nullable=True)
+
+    reviewed_by = Column(String, ForeignKey("users.id"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    resolved_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
