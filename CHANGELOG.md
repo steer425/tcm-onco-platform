@@ -1,5 +1,79 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.39.1 — 2026-08-27（補上方法學缺的兩道篩選：活性成分與疾病類雜訊通路）
+
+### 起因：人參的第一次分析結果不對勁
+
+v1.39.0 上線後跑人參（目標一指定的首個驗證案例），前七名長這樣：
+
+| 排名 | 通路 | q 值 |
+|---|---|---|
+| 1 | Neuroactive ligand signaling | 3.21e-6 |
+| 2 | C-type lectin receptor signaling | 2.36e-5 |
+| 3 | **Lipid and atherosclerosis** | 2.36e-5 |
+| 4 | cGMP-PKG signaling | 1.86e-4 |
+| 5 | **Tuberculosis** | 1.86e-4 |
+| 6 | **Fluid shear stress and atherosclerosis** | 1.86e-4 |
+
+**沒有任何癌症通路進前七名，卻有結核病。** 統計本身沒錯
+（fold enrichment 逐項手算對得上，FDR 也正確），錯的是餵進去的東西。
+281 條通路裡有 80 條達 q<0.05——**28% 的通路都「顯著」，這個比例本身就是警訊**。
+
+### 問題一：沒有套用 OB／DL 活性成分篩選
+
+`docs/2026_goals.md` 目標一 Step 1 白紙黑字寫著「TCMSP 活性成分篩選
+（OB ≥ 30%、DL ≥ 0.18）」，而且記載人參篩選後是「22 個活性成分、
+約 109 個不重複靶點基因」。但 v1.39.0 的 `targets_for_herb()` 直接抓了
+藥材的**全部**成分——所以畫面顯示 196 個靶點、139 個註解基因。
+
+TCMSP 收錄的是這個藥材裡「偵測得到」的所有化合物，絕大多數口服吸收率極低
+或根本不具類藥性，到不了體內任何靶點。不篩就等於宣稱人參的每一個化合物
+都在體內作用——**那不是保守，是錯的**。而且 n 從 109 灌水到 139，
+在超幾何檢定裡直接推高每一條通路的顯著性。
+
+修正：`targets_for_herb()` 預設套用 OB／DL 篩選，門檻存在系統設定可調
+（預設就是 TCMSP 原始論文的建議值，動了就跟文獻方法學對不起來）。
+畫面上顯示篩選前後的成分數與靶點數，**篩掉多少一定要看得見**——
+篩太兇導致樣本剩沒幾個，結論一樣不可信。
+
+ADME 缺值（`ob`／`dl` 是空字串或 `NA`）一律排除並**單獨計數**：
+當成通過會讓篩選形同虛設，當成 0 則無法跟「真的很低」區分。
+
+### 問題二：KEGG 疾病類通路是通用發炎凋亡基因的大雜燴
+
+結核病、動脈粥狀硬化、B 型肝炎這類 KEGG 通路，每一條都塞了
+AKT1／BCL2／CASP3/8/9／IL1B／IL6／MAPK／NFKB／RELA／TP53。
+**任何**含有這組通用機器的靶點集合都會對它們「顯著富集」。
+人參的「結核病 q=1.86e-4」就是這樣來的——不代表人參治結核病，
+只代表人參的靶點包含通用發炎凋亡核心。這是 ORA 眾所周知的假象。
+
+修正：新增 `exclude_noncancer_disease`（**預設開啟**）。
+但不能把整個 Human Diseases 排掉——癌症通路正好也在這一類底下。
+所以依 KEGG 自己的 BRITE B 層子分類做白名單：
+`Cancer: overview`、`Cancer: specific types`、`Drug resistance: antineoplastic`
+保留，其餘 Human Diseases 排除。判斷依 KEGG 官方分類，不是猜關鍵字。
+分類抓不到（category 為空）時一律保留——寧可留著也不要靜默刪資料。
+
+### 這兩道篩選預設都開啟，但可以關
+
+關掉之前要知道自己在關什麼，所以畫面上把兩者的理由直接寫在控制項旁邊，
+而且關掉 ADME 篩選時會顯示紅字警告「這個結果只適合當對照，不適合當成正式分析」。
+
+### 測試
+
+`tests/test_pathways.py` 增至 90 項斷言。新增涵蓋：
+OB／DL 四種邊界（通過、剛好在門檻上、OB 不足、DL 不足）、
+ADME 缺值的兩種寫法（空字串與 `NA`）、門檻可覆寫與設定值壞掉時退回預設、
+KEGG 疾病分類白名單的七種分類、以及「只由未通過 ADME 的成分連到的靶點
+不該出現在結果裡」。
+
+### 檔案
+
+- 修改：`app/pathways.py`（`active_ingredients`／`adme_thresholds`／`_num`／
+  `is_noncancer_disease_pathway`，`targets_for_herb` 改回傳 `(靶點, 成分統計)`）、
+  `app/routers/pathways.py`、`frontend/pathways.html`、`frontend/js/pathways.js`、
+  `tests/test_pathways.py`、`rules.md`
+
 ## v1.39.0 — 2026-08-27（KEGG／Reactome 通路富集分析，分析鏈路第四站）
 
 ### 這一版做了什麼

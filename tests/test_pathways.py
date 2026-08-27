@@ -228,9 +228,15 @@ def main():
 
     if not db.query(models.TcmspHerb).filter(models.TcmspHerb.id == 9001).first():
         db.add(models.TcmspHerb(id=9001, herb_en_name="Test herb", herb_cn_name="測試藥材"))
-        for mol, tars in [("MOLP01", ["TARP001", "TARP002", "TARP006"]),
-                          ("MOLP02", ["TARP003", "TARP004"])]:
-            db.add(models.TcmspIngredient(mol_id=mol, molecule_name=mol))
+        # (mol_id, ob, dl, 靶點)：涵蓋通過／OB 不足／DL 不足／缺值四種情況
+        for mol, ob, dl, tars in [
+                ("MOLP01", "45.6", "0.72", ["TARP001", "TARP002", "TARP006"]),  # 通過
+                ("MOLP02", "31.0", "0.19", ["TARP003", "TARP004"]),             # 剛好通過
+                ("MOLP03", "12.3", "0.55", ["TARP005"]),                        # OB 不足
+                ("MOLP04", "88.0", "0.05", ["TARP005"]),                        # DL 不足
+                ("MOLP05", "", "0.60", ["TARP005"]),                            # OB 缺值
+                ("MOLP06", "50.0", "NA", ["TARP005"])]:                         # DL 是 'NA'
+            db.add(models.TcmspIngredient(mol_id=mol, molecule_name=mol, ob=ob, dl=dl))
             db.add(models.TcmspHerbIngredient(herb_id=9001, mol_id=mol))
             for t in tars:
                 db.add(models.TcmspIngredientTarget(mol_id=mol, tar_id=t))
@@ -303,9 +309,76 @@ def main():
           stats["by_source"]["kegg"]["background_total"] == 5,
           stats["by_source"]["kegg"]["background_total"])
 
+    # ---------- ADME 活性成分篩選 ----------
+    print("\n【ADME 活性成分篩選（目標一 Step 1 的條件）】")
+    check("_num 解析得出正常數字", pw._num("45.6") == 45.6)
+    check("_num 對空字串回 None 而不是 0（缺值 ≠ 不活性）", pw._num("") is None)
+    check("_num 對 'NA' 回 None", pw._num("NA") is None)
+    check("_num 對 None 回 None", pw._num(None) is None)
+
+    meta = pw.active_ingredients(db, 9001, 30.0, 0.18)
+    check("6 個成分中只有 2 個通過 OB≥30 且 DL≥0.18",
+          meta["passed_count"] == 2, meta)
+    check("通過的是 MOLP01 與 MOLP02（含剛好在門檻上的 31.0/0.19）",
+          sorted(meta["passed"]) == ["MOLP01", "MOLP02"], meta["passed"])
+    check("ADME 缺值的 2 個成分單獨計數，不混進通過或不通過",
+          meta["missing_adme"] == 2, meta["missing_adme"])
+
+    tar_filtered, m1 = pw.targets_for_herb(db, 9001, apply_adme=True)
+    tar_all, m2 = pw.targets_for_herb(db, 9001, apply_adme=False)
+    check("篩選後靶點變少（5 個 → 5 個活性靶點，TARP005 被排除）",
+          len(tar_filtered) < len(tar_all), (len(tar_filtered), len(tar_all)))
+    check("只有低活性成分連到的 TARP005 被排除",
+          "TARP005" not in tar_filtered and "TARP005" in tar_all,
+          sorted(tar_filtered))
+    check("不篩時 meta 明確標示沒有套用門檻",
+          m2["ob_min"] is None and m2["passed_count"] == 6, m2)
+    check("targets_for_herb 不會把成分清單一起回傳（避免灌大回應）",
+          "passed" not in m1, list(m1))
+
+    ob, dl = pw.adme_thresholds(db)
+    check("預設門檻為 TCMSP 論文建議值 OB 30 / DL 0.18",
+          (ob, dl) == (30.0, 0.18), (ob, dl))
+    db.add(models.SystemSetting(key=pw.OB_KEY, value="50"))
+    db.commit()
+    check("門檻可由系統設定覆寫", pw.adme_thresholds(db)[0] == 50.0)
+    db.query(models.SystemSetting).filter(models.SystemSetting.key == pw.OB_KEY).delete()
+    db.commit()
+    db.add(models.SystemSetting(key=pw.OB_KEY, value="壞掉的值"))
+    db.commit()
+    check("設定值壞掉時退回預設，不讓分析整個掛掉",
+          pw.adme_thresholds(db)[0] == 30.0, pw.adme_thresholds(db))
+    db.query(models.SystemSetting).filter(models.SystemSetting.key == pw.OB_KEY).delete()
+    db.commit()
+
+    r_on = client.get("/pathways/herb/9001?apply_adme=true", headers=U).json()
+    r_off = client.get("/pathways/herb/9001?apply_adme=false", headers=U).json()
+    check("端點預設就會套用 ADME 篩選",
+          client.get("/pathways/herb/9001", headers=U).json()["apply_adme"] is True)
+    check("回應帶出成分篩選統計給畫面顯示",
+          r_on["ingredients"]["passed_count"] == 2 and r_on["ingredients"]["total"] == 6,
+          r_on["ingredients"])
+    check("關掉篩選時靶點數較多",
+          r_off["herb"]["target_count"] > r_on["herb"]["target_count"],
+          (r_off["herb"]["target_count"], r_on["herb"]["target_count"]))
+
+    # ---------- 非癌症疾病類通路排除 ----------
+    print("\n【排除非癌症的疾病類大雜燴通路】")
+    for cat, want in [("Human Diseases / Cardiovascular disease", True),
+                      ("Human Diseases / Infectious disease: bacterial", True),
+                      ("Human Diseases / Cancer: overview", False),
+                      ("Human Diseases / Cancer: specific types", False),
+                      ("Human Diseases / Drug resistance: antineoplastic", False),
+                      ("Organismal Systems / Immune system", False),
+                      (None, False)]:
+        check(f"分類判定：{cat}", pw.is_noncancer_disease_pathway(cat) is want, cat)
+    check("分類為空時不排除（寧可保留也不要靜默刪資料）",
+          pw.is_noncancer_disease_pathway("") is False)
+
     # ---------- 富集 ----------
     print("\n【富集分析】")
-    res = client.get("/pathways/herb/9001?source=kegg&background=genome", headers=U).json()
+    res = client.get("/pathways/herb/9001?source=kegg&background=genome"
+                     "&apply_adme=true&exclude_noncancer_disease=false", headers=U).json()
     check("藥材富集 200 並帶回藥材資訊", res["herb"]["herb_cn_name"] == "測試藥材", res.get("herb"))
     check("**在基因符號空間去重**：AR 與 AR-isoform 只算一個基因 → n=4",
           res["study_gene_count"] == 4, res["study_gene_count"])
@@ -319,7 +392,7 @@ def main():
           by_id["hsa04915"]["hit_symbols"] == ["AR", "ESR1"], by_id["hsa04915"]["hit_symbols"])
     check("hsa05200 命中 AR/TP53/AKT1 三個基因",
           by_id["hsa05200"]["hit_count"] == 3, by_id.get("hsa05200"))
-    check("PTK2 不在這個藥材的靶點裡 → hsa00010 不出現在結果",
+    check("PTK2 只由未通過 ADME 的成分連到 → hsa00010 不出現在結果",
           "hsa00010" not in by_id, list(by_id))
 
     want = exact_sf(3, 5, 3, 4)
@@ -333,11 +406,11 @@ def main():
               for i in range(len(res["items"]) - 1)))
     check("有算 fold enrichment", by_id["hsa05200"]["fold_enrichment"] is not None)
 
-    res_c = client.get("/pathways/herb/9001?source=kegg&cancer_only=true", headers=U).json()
+    res_c = client.get("/pathways/herb/9001?source=kegg&cancer_only=true&apply_adme=true&exclude_noncancer_disease=false", headers=U).json()
     check("只看癌症通路時，糖解作用被濾掉",
           all(i["is_cancer_related"] for i in res_c["items"]), [i["pathway_id"] for i in res_c["items"]])
 
-    res_t = client.get("/pathways/herb/9001?source=kegg&background=tcmsp", headers=U).json()
+    res_t = client.get("/pathways/herb/9001?source=kegg&background=tcmsp&apply_adme=true&exclude_noncancer_disease=false", headers=U).json()
     check("換成 TCMSP 母體時背景總數不同（5 → 5 個已標準化且有註解的基因）",
           res_t["background"] == "tcmsp", res_t["background"])
     check("換母體後 p 值會不同（母體不同結論就不同，畫面必須標示用了哪一種）",

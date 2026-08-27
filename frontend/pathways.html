@@ -49,6 +49,16 @@
         一次對數千條通路做檢定，就算全是雜訊，在 p&lt;0.05 這條線下也會有上百條「顯著」——
         所以請以 <b>q 值</b>（FDR 校正後）為準，不要只看 p 值。
       </p>
+      <p class="hint-msg">
+        <b>兩個預設開啟的篩選，關掉之前請先知道自己在關什麼：</b><br>
+        <b>只用活性成分</b>——TCMSP 收錄的是這個藥材裡偵測得到的<b>所有</b>化合物，
+        多數口服吸收率極低或不具類藥性，到不了體內任何靶點。預設先用 OB ≥ 30%、DL ≥ 0.18 篩過
+        （TCMSP 原始論文的建議值，也是本專案目標一 Step 1 定義的條件）。<br>
+        <b>排除非癌症疾病類通路</b>——KEGG 的結核病、動脈粥狀硬化、B 型肝炎這類通路，
+        每一條都塞了 AKT1／BCL2／CASP3／IL6／TP53 這組通用發炎凋亡機器，
+        所以<b>任何</b>靶點集合都會對它們「顯著」。那是統計假象，不是藥理發現。
+        癌症通路與抗腫瘤抗藥性通路不受此排除影響。
+      </p>
       <p class="hint-msg" style="color:#a83232;">
         ⚠️ 同步需要對外連線到 rest.kegg.jp 與 reactome.org，請在已部署的 Render 環境操作。
         本結果為文獻資料庫的統計關聯，屬研究輔助資訊，<b>不構成任何醫療診斷或治療建議</b>。
@@ -84,8 +94,15 @@
         <label style="display:flex; align-items:center; gap:6px;">
           <input type="checkbox" id="cancerOnly" style="width:auto; margin:0;" /> 只看癌症相關通路
         </label>
+        <label style="display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="applyAdme" checked style="width:auto; margin:0;" /> 只用活性成分（OB／DL 篩選）
+        </label>
+        <label style="display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="excludeDisease" checked style="width:auto; margin:0;" /> 排除非癌症疾病類通路
+        </label>
         <button id="runBtn">分析</button>
       </div>
+      <div class="bgnote" id="admeNote"></div>
       <div class="bgnote" id="bgNote"></div>
       <p class="hint-msg" id="enrichHint"></p>
       <table class="enrich">

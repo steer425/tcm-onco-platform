@@ -51,8 +51,10 @@ def pathway_stats(current_user: models.User = Depends(get_current_user),
     standardised = (db.query(func.count(func.distinct(models.TcmspTargetUniprot.tar_id)))
                     .filter(models.TcmspTargetUniprot.status.in_(("auto", "confirmed")))
                     .scalar() or 0)
+    ob_min, dl_min = pw.adme_thresholds(db)
     return {"by_source": out, "standardised_targets": standardised,
-            "total_targets": db.query(models.TcmspTarget).count()}
+            "total_targets": db.query(models.TcmspTarget).count(),
+            "adme": {"ob_min": ob_min, "dl_min": dl_min}}
 
 
 class SyncIn(BaseModel):
@@ -109,25 +111,42 @@ def herb_enrichment(herb_id: int,
                     source: str = Query("kegg", pattern="^(kegg|reactome)$"),
                     background: str = Query("genome", pattern="^(genome|tcmsp)$"),
                     cancer_only: bool = False,
+                    exclude_noncancer_disease: bool = True,
+                    apply_adme: bool = True,
                     limit: int = Query(50, ge=1, le=200),
                     current_user: models.User = Depends(get_current_user),
                     db: Session = Depends(get_query_db)):
     """藥材 → 成分 → 靶點 → 通路，做過度代表分析。
 
-    `background` 兩種母體的差別見 `app.pathways.enrich` 的說明——
-    畫面上必須顯示目前用的是哪一種，同一個藥材換母體會得到不同的排序，
-    看到數字卻不知道母體是什麼，那個數字就沒有意義。
+    三個預設值都是刻意的，關掉之前要知道自己在關什麼：
+
+    `apply_adme=True`
+        先用 OB ≥ 30%、DL ≥ 0.18 篩出活性成分——這是 TCMSP 原始論文的建議值，
+        也是 `docs/2026_goals.md` 目標一 Step 1 白紙黑字寫的條件。
+        不篩等於宣稱這個藥材裡每一個偵測得到的化合物都在體內作用。
+
+    `exclude_noncancer_disease=True`
+        排除 KEGG 裡非癌症的疾病類通路（結核病、動脈粥狀硬化…）。
+        那些通路是通用發炎凋亡基因的大雜燴，任何靶點集合都會對它們「顯著」。
+
+    `background`
+        兩種母體的差別見 `app.pathways.enrich`。畫面上必須顯示用的是哪一種——
+        同一個藥材換母體會得到不同排序，看到數字卻不知道母體是什麼就沒有意義。
     """
     herb = db.query(models.TcmspHerb).filter(models.TcmspHerb.id == herb_id).first()
     if not herb:
         raise HTTPException(status_code=404, detail="找不到藥材資料")
 
-    tar_ids = pw.targets_for_herb(db, herb_id)
+    tar_ids, ingredient_meta = pw.targets_for_herb(db, herb_id, apply_adme=apply_adme)
     result = pw.enrich(db, tar_ids, source=source, background=background,
-                       cancer_only=cancer_only, limit=limit)
+                       cancer_only=cancer_only,
+                       exclude_noncancer_disease=exclude_noncancer_disease,
+                       limit=limit)
     result["herb"] = {"id": herb.id, "herb_en_name": herb.herb_en_name,
                       "herb_cn_name": herb.herb_cn_name,
                       "target_count": len(tar_ids)}
+    result["ingredients"] = ingredient_meta
+    result["apply_adme"] = apply_adme
     return result
 
 
@@ -136,6 +155,7 @@ class TargetsIn(BaseModel):
     source: str = Field(default="kegg", pattern="^(kegg|reactome)$")
     background: str = Field(default="genome", pattern="^(genome|tcmsp)$")
     cancer_only: bool = False
+    exclude_noncancer_disease: bool = True
     limit: int = Field(default=50, ge=1, le=200)
 
 
@@ -146,7 +166,9 @@ def enrich_targets(payload: TargetsIn,
     """給複方（多味藥材）、暗黑基因反查等場景共用的通用入口。"""
     return pw.enrich(db, set(payload.tar_ids), source=payload.source,
                      background=payload.background,
-                     cancer_only=payload.cancer_only, limit=payload.limit)
+                     cancer_only=payload.cancer_only,
+                     exclude_noncancer_disease=payload.exclude_noncancer_disease,
+                     limit=payload.limit)
 
 
 @router.get("/target/{tar_id}", summary="（前台）單一靶點參與的通路")

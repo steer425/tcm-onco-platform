@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.39.0 KEGG/Reactome pathway over-representation analysis with hypergeometric test and BH FDR correction, built on the UniProt cross-references v1.38.0 already captured"
+set "DEFAULT_MSG=v1.39.1 apply the OB/DL active-ingredient filter the methodology already required, and exclude KEGG non-cancer disease pathways that any gene set enriches for"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

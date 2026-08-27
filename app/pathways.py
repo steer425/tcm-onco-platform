@@ -81,6 +81,39 @@ KEGG_CANCER_RELATED_EXTRA = {
     "hsa04915",  # Estrogen signaling pathway
 }
 
+# ---------------------------------------------------------------------------
+# 「疾病類大雜燴通路」的排除規則
+# ---------------------------------------------------------------------------
+# KEGG 的 Human Diseases 底下有一批通路（結核病、動脈粥狀硬化、B 型肝炎、
+# 查加斯氏病…）本質上是**大雜燴**：每一條都塞了 AKT1／BCL2／CASP3/8/9／
+# IL1B／IL6／MAPK／NFKB／RELA／TP53 這組通用的發炎與凋亡機器。
+#
+# 後果是：任何含有這組通用基因的集合，都會對這些疾病「顯著富集」。
+# 人參的分析結果裡「結核病 q=1.86e-4」就是這樣來的——那不代表人參治結核病，
+# 只代表人參的靶點包含通用發炎凋亡核心。這是 ORA 眾所周知的假象。
+#
+# 但**不能把整個 Human Diseases 排掉**：癌症通路正好也在這一類底下。
+# 所以按 KEGG 自己的 B 層子分類白名單保留，其餘的 Human Diseases 才排除。
+KEGG_DISEASE_KEEP = (
+    "Cancer: overview",
+    "Cancer: specific types",
+    "Drug resistance: antineoplastic",
+)
+DISEASE_CATEGORY_PREFIX = "Human Diseases"
+
+
+def is_noncancer_disease_pathway(category) -> bool:
+    """這條通路是不是「非癌症的疾病類大雜燴」。
+
+    判斷完全依 KEGG 自己的 BRITE 分類，不是猜關鍵字。
+    分類抓不到（category 為空）時一律回 False——寧可保留也不要靜默刪掉資料。
+    """
+    cat = (category or "").strip()
+    if not cat.startswith(DISEASE_CATEGORY_PREFIX):
+        return False
+    return not any(keep in cat for keep in KEGG_DISEASE_KEEP)
+
+
 # Reactome 沒有像 KEGG 那樣現成的癌症分類可以直接用（要另外抓事件階層檔），
 # 所以先用名稱關鍵字判斷，並在頁面上明講這是啟發式的。
 REACTOME_CANCER_KEYWORDS = (
@@ -445,19 +478,102 @@ def link_targets(db: Session, source: str, data: dict) -> dict:
     return {"links": links, "targets_with_pathway": len(targets_with_pathway)}
 
 
-def targets_for_herb(db: Session, herb_id) -> set:
-    """藥材 → 成分 → 靶點。回傳 tar_id 集合。"""
-    mol_ids = [r.mol_id for r in db.query(models.TcmspHerbIngredient)
-               .filter(models.TcmspHerbIngredient.herb_id == herb_id).all()]
+# ADME 篩選門檻。這不是我們發明的數字，是 TCMSP 原始論文的建議值，
+# 也是 docs/2026_goals.md 裡「目標一 Step 1」白紙黑字寫的條件。
+# 存成系統設定讓管理者可調，但預設值不要亂動——動了就跟文獻上的方法學對不起來。
+DEFAULT_OB_MIN = 30.0     # 口服生體可用率 (%)
+DEFAULT_DL_MIN = 0.18     # 類藥性
+OB_KEY, DL_KEY = "tcmsp_ob_threshold", "tcmsp_dl_threshold"
+
+
+def _setting_float(db: Session, key: str, default: float) -> float:
+    row = db.query(models.SystemSetting).filter(models.SystemSetting.key == key).first()
+    try:
+        return float(row.value) if row and row.value not in (None, "") else default
+    except (TypeError, ValueError):
+        return default
+
+
+def adme_thresholds(db: Session) -> tuple:
+    return (_setting_float(db, OB_KEY, DEFAULT_OB_MIN),
+            _setting_float(db, DL_KEY, DEFAULT_DL_MIN))
+
+
+def _num(value):
+    """TCMSP 的 ob／dl 存成字串（可攜型別規範），而且會有空字串與 'NA'。
+
+    解析不出來時回 None 而不是 0——當成 0 會讓那個成分被靜默篩掉，
+    看起來像「這個成分不活性」，實際上是「這筆資料缺值」。兩件事必須分得開。
+    """
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def active_ingredients(db: Session, herb_id, ob_min: float, dl_min: float) -> dict:
+    """套用 OB／DL 篩選，回傳篩選前後的成分清單與統計。
+
+    **為什麼一定要篩**：TCMSP 收錄的是這個藥材裡「偵測得到」的所有化合物，
+    絕大多數口服吸收率極低或根本不具類藥性，到不了體內任何靶點。
+    不篩就等於宣稱人參的每一個化合物都在體內作用——那不是保守，是錯的。
+
+    實測差別（人參，2026-08-27）：不篩 196 個靶點，篩了之後降到接近
+    docs/2026_goals.md 記載的「22 個活性成分、約 109 個不重複靶點基因」。
+
+    缺值（`ob`／`dl` 是空字串或 'NA'）一律**排除**並單獨計數。
+    把缺值當成通過會讓篩選形同虛設；當成 0 則無法跟「真的很低」區分，
+    所以獨立回報，讓使用者知道有多少筆是因為資料不全而被排除的。
+    """
+    rows = (db.query(models.TcmspIngredient)
+            .join(models.TcmspHerbIngredient,
+                  models.TcmspHerbIngredient.mol_id == models.TcmspIngredient.mol_id)
+            .filter(models.TcmspHerbIngredient.herb_id == herb_id).all())
+
+    passed, missing = [], 0
+    for ing in rows:
+        ob, dl = _num(ing.ob), _num(ing.dl)
+        if ob is None or dl is None:
+            missing += 1
+            continue
+        if ob >= ob_min and dl >= dl_min:
+            passed.append(ing.mol_id)
+
+    return {"total": len(rows), "passed": passed,
+            "passed_count": len(passed), "missing_adme": missing,
+            "ob_min": ob_min, "dl_min": dl_min}
+
+
+def targets_for_herb(db: Session, herb_id, apply_adme: bool = True,
+                     ob_min: float = None, dl_min: float = None) -> tuple:
+    """藥材 → 成分 → 靶點。回傳 (tar_id 集合, 成分篩選統計)。
+
+    `apply_adme=True`（預設）會先套用 OB／DL 篩選，也就是
+    docs/2026_goals.md 目標一 Step 1 定義的活性成分條件。
+    關掉只該用在「想看未篩選有多少」的對照，不該當成正式分析結果。
+    """
+    if apply_adme:
+        if ob_min is None or dl_min is None:
+            ob_min, dl_min = adme_thresholds(db)
+        meta = active_ingredients(db, herb_id, ob_min, dl_min)
+        mol_ids = meta["passed"]
+    else:
+        mol_ids = [r.mol_id for r in db.query(models.TcmspHerbIngredient)
+                   .filter(models.TcmspHerbIngredient.herb_id == herb_id).all()]
+        meta = {"total": len(mol_ids), "passed_count": len(mol_ids),
+                "missing_adme": 0, "ob_min": None, "dl_min": None}
+
+    meta.pop("passed", None)
     if not mol_ids:
-        return set()
-    return {r.tar_id for r in db.query(models.TcmspIngredientTarget)
-            .filter(models.TcmspIngredientTarget.mol_id.in_(mol_ids)).all()}
+        return set(), meta
+    tar_ids = {r.tar_id for r in db.query(models.TcmspIngredientTarget)
+               .filter(models.TcmspIngredientTarget.mol_id.in_(mol_ids)).all()}
+    return tar_ids, meta
 
 
 def enrich(db: Session, tar_ids, source: str = "kegg",
            background: str = "genome", cancer_only: bool = False,
-           limit: int = 50) -> dict:
+           exclude_noncancer_disease: bool = False, limit: int = 50) -> dict:
     """對一組靶點做通路過度代表分析（ORA）。
 
     **在基因符號空間計算，不是 tar_id 空間**：TCMSP 有多個靶點指向同一個基因
@@ -486,6 +602,18 @@ def enrich(db: Session, tar_ids, source: str = "kegg",
         q = q.filter(models.Pathway.is_cancer_related.is_(True))
     all_links = q.all()
 
+    excluded_disease = 0
+    if exclude_noncancer_disease:
+        kept = []
+        dropped: set = set()
+        for link, pathway in all_links:
+            if is_noncancer_disease_pathway(pathway.category):
+                dropped.add(pathway.id)
+                continue
+            kept.append((link, pathway))
+        excluded_disease = len(dropped)
+        all_links = kept
+
     # 通路 → 這個藥材命中的基因符號；以及母體側的統計
     study_hits: dict = {}
     study_symbols: set = set()
@@ -508,7 +636,8 @@ def enrich(db: Session, tar_ids, source: str = "kegg",
     if n == 0:
         return {"source": source, "background": background, "study_gene_count": 0,
                 "background_total": 0, "total_tested": 0, "items": [],
-                "note": "這個藥材的靶點沒有任何一個對應到通路註解（可能尚未標準化）"}
+                "excluded_disease_pathways": excluded_disease,
+                "note": "這個藥材的靶點沒有任何一個對應到通路註解（可能尚未標準化，或篩選條件過嚴）"}
 
     if background == "tcmsp":
         N = len(tcmsp_symbols)
@@ -549,4 +678,7 @@ def enrich(db: Session, tar_ids, source: str = "kegg",
 
     return {"source": source, "background": background,
             "study_gene_count": n, "background_total": N,
-            "total_tested": len(raw), "items": items}
+            "total_tested": len(raw),
+            "significant_count": sum(1 for r in raw if r["q_value"] < 0.05),
+            "excluded_disease_pathways": excluded_disease,
+            "items": items}

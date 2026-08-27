@@ -95,6 +95,27 @@ async function loadHerbs() {
 
 // ---------------------------------------------------------------- 富集分析
 
+function renderIngredientNote(r) {
+  // 成分篩掉多少一定要看得見。使用者需要知道「這個結果是根據幾個成分算出來的」，
+  // 而不是預設有篩就當作沒事——篩太兇導致樣本剩沒幾個，結論一樣不可信。
+  const box = document.getElementById("admeNote");
+  const m = r.ingredients || {};
+  if (!r.apply_adme) {
+    box.innerHTML = `<b style="color:#a83232;">未套用活性成分篩選。</b>
+      這個藥材全部 ${esc(m.total || 0)} 個成分的靶點都被納入。
+      TCMSP 收錄的是偵測得到的所有化合物，多數到不了體內靶點——
+      這個結果只適合當對照，<b>不適合當成正式分析</b>。`;
+    return;
+  }
+  const pct = m.total ? Math.round((m.passed_count / m.total) * 100) : 0;
+  box.innerHTML = `<b>活性成分篩選：OB ≥ ${esc(m.ob_min)}%、DL ≥ ${esc(m.dl_min)}。</b>
+    ${esc(m.total || 0)} 個成分中有 <b>${esc(m.passed_count || 0)}</b> 個通過（${esc(pct)}%），
+    對應 <b>${esc(r.herb ? r.herb.target_count : 0)}</b> 個靶點。
+    ${m.missing_adme ? `另有 ${esc(m.missing_adme)} 個成分因為 ADME 資料缺值而排除
+       （缺值不等於不活性，只是 TCMSP 沒收錄這個數字）。` : ""}`;
+}
+
+
 function renderBackgroundNote(background, backgroundTotal, studyGeneCount) {
   // 母體選了什麼，結論就跟著變。畫面上一定要講清楚現在算的是哪一種，
   // 不然使用者看到的 p 值不知道在跟什麼比。
@@ -120,13 +141,19 @@ async function runEnrichment() {
   const source = document.getElementById("sourceSelect").value;
   const background = document.getElementById("bgSelect").value;
   const cancerOnly = document.getElementById("cancerOnly").checked;
+  const applyAdme = document.getElementById("applyAdme").checked;
+  const excludeDisease = document.getElementById("excludeDisease").checked;
   const btn = document.getElementById("runBtn");
   btn.disabled = true;
   hint.textContent = "分析中…";
   try {
-    const params = new URLSearchParams({ source, background, cancer_only: cancerOnly, limit: 100 });
+    const params = new URLSearchParams({
+      source, background, cancer_only: cancerOnly, apply_adme: applyAdme,
+      exclude_noncancer_disease: excludeDisease, limit: 100,
+    });
     const r = await api(`/pathways/herb/${encodeURIComponent(herbId)}?${params}`);
 
+    renderIngredientNote(r);
     renderBackgroundNote(r.background, r.background_total, r.study_gene_count);
 
     if (!r.items || !r.items.length) {
@@ -134,9 +161,13 @@ async function runEnrichment() {
       body.innerHTML = "";
       return;
     }
-    const sig = r.items.filter(i => i.q_value != null && i.q_value < 0.05).length;
+    const sig = r.significant_count != null ? r.significant_count
+              : r.items.filter(i => i.q_value != null && i.q_value < 0.05).length;
+    const dropped = r.excluded_disease_pathways
+      ? `（已排除 ${r.excluded_disease_pathways} 條非癌症疾病類通路）` : "";
     hint.innerHTML = `${esc(r.herb.herb_cn_name || r.herb.herb_en_name)}：` +
-      `共檢定 ${r.total_tested} 條通路，其中 <b>${sig}</b> 條達 FDR q&lt;0.05；以下顯示前 ${r.items.length} 條。`;
+      `共檢定 ${r.total_tested} 條通路${esc(dropped)}，其中 <b>${sig}</b> 條達 FDR q&lt;0.05；` +
+      `以下顯示前 ${r.items.length} 條。`;
 
     body.innerHTML = r.items.map(i => `
       <tr>
