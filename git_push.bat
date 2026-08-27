@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.39.1 apply the OB/DL active-ingredient filter the methodology already required, and exclude KEGG non-cancer disease pathways that any gene set enriches for"
+set "DEFAULT_MSG=v1.39.2 replace the 502-item herb dropdown with a fuzzy search box, and add the missing OpenCC script to six pages where simplified-Chinese mode silently did nothing"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

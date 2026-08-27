@@ -78,18 +78,156 @@ async function runSync(source) {
   }
 }
 
-// ---------------------------------------------------------------- 藥材清單
+// ---------------------------------------------------------------- 藥材搜尋
+// 502 種藥材用下拉選單根本找不到（實際使用時捲不完），改成輸入即時模糊比對。
+// 清單本來就整包載到前端了，所以比對純在瀏覽器端做，不用再打一次 API。
+
+let allHerbs = [];
+let selectedHerbId = null;
+let activeIndex = -1;
+let toCn = null;   // OpenCC 繁→簡轉換器
+
+function initConverter() {
+  // 藥材名稱在資料庫裡是簡體（猫爪草、鱼腥草）。使用者用繁體輸入「貓爪草」
+  // 直接比對會找不到——這不是使用者輸錯，是我們的比對沒處理字形差異。
+  // OpenCC 已經是全站語系機制在用的東西，這裡直接沿用。
+  try {
+    if (!toCn && window.OpenCC) toCn = OpenCC.Converter({ from: "tw", to: "cn" });
+  } catch (e) { toCn = null; }
+}
+
+function normalize(text) {
+  const t = String(text == null ? "" : text).toLowerCase().trim();
+  if (!t) return "";
+  try {
+    return toCn ? toCn(t) : t;
+  } catch (e) {
+    return t;   // 轉換失敗就用原文比，不要讓搜尋整個壞掉
+  }
+}
+
+function herbHaystack(h) {
+  return [h.herb_cn_name, h.herb_en_name, h.herb_pinyin,
+          h.child_cn_name, h.child_en_name].filter(Boolean).join(" ");
+}
+
+function searchHerbs(query) {
+  const q = normalize(query);
+  if (!q) return allHerbs.slice(0, 40);
+  const scored = [];
+  for (const h of allHerbs) {
+    const hay = normalize(herbHaystack(h));
+    const idx = hay.indexOf(q);
+    if (idx < 0) continue;
+    // 開頭命中排前面，其次才是出現在中間的；同分再依靶點數
+    const name = normalize(h.herb_cn_name || h.herb_en_name || "");
+    let score = 2;
+    if (name === q) score = 0;
+    else if (name.startsWith(q)) score = 1;
+    scored.push({ h, score, idx });
+  }
+  scored.sort((a, b) => a.score - b.score || a.idx - b.idx
+                        || (b.h.target_count || 0) - (a.h.target_count || 0));
+  return scored.slice(0, 40).map(x => x.h);
+}
+
+function highlight(text, query) {
+  const raw = String(text == null ? "" : text);
+  const q = normalize(query);
+  if (!q) return esc(raw);
+  const idx = normalize(raw).indexOf(q);
+  // 轉換後長度可能與原字串不同，只有長度一致時才安全地標記
+  if (idx < 0 || normalize(raw).length !== raw.length) return esc(raw);
+  return esc(raw.slice(0, idx)) + "<mark>" + esc(raw.slice(idx, idx + q.length)) +
+         "</mark>" + esc(raw.slice(idx + q.length));
+}
+
+function renderHerbResults(query) {
+  const box = document.getElementById("herbResults");
+  const list = searchHerbs(query);
+  activeIndex = -1;
+  if (!list.length) {
+    box.innerHTML = `<div class="herb-empty">找不到符合「${esc(query)}」的藥材。
+      可以試中文、英文學名或拼音，例如「人參」「ginseng」「renshen」。</div>`;
+    box.hidden = false;
+    return;
+  }
+  box.innerHTML = list.map((h, i) => {
+    const cn = h.herb_cn_name || "";
+    const en = h.herb_en_name || "";
+    const py = h.herb_pinyin || "";
+    return `<div class="herb-item" data-herb-id="${esc(h.herb_id)}" data-idx="${i}">
+      <b>${highlight(cn || en, query)}</b>
+      <div class="sub">${highlight(en, query)}${py ? " · " + highlight(py, query) : ""}
+        · 靶點 ${esc(h.target_count || 0)}（未篩選）</div>
+    </div>`;
+  }).join("");
+  box.hidden = false;
+  box.querySelectorAll("[data-herb-id]").forEach(el => {
+    el.addEventListener("mousedown", ev => {
+      // 用 mousedown 而不是 click：input 的 blur 會先關掉清單，click 就永遠觸發不到
+      ev.preventDefault();
+      chooseHerb(el.dataset.herbId);
+    });
+  });
+}
+
+function chooseHerb(herbId) {
+  const h = allHerbs.find(x => String(x.herb_id) === String(herbId));
+  if (!h) return;
+  selectedHerbId = h.herb_id;
+  document.getElementById("herbSearch").value = h.herb_cn_name || h.herb_en_name || "";
+  document.getElementById("herbResults").hidden = true;
+  runEnrichment();
+}
+
+function moveActive(delta) {
+  const box = document.getElementById("herbResults");
+  const items = [...box.querySelectorAll(".herb-item")];
+  if (!items.length) return;
+  activeIndex = (activeIndex + delta + items.length) % items.length;
+  items.forEach((el, i) => el.classList.toggle("active", i === activeIndex));
+  items[activeIndex].scrollIntoView({ block: "nearest" });
+}
+
+function bindHerbSearch() {
+  const input = document.getElementById("herbSearch");
+  const box = document.getElementById("herbResults");
+
+  input.addEventListener("input", () => {
+    selectedHerbId = null;      // 改過字就當作還沒選定，避免用舊的藥材去分析
+    renderHerbResults(input.value);
+  });
+  input.addEventListener("focus", () => renderHerbResults(input.value));
+  input.addEventListener("blur", () => setTimeout(() => { box.hidden = true; }, 120));
+  input.addEventListener("keydown", ev => {
+    if (box.hidden && ["ArrowDown", "ArrowUp"].includes(ev.key)) {
+      renderHerbResults(input.value);
+      return;
+    }
+    if (ev.key === "ArrowDown") { ev.preventDefault(); moveActive(1); }
+    else if (ev.key === "ArrowUp") { ev.preventDefault(); moveActive(-1); }
+    else if (ev.key === "Escape") { box.hidden = true; }
+    else if (ev.key === "Enter") {
+      ev.preventDefault();
+      const items = [...box.querySelectorAll("[data-herb-id]")];
+      // 沒有用方向鍵選的話，Enter 就取第一筆——只有一筆結果時這是最順的操作
+      const pick = activeIndex >= 0 ? items[activeIndex] : items[0];
+      if (pick) chooseHerb(pick.dataset.herbId);
+    }
+  });
+}
 
 async function loadHerbs() {
-  const sel = document.getElementById("herbSelect");
+  const input = document.getElementById("herbSearch");
   try {
-    const herbs = await api("/tcmsp/herbs/public/list");
-    herbs.sort((a, b) => (b.target_count || 0) - (a.target_count || 0));
-    sel.innerHTML = `<option value="">請選擇藥材（依靶點數排序）</option>` + herbs.map(h =>
-      `<option value="${h.herb_id}">${esc(h.herb_cn_name || h.herb_en_name)}` +
-      `（${h.target_count || 0} 個靶點）</option>`).join("");
+    initConverter();
+    allHerbs = await api("/tcmsp/herbs/public/list");
+    allHerbs.sort((a, b) => (b.target_count || 0) - (a.target_count || 0));
+    input.placeholder = `輸入藥材名稱搜尋（共 ${allHerbs.length} 種，可用中文／英文／拼音）`;
   } catch (err) {
-    sel.innerHTML = `<option value="">藥材清單載入失敗</option>`;
+    input.placeholder = "藥材清單載入失敗";
+    input.disabled = true;
   }
 }
 
@@ -133,10 +271,14 @@ function renderBackgroundNote(background, backgroundTotal, studyGeneCount) {
 }
 
 async function runEnrichment() {
-  const herbId = document.getElementById("herbSelect").value;
+  const herbId = selectedHerbId;
   const hint = document.getElementById("enrichHint");
   const body = document.getElementById("enrichBody");
-  if (!herbId) { hint.textContent = "請先選擇一個藥材。"; body.innerHTML = ""; return; }
+  if (!herbId) {
+    hint.textContent = "請先在上方輸入並選擇一個藥材。";
+    body.innerHTML = "";
+    return;
+  }
 
   const source = document.getElementById("sourceSelect").value;
   const background = document.getElementById("bgSelect").value;
@@ -198,7 +340,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("syncKeggBtn").addEventListener("click", () => runSync("kegg"));
   document.getElementById("syncReactomeBtn").addEventListener("click", () => runSync("reactome"));
   document.getElementById("runBtn").addEventListener("click", runEnrichment);
-  document.getElementById("herbSelect").addEventListener("change", runEnrichment);
+  bindHerbSearch();
 
   try {
     await Promise.all([loadStats(), loadHerbs()]);

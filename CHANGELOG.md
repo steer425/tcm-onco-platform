@@ -1,5 +1,53 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.39.2 — 2026-08-27（藥材改為模糊搜尋；補上六個頁面漏掉的 OpenCC）
+
+### 藥材選取：下拉選單換成輸入即時搜尋
+
+502 種藥材塞在一個 `<select>` 裡，實際使用時捲不完也找不到——
+使用者要選「人參」得在兩百多筆之間目視搜尋。改成文字輸入框 + 即時模糊比對。
+
+- 比對範圍：中文名、英文學名、拼音、以及 child 名稱
+- 排序：完全相同 → 開頭命中 → 出現在中間；同分再依靶點數
+- 鍵盤可用：↑↓ 選擇、Enter 確認（沒按方向鍵時 Enter 取第一筆）、Esc 關閉
+- 命中的字串會標黃
+
+**繁簡字形一併處理**：藥材名稱在資料庫裡是簡體（`猫爪草`、`鱼腥草`），
+使用者用繁體打「貓爪草」直接比對會找不到——**那不是使用者輸錯，是我們的比對沒處理字形差異**。
+沿用全站語系機制已經在用的 OpenCC 做正規化，兩邊都轉成簡體再比。
+轉換失敗時退回原文比對，不讓搜尋整個壞掉。
+
+選項用 `mousedown` 而不是 `click` 綁定：input 的 `blur` 會先把清單關掉，
+用 `click` 的話永遠觸發不到。
+
+另外把清單裡的靶點數標成「靶點 196（**未篩選**）」——那個數字來自
+`TcmspHerb.target_count` 這個預先計算欄位，沒有經過 OB／DL 篩選，
+跟分析實際使用的靶點數不同。兩個數字擺在同一畫面上不標清楚會讓人以為算錯了。
+
+### 修正：六個頁面漏掉 OpenCC，簡體語系實際上完全沒作用
+
+`site-lang.js` 的簡體轉換靠 CDN 載入的 `opencc-js`，但下列頁面的 `<head>`
+從來沒有引入它——切到簡體時 `initOpenCCForSiteLang()` 取不到 `window.OpenCC`，
+**畫面靜默維持繁體，不會報錯**：
+
+- `pathways.html`、`target-mapping.html`（v1.38.0／v1.39.0 新增的兩頁，我漏了）
+- `darkgene-stats.html`、`dna-test-data.html`、`gencc-diseases.html`、
+  `patient-dark-gene-ranking.html`（既有頁面，一併補上）
+
+`rules.md` §5-2 明訂「任何新頁面都要檢查四種語系」，這兩頁我沒做到。
+六頁全部補上 script 標籤。`oauth_callback.html` 是純轉址頁，沒有可見文字，不需要。
+
+**這類缺漏沒有任何徵兆**——不會報錯、不會空白，只是語系切了沒反應。
+所以檢查方式不能只靠肉眼看畫面，要確認 script 標籤真的在。
+
+### 檔案
+
+- 修改：`frontend/pathways.html`、`frontend/js/pathways.js`、
+  `frontend/target-mapping.html`、`frontend/darkgene-stats.html`、
+  `frontend/dna-test-data.html`、`frontend/gencc-diseases.html`、
+  `frontend/patient-dark-gene-ranking.html`、`frontend/js/i18n-dict.js`
+  （en／ko 各補 2 詞條，維持對等：各 684 條）、`rules.md`
+
 ## v1.39.1 — 2026-08-27（補上方法學缺的兩道篩選：活性成分與疾病類雜訊通路）
 
 ### 起因：人參的第一次分析結果不對勁
