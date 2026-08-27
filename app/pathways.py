@@ -571,9 +571,53 @@ def targets_for_herb(db: Session, herb_id, apply_adme: bool = True,
     return tar_ids, meta
 
 
+# 冗餘判定門檻。一條通路的命中基因如果有這個比例以上已經出現在更高名次的通路裡，
+# 就標記為冗餘——它沒有帶來新的觀察，只是同一組基因的另一種通路定義。
+#
+# 0.8 這個值的理由：人參的 p53 signaling 命中 BAX／BCL2／CASP3／CASP8／CASP9／CDK1，
+# 其中五個跟排在前面的 Apoptosis 完全相同（5/6 = 0.83）。那兩條並列在報告裡
+# 會被讀成兩項獨立證據，實際上是同一個觀察被 KEGG 的通路定義重複計入。
+# 門檻訂太低會把真正互補的通路也標成冗餘，訂太高則抓不到這種明顯重複。
+REDUNDANCY_THRESHOLD = 0.8
+
+
+def annotate_redundancy(ranked: list) -> list:
+    """依統計證據順序（p 值由小到大）標記冗餘，並算出每條的「新增基因」。
+
+    為什麼需要：KEGG／Reactome 的通路定義大量重疊，
+    同一組基因會同時落在凋亡、p53、癌症總覽等好幾條通路裡。
+    畫面上並列成好幾項會看起來像交叉印證，**實際上是一個觀察被算了很多次**。
+
+    每一條會多兩個資訊：
+      `new_symbols`   這條通路命中、但更高名次都沒出現過的基因
+      `redundant_with` 重疊比例最高且達門檻的那條更高名次通路（沒有則為 None）
+    """
+    seen: set = set()
+    prior: list = []          # [(pathway_id, name, rank, 命中集合)]
+    for idx, item in enumerate(ranked):
+        hits = set(item["symbols"])
+        item["new_symbols"] = sorted(hits - seen)
+
+        best = None
+        for pid, name, rank, prev_hits in prior:
+            if not hits:
+                break
+            ratio = len(hits & prev_hits) / len(hits)
+            if ratio >= REDUNDANCY_THRESHOLD and (best is None or ratio > best["ratio"]):
+                best = {"pathway_id": pid, "name": name, "rank": rank,
+                        "shared": len(hits & prev_hits), "total": len(hits),
+                        "ratio": round(ratio, 3)}
+        item["redundant_with"] = best
+
+        prior.append((item["pathway"].pathway_id, item["pathway"].name, idx + 1, hits))
+        seen |= hits
+    return ranked
+
+
 def enrich(db: Session, tar_ids, source: str = "kegg",
            background: str = "genome", cancer_only: bool = False,
-           exclude_noncancer_disease: bool = False, limit: int = 50) -> dict:
+           exclude_noncancer_disease: bool = False,
+           sort: str = "p", limit: int = 50) -> dict:
     """對一組靶點做通路過度代表分析（ORA）。
 
     ## 樣本數與母體，絕對不能被「只顯示哪些通路」影響（v1.39.3 修正的錯誤）
@@ -681,10 +725,23 @@ def enrich(db: Session, tar_ids, source: str = "kegg",
     qs = benjamini_hochberg([r["p_value"] for r in raw])
     for r, qv in zip(raw, qs):
         r["q_value"] = qv
+        r["fold"] = round((r["k"] / n) / (r["K"] / N), 3) if N and r["K"] else None
 
+    # 冗餘一律依「統計證據順序」判定，跟使用者選哪種排序無關——
+    # 誰是誰的重複，是資料的事實，不該因為畫面怎麼排而改變
     raw.sort(key=lambda r: (r["p_value"], -r["k"]))
+    annotate_redundancy(raw)
+    p_rank = {id(r): i + 1 for i, r in enumerate(raw)}
+
+    if sort == "fold":
+        # 依倍率排序的用途：p 值天生偏袒基因數多的大通路
+        #（k 大檢定力高），依 p 值排會把高特異性的小通路往後推。
+        # 人參的 Apoptosis 是 19.2 倍卻排第 20，就是這樣來的。
+        raw.sort(key=lambda r: (-(r["fold"] or 0), r["p_value"]))
+
     items = [{
         "rank": i + 1,
+        "p_rank": p_rank[id(r)],
         "pathway_id": r["pathway"].pathway_id,
         "name": r["pathway"].name,
         "name_tw": r["pathway"].name_tw,
@@ -693,14 +750,20 @@ def enrich(db: Session, tar_ids, source: str = "kegg",
         "hit_count": r["k"],
         "pathway_gene_count": r["K"],
         "hit_symbols": r["symbols"],
+        "new_symbols": r["new_symbols"],
+        "redundant_with": r["redundant_with"],
         "p_value": r["p_value"],
         "q_value": r["q_value"],
-        "fold_enrichment": round((r["k"] / n) / (r["K"] / N), 3) if N and r["K"] else None,
+        "fold_enrichment": r["fold"],
     } for i, r in enumerate(raw[:limit])]
 
-    return {"source": source, "background": background,
+    significant = [r for r in raw if r["q_value"] < 0.05]
+    return {"source": source, "background": background, "sort": sort,
             "study_gene_count": n, "background_total": N,
             "total_tested": len(raw),
-            "significant_count": sum(1 for r in raw if r["q_value"] < 0.05),
+            "significant_count": len(significant),
+            # 去除冗餘後還剩幾條——這才是「有幾項獨立發現」的答案。
+            # 顯著通路數本身會被通路定義的重疊灌水。
+            "independent_count": sum(1 for r in significant if not r["redundant_with"]),
             "excluded_disease_pathways": excluded_disease,
             "items": items}

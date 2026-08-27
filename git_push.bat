@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.39.3 stop pathway display filters from shrinking the study set (which inflated fold enrichment up to 20x), and number the result rows"
+set "DEFAULT_MSG=v1.39.4 flag redundant pathway findings that reuse the same genes, and add fold-enrichment sorting so specific small pathways are not buried by p-value"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

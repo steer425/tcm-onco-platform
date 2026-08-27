@@ -282,6 +282,7 @@ async function runEnrichment() {
 
   const source = document.getElementById("sourceSelect").value;
   const background = document.getElementById("bgSelect").value;
+  const sort = document.getElementById("sortSelect").value;
   const cancerOnly = document.getElementById("cancerOnly").checked;
   const applyAdme = document.getElementById("applyAdme").checked;
   const excludeDisease = document.getElementById("excludeDisease").checked;
@@ -290,7 +291,7 @@ async function runEnrichment() {
   hint.textContent = "分析中…";
   try {
     const params = new URLSearchParams({
-      source, background, cancer_only: cancerOnly, apply_adme: applyAdme,
+      source, background, sort, cancer_only: cancerOnly, apply_adme: applyAdme,
       exclude_noncancer_disease: excludeDisease, limit: 100,
     });
     const r = await api(`/pathways/herb/${encodeURIComponent(herbId)}?${params}`);
@@ -307,24 +308,47 @@ async function runEnrichment() {
               : r.items.filter(i => i.q_value != null && i.q_value < 0.05).length;
     const dropped = r.excluded_disease_pathways
       ? `（已排除 ${r.excluded_disease_pathways} 條非癌症疾病類通路）` : "";
+    // 「獨立發現數」比「顯著通路數」誠實：KEGG 的通路定義大量重疊，
+    // 同一組基因會同時落在好幾條通路，顯著數本身是被灌水的
+    const indep = r.independent_count;
+    const indepText = (indep != null && sig > 0)
+      ? `其中 <b>${indep}</b> 條是獨立的基因組合（其餘與更高名次重疊 ≥80%，
+         並列在報告裡會高估證據強度）；` : "";
     hint.innerHTML = `${esc(r.herb.herb_cn_name || r.herb.herb_en_name)}：` +
-      `共檢定 ${r.total_tested} 條通路${esc(dropped)}，其中 <b>${sig}</b> 條達 FDR q&lt;0.05；` +
-      `以下顯示前 ${r.items.length} 條。`;
+      `共檢定 ${r.total_tested} 條通路${esc(dropped)}，<b>${sig}</b> 條達 FDR q&lt;0.05，` +
+      indepText + `以下依${r.sort === "fold" ? "富集倍率" : "統計顯著性"}排序，` +
+      `顯示前 ${r.items.length} 條。`;
 
-    body.innerHTML = r.items.map((i, idx) => `
+    body.innerHTML = r.items.map((i, idx) => {
+      const isSig = i.q_value != null && i.q_value < 0.05;
+      const newSet = new Set(i.new_symbols || []);
+      // 新出現的基因加粗，已在更高名次出現過的變灰——
+      // 一眼看得出這一列到底帶來多少新資訊
+      const syms = (i.hit_symbols || []).map(sym =>
+        `<span class="${newSet.has(sym) ? "sym-new" : "sym-old"}">${esc(sym)}</span>`).join("、");
+      const dup = i.redundant_with;
+      return `
       <tr>
-        <td class="rank-cell ${i.q_value != null && i.q_value < 0.05 ? "rank-sig" : ""}">${esc(i.rank || idx + 1)}</td>
+        <td class="rank-cell ${isSig ? "rank-sig" : ""}">${esc(i.rank || idx + 1)}
+          ${r.sort === "fold" && i.p_rank ? `<small>p #${esc(i.p_rank)}</small>` : ""}</td>
         <td><span class="pill pill-${esc(r.source)}">${esc(i.pathway_id)}</span></td>
         <td>${esc(i.name_tw || i.name)}
           ${i.is_cancer_related ? '<span class="pill pill-cancer" style="margin-left:6px;">癌症相關</span>' : ""}
-          ${i.category ? `<div class="hint-msg">${esc(i.category)}</div>` : ""}</td>
+          ${dup ? `<span class="dup-tag">重複</span>` : ""}
+          ${i.category ? `<div class="hint-msg">${esc(i.category)}</div>` : ""}
+          ${dup ? `<div class="dup-note">命中基因與 #${esc(dup.rank)}
+              ${esc(dup.name)} 重疊 ${esc(dup.shared)}/${esc(dup.total)}
+              — 不是獨立證據</div>` : ""}</td>
         <td><b>${esc(i.hit_count)}</b></td>
         <td>${esc(i.pathway_gene_count)}</td>
         <td>${i.fold_enrichment == null ? "-" : esc(i.fold_enrichment)}</td>
         <td class="mono ${sigClass(i.q_value, i.p_value)}">${fmtP(i.p_value)}</td>
         <td class="mono ${sigClass(i.q_value, i.p_value)}">${fmtP(i.q_value)}</td>
-        <td class="syms">${esc((i.hit_symbols || []).join("、"))}</td>
-      </tr>`).join("");
+        <td class="syms">${syms}
+          <div class="newcount">新增 ${esc(newSet.size)} / ${esc((i.hit_symbols || []).length)} 個基因</div>
+        </td>
+      </tr>`;
+    }).join("");
   } catch (err) {
     hint.textContent = `分析失敗：${err.message || err}`;
     body.innerHTML = "";
@@ -341,6 +365,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("syncKeggBtn").addEventListener("click", () => runSync("kegg"));
   document.getElementById("syncReactomeBtn").addEventListener("click", () => runSync("reactome"));
   document.getElementById("runBtn").addEventListener("click", runEnrichment);
+  document.getElementById("sortSelect").addEventListener("change", runEnrichment);
   bindHerbSearch();
 
   try {

@@ -113,6 +113,7 @@ def herb_enrichment(herb_id: int,
                     cancer_only: bool = False,
                     exclude_noncancer_disease: bool = True,
                     apply_adme: bool = True,
+                    sort: str = Query("p", pattern="^(p|fold)$"),
                     limit: int = Query(50, ge=1, le=200),
                     current_user: models.User = Depends(get_current_user),
                     db: Session = Depends(get_query_db)):
@@ -132,6 +133,12 @@ def herb_enrichment(herb_id: int,
     `background`
         兩種母體的差別見 `app.pathways.enrich`。畫面上必須顯示用的是哪一種——
         同一個藥材換母體會得到不同排序，看到數字卻不知道母體是什麼就沒有意義。
+
+    `sort`
+        `p`（預設）依統計顯著性；`fold` 依富集倍率。
+        p 值天生偏袒基因數多的大通路（k 大則檢定力高），
+        依 p 值排會把高特異性的小通路往後推——人參的 Apoptosis 是 19.2 倍
+        卻排第 20 就是這樣來的。兩種排序都看一次比較不會漏掉東西。
     """
     herb = db.query(models.TcmspHerb).filter(models.TcmspHerb.id == herb_id).first()
     if not herb:
@@ -141,7 +148,7 @@ def herb_enrichment(herb_id: int,
     result = pw.enrich(db, tar_ids, source=source, background=background,
                        cancer_only=cancer_only,
                        exclude_noncancer_disease=exclude_noncancer_disease,
-                       limit=limit)
+                       sort=sort, limit=limit)
     result["herb"] = {"id": herb.id, "herb_en_name": herb.herb_en_name,
                       "herb_cn_name": herb.herb_cn_name,
                       "target_count": len(tar_ids)}
@@ -156,6 +163,7 @@ class TargetsIn(BaseModel):
     background: str = Field(default="genome", pattern="^(genome|tcmsp)$")
     cancer_only: bool = False
     exclude_noncancer_disease: bool = True
+    sort: str = Field(default="p", pattern="^(p|fold)$")
     limit: int = Field(default=50, ge=1, le=200)
 
 
@@ -168,7 +176,7 @@ def enrich_targets(payload: TargetsIn,
                      background=payload.background,
                      cancer_only=payload.cancer_only,
                      exclude_noncancer_disease=payload.exclude_noncancer_disease,
-                     limit=payload.limit)
+                     sort=payload.sort, limit=payload.limit)
 
 
 @router.get("/target/{tar_id}", summary="（前台）單一靶點參與的通路")

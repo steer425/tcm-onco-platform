@@ -27,6 +27,13 @@
   table.enrich td { vertical-align:top; }
   .rank-cell { font-weight:700; color:#777; text-align:right; padding-right:10px !important; }
   .rank-sig { color:#1f4f37; }
+  .rank-cell small { display:block; font-weight:400; font-size:10px; color:#aaa; }
+  .dup-tag { display:inline-block; padding:1px 7px; border-radius:999px; font-size:10.5px;
+             font-weight:600; background:#f0ece4; color:#8a6d3b; margin-left:6px; }
+  .dup-note { font-size:11px; color:#8a6d3b; margin-top:3px; }
+  .sym-new { font-weight:700; color:#1f4f37; }
+  .sym-old { color:#999; }
+  .newcount { font-size:11px; color:#666; margin-top:3px; }
   /* 藥材搜尋：502 種藥材用下拉選單根本找不到，改成輸入即時模糊比對 */
   .herb-picker { position:relative; width:300px; }
   .herb-picker input { width:100%; }
@@ -123,6 +130,10 @@
         <label style="display:flex; align-items:center; gap:6px;">
           <input type="checkbox" id="excludeDisease" checked style="width:auto; margin:0;" /> 排除非癌症疾病類通路
         </label>
+        <select id="sortSelect" style="max-width:170px;">
+          <option value="p">排序：統計顯著性</option>
+          <option value="fold">排序：富集倍率</option>
+        </select>
         <button id="runBtn">分析</button>
       </div>
       <div class="bgnote" id="admeNote"></div>

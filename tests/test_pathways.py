@@ -462,6 +462,72 @@ def main():
           [i["rank"] for i in base["items"]] == list(range(1, len(base["items"]) + 1)),
           [i["rank"] for i in base["items"]])
 
+    # ---------- 冗餘標記與排序 ----------
+    print("\n【冗餘標記：同一組基因不該被算成好幾項發現】")
+    # 純函式驗證：第二條的命中基因是第一條的子集 → 應標為冗餘
+    fake = [
+        {"pathway": type("P", (), {"pathway_id": "hsaA", "name": "Alpha"})(),
+         "symbols": ["BAX", "BCL2", "CASP3", "CASP8", "CASP9", "MAPK8"]},
+        {"pathway": type("P", (), {"pathway_id": "hsaB", "name": "Beta"})(),
+         "symbols": ["BAX", "BCL2", "CASP3", "CASP8", "CASP9", "CDK1"]},
+        {"pathway": type("P", (), {"pathway_id": "hsaC", "name": "Gamma"})(),
+         "symbols": ["EGFR", "KRAS"]},
+    ]
+    pw.annotate_redundancy(fake)
+    check("第一條永遠不是冗餘（前面沒有東西可以重複）",
+          fake[0]["redundant_with"] is None)
+    check("第一條的命中基因全部算新增", len(fake[0]["new_symbols"]) == 6)
+    check("重疊 5/6 = 0.83 ≥ 門檻 → 標記為冗餘",
+          fake[1]["redundant_with"] is not None, fake[1]["redundant_with"])
+    check("冗餘標記指向正確的來源通路",
+          fake[1]["redundant_with"]["pathway_id"] == "hsaA",
+          fake[1]["redundant_with"])
+    check("冗餘標記帶出重疊數量供畫面顯示",
+          fake[1]["redundant_with"]["shared"] == 5 and
+          fake[1]["redundant_with"]["total"] == 6, fake[1]["redundant_with"])
+    check("冗餘那條只有 CDK1 是新增基因",
+          fake[1]["new_symbols"] == ["CDK1"], fake[1]["new_symbols"])
+    check("完全不重疊的通路不會被誤標",
+          fake[2]["redundant_with"] is None and len(fake[2]["new_symbols"]) == 2)
+
+    partial = [
+        {"pathway": type("P", (), {"pathway_id": "hsaX", "name": "X"})(),
+         "symbols": ["A", "B", "C", "D"]},
+        {"pathway": type("P", (), {"pathway_id": "hsaY", "name": "Y"})(),
+         "symbols": ["A", "B", "E", "F"]},   # 重疊只有 0.5，低於門檻
+    ]
+    pw.annotate_redundancy(partial)
+    check("重疊 2/4 = 0.5 低於門檻 → 不標記為冗餘（互補的通路要留著）",
+          partial[1]["redundant_with"] is None, partial[1]["redundant_with"])
+    check("低重疊時新增基因仍正確扣掉已出現的",
+          partial[1]["new_symbols"] == ["E", "F"], partial[1]["new_symbols"])
+
+    print("\n【排序切換】")
+    by_p = client.get("/pathways/herb/9001?source=kegg&apply_adme=true"
+                      "&exclude_noncancer_disease=false&sort=p", headers=U).json()
+    by_fold = client.get("/pathways/herb/9001?source=kegg&apply_adme=true"
+                         "&exclude_noncancer_disease=false&sort=fold", headers=U).json()
+    check("回應標示目前用的排序", by_p["sort"] == "p" and by_fold["sort"] == "fold")
+    check("依倍率排序時倍率由大到小",
+          all(( by_fold["items"][i]["fold_enrichment"] or 0) >=
+              (by_fold["items"][i + 1]["fold_enrichment"] or 0)
+              for i in range(len(by_fold["items"]) - 1)),
+          [i["fold_enrichment"] for i in by_fold["items"]])
+    check("依倍率排序時仍帶出原本的 p 名次（才知道統計上排第幾）",
+          all(i.get("p_rank") for i in by_fold["items"]),
+          [(i["pathway_id"], i["rank"], i["p_rank"]) for i in by_fold["items"]])
+    p_ranks = {i["pathway_id"]: i["p_rank"] for i in by_fold["items"]}
+    check("p_rank 與依 p 排序時的名次一致（冗餘與名次不因顯示排序而變）",
+          all(i["rank"] == p_ranks.get(i["pathway_id"]) for i in by_p["items"]),
+          [(i["pathway_id"], i["rank"]) for i in by_p["items"]])
+    check("換排序不影響 p 值本身",
+          {i["pathway_id"]: round(i["p_value"], 12) for i in by_p["items"]} ==
+          {i["pathway_id"]: round(i["p_value"], 12) for i in by_fold["items"]})
+    check("回應帶出獨立發現數（顯著數會被通路重疊灌水）",
+          "independent_count" in by_p and by_p["independent_count"] <= by_p["significant_count"],
+          (by_p.get("independent_count"), by_p.get("significant_count")))
+    check("每一列都有新增基因清單", all("new_symbols" in i for i in by_p["items"]))
+
     print("\n【通用富集入口與單一靶點查詢】")
     r = client.post("/pathways/enrich", headers=U,
                     json={"tar_ids": ["TARP003", "TARP004"], "source": "kegg"}).json()
