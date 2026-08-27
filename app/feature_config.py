@@ -139,6 +139,10 @@ FEATURE_CONFIG = [
      "nav_label": "靶點標準化", "page_url": "target-mapping.html",
      "show_frontend": False, "show_backend": True, "sort_order": 73},
 
+    {"code": "F1-5", "module": "目標一/二", "name": "通路富集分析（KEGG／Reactome）",
+     "nav_label": "通路富集分析", "page_url": "pathways.html",
+     "show_frontend": True, "show_backend": True, "sort_order": 74},
+
     # ---- 其餘目標零基礎建設項目：現在都有對應頁面可查看/設定 ----
     {"code": "F0-1", "module": "目標零", "name": "前後台架構規劃",
      "nav_label": "系統架構規劃", "page_url": "architecture.html",

@@ -975,9 +975,14 @@ class TcmspTargetUniprot(Base):
     全都是拿「基因符號」去比對靶點名稱字串——「Androgen receptor」這串字裡
     永遠不會出現 AR，所以那三個功能看到的都是嚴重失真的結果。
 
-    實測：1245 個癌症基因只比對到 32 個（2.6%），而 AR／AKT1／TP53／APC／
+    實測（標準化前）：1245 個癌症基因只比對到 32 個（2.6%），而 AR／AKT1／TP53／APC／
     EGFR／ESR1／PTGS2 全都在 TCMSP 裡、全都比對不到。而且失真是靜默的——
     畫面不會顯示「比對失敗」，只會顯示「沒有關聯」。
+
+    v1.38.0 上線後實測（2026-08-27）：1265／1751 標準化（72.2%），
+    比對率 2.6% → **18.0%（224/1245）**。18% 已接近真實上限——TCMSP 的靶點
+    偏向可成藥蛋白，OncoKB 癌症基因裡有大量 undruggable 的轉錄因子與染色質因子，
+    兩個集合重疊 18% 是合理的，不要當成還沒做完而硬追。
 
     刻意獨立成表，不在 tcmsp_targets 加欄位：
 
@@ -1022,3 +1027,69 @@ class TcmspTargetUniprot(Base):
     reviewed_at = Column(DateTime, nullable=True)
     resolved_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Pathway(Base):
+    """訊號通路／代謝通路主檔（KEGG 與 Reactome，目標一 Step 4）。
+
+    資料從哪來：v1.38.0 解析 UniProt 時，順手把每個靶點的 `kegg_id`（`hsa:367`）
+    與 `reactome_ids`（`R-HSA-383280`）一起存進 `tcmsp_target_uniprot` 了。
+    1751 個靶點裡有 1258 個帶 KEGG 交叉引用——通路分析最貴的那一步
+    （把蛋白對應到通路識別碼）等於已經完成，這張表只是把通路本身的
+    名稱、分類與背景基因數補上。
+
+    **注意 KEGG 的兩種識別碼不要搞混**：
+      - `hsa:367` 是 KEGG **基因** ID（就是 UniProt 交叉引用給的那個）
+      - `hsa04915` 才是 KEGG **通路** ID（這張表存的）
+    兩者之間的對應要另外向 KEGG 要（`rest.kegg.jp/link/pathway/hsa`，一次整包）。
+    Reactome 則不必：UniProt 的 Reactome 交叉引用給的本來就是通路 ID。
+
+    `background_gene_count` 是富集檢定的分母之一（該通路在**全人類基因**裡有幾個成員），
+    必須來自資料庫本身而不是我們手上的靶點——拿我們自己的資料當母體會讓
+    每個通路看起來都「富集」，那是統計上的循環論證。
+    """
+    __tablename__ = "pathways"
+    __table_args__ = (
+        UniqueConstraint("source", "pathway_id", name="uq_pathway_source_id"),
+    )
+
+    id = Column(String, primary_key=True, default=gen_id)
+    source = Column(String, nullable=False, index=True)      # kegg / reactome
+    pathway_id = Column(String, nullable=False, index=True)  # hsa04915 / R-HSA-383280
+    name = Column(Text, nullable=False)
+
+    # 三語系獨立儲存，不用 OpenCC／字典轉換——通路名稱是專有名詞，
+    # 字形轉換會產出「訊號傳導」這種看似正確但不是慣用譯名的結果（GenCC 那邊踩過）
+    name_cn = Column(Text, nullable=True)
+    name_tw = Column(Text, nullable=True)
+    name_ko = Column(Text, nullable=True)
+
+    category = Column(Text, nullable=True)   # KEGG class／Reactome 上層事件
+    is_cancer_related = Column(Boolean, default=False, index=True)
+    background_gene_count = Column(Integer, nullable=True)   # 全人類基因中的成員數
+    synced_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TargetPathway(Base):
+    """TCMSP 靶點 ↔ 通路關聯（由 tcmsp_target_uniprot 的交叉引用推導而來）。
+
+    跟 `tcmsp_target_uniprot` 一樣是**推導出來的資料**，不是原始資料：
+    整張表隨時可以清掉重建，重建來源是映射表 + 通路主檔，不需要重新解析 UniProt。
+
+    `via_symbol` 記錄「是靠哪個基因符號連上的」。看起來多餘，
+    但沒有它就無法回答「這條連結是怎麼來的」——而通路富集的結果是要寫進
+    研究報告的，每一條連結都必須追得回源頭。
+    """
+    __tablename__ = "target_pathways"
+    __table_args__ = (
+        UniqueConstraint("tar_id", "pathway_ref_id", name="uq_target_pathway"),
+    )
+
+    id = Column(String, primary_key=True, default=gen_id)
+    tar_id = Column(String, ForeignKey("tcmsp_targets.tar_id"), nullable=False, index=True)
+    pathway_ref_id = Column(String, ForeignKey("pathways.id"), nullable=False, index=True)
+    source = Column(String, nullable=False, index=True)   # kegg / reactome
+    via_symbol = Column(String, nullable=True)            # 靠哪個基因符號連上的
+    via_accession = Column(String, nullable=True)         # 對應的 UniProt accession
+    created_at = Column(DateTime, default=datetime.utcnow)

@@ -9,7 +9,7 @@ from app.database import Base, SessionLocal, engine
 from app.routers import (
     account_applications, announcements, audit_logs, auth, backup_jobs,
     dark_genes, dashboard, dna_data, gencc_diseases, login_logs, nav, news, news_admin, oauth_accounts, patients, permissions, pharmacies, project_info, roles,
-    system_settings, target_mapping, tcmsp, user_preferences, users,
+    pathways, system_settings, target_mapping, tcmsp, user_preferences, users,
 )
 from app.seed import seed_default_data
 
@@ -18,7 +18,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="TCM 中藥腫瘤篩選平台 - 後台系統 API（目標零）",
     description="帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄 / 每日重點新聞（含多語系簡短摘要）",
-    version="1.38.0",
+    version="1.39.0",
 )
 
 ALLOWED_ORIGINS = [
@@ -94,6 +94,7 @@ app.include_router(dashboard.router)
 app.include_router(pharmacies.router)
 app.include_router(tcmsp.router)
 app.include_router(target_mapping.router)
+app.include_router(pathways.router)
 app.include_router(project_info.router)
 app.include_router(nav.router)
 app.include_router(system_settings.router)

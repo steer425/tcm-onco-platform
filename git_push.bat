@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.38.0 standardise TCMSP targets against UniProt (gene symbols + synonyms) so cancer-gene matching stops silently failing at 2.6%"
+set "DEFAULT_MSG=v1.39.0 KEGG/Reactome pathway over-representation analysis with hypergeometric test and BH FDR correction, built on the UniProt cross-references v1.38.0 already captured"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ccircle cx=%2750%27 cy=%2750%27 r=%2745%27 fill=%27%232f5c8a%27/%3E%3Ctext x=%2750%27 y=%2768%27 font-size=%2760%27 text-anchor=%27middle%27 fill=%27white%27%3E%E8%97%A5%3C/text%3E%3C/svg%3E" />
+<title>通路富集分析 - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<style>
+  .stat-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; }
+  .stat-box { background:var(--card-bg, #fff); border:1px solid var(--border-color, #e2e6ea); border-radius:8px; padding:12px 14px; }
+  .stat-box .num { font-size:21px; font-weight:700; }
+  .stat-box .lbl { font-size:12px; color:#777; margin-top:2px; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+  .pill-cancer { background:#fdecea; color:#a83232; }
+  .pill-kegg { background:#e3ecf5; color:#1c4d78; }
+  .pill-reactome { background:#e8f3ec; color:#1f4f37; }
+  .sig-q { font-weight:700; color:#1f4f37; }
+  .sig-p { font-weight:600; color:#7a5420; }
+  .sig-no { color:#999; }
+  .mono { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:12px; }
+  .syms { font-size:11.5px; color:#666; word-break:break-word; }
+  .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .controls label { margin:0; }
+  .bgnote { border-left:3px solid #2f5c8a; padding:8px 12px; margin-top:10px; background:rgba(47,92,138,.06); font-size:12.5px; line-height:1.7; }
+  table.enrich td { vertical-align:top; }
+</style>
+</head>
+<body data-current-page="pathways.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">通路富集分析</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <p class="hint-msg" style="margin-top:0;">
+        分析鏈路的第四站：<b>中藥 → 成分 → 靶點 → 通路</b>。
+        靶點標準化（F1-4）解析 UniProt 時已經順手把每個靶點的 KEGG 基因編號與 Reactome 通路編號存下來，
+        所以這裡不必再跑一輪外部解析，只需要向 KEGG／Reactome 要通路目錄本身。
+      </p>
+      <p class="hint-msg">
+        <b>富集檢定用的是超幾何分布</b>（over-representation analysis），並以 Benjamini–Hochberg 校正多重檢定。
+        一次對數千條通路做檢定，就算全是雜訊，在 p&lt;0.05 這條線下也會有上百條「顯著」——
+        所以請以 <b>q 值</b>（FDR 校正後）為準，不要只看 p 值。
+      </p>
+      <p class="hint-msg" style="color:#a83232;">
+        ⚠️ 同步需要對外連線到 rest.kegg.jp 與 reactome.org，請在已部署的 Render 環境操作。
+        本結果為文獻資料庫的統計關聯，屬研究輔助資訊，<b>不構成任何醫療診斷或治療建議</b>。
+      </p>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="margin:0;">通路資料覆蓋率</h3>
+        <button class="secondary" id="refreshBtn">重新整理</button>
+      </div>
+      <div class="stat-grid" id="statGrid"></div>
+      <div class="controls" id="adminBox" style="margin-top:14px; display:none;">
+        <button id="syncKeggBtn">同步 KEGG</button>
+        <button id="syncReactomeBtn">同步 Reactome</button>
+        <span class="hint-msg" id="syncMsg"></span>
+      </div>
+      <div id="syncLog" class="hint-msg" style="margin-top:8px; white-space:pre-wrap;"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">藥材通路富集</h3>
+      <div class="controls">
+        <select id="herbSelect" style="max-width:280px;"><option value="">載入藥材清單中…</option></select>
+        <select id="sourceSelect" style="max-width:140px;">
+          <option value="kegg">KEGG</option>
+          <option value="reactome">Reactome</option>
+        </select>
+        <select id="bgSelect" style="max-width:210px;">
+          <option value="genome">背景：全人類基因（慣例）</option>
+          <option value="tcmsp">背景：全部中藥靶點</option>
+        </select>
+        <label style="display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="cancerOnly" style="width:auto; margin:0;" /> 只看癌症相關通路
+        </label>
+        <button id="runBtn">分析</button>
+      </div>
+      <div class="bgnote" id="bgNote"></div>
+      <p class="hint-msg" id="enrichHint"></p>
+      <table class="enrich">
+        <thead>
+          <tr>
+            <th style="width:100px;">通路</th><th>名稱</th><th style="width:70px;">命中</th>
+            <th style="width:80px;">通路基因</th><th style="width:80px;">倍率</th>
+            <th style="width:90px;">p 值</th><th style="width:90px;">q 值 (FDR)</th>
+            <th>命中的基因</th>
+          </tr>
+        </thead>
+        <tbody id="enrichBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/i18n-dict.js"></script>
+<script src="js/site-lang.js"></script>
+<script src="js/pathways.js"></script>
+</body>
+</html>
