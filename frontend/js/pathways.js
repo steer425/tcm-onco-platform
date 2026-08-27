@@ -33,6 +33,149 @@ async function loadUserInfo() {
   } catch (err) {}
 }
 
+
+// ---------------------------------------------------------------- 欄位說明
+// 這個平台的使用者包含生技研發與醫院研究單位，不見得熟悉 ORA 的判讀陷阱。
+// 把說明放在欄位旁邊而不是另開文件——會去翻文件的人，通常是已經知道要小心的人。
+// `{n}`／`{N}` 會用目前這次分析的實際數字替換，抽象說明遠不如具體數字有用。
+
+let lastStats = { n: "（樣本數）", N: "（母體）", tested: "（受檢通路數）" };
+
+const HELP = {
+  overview: {
+    title: "這張表在做什麼：通路富集分析",
+    html: `<p>回答一個問題：<b>這個藥材打到的蛋白，有沒有不成比例地集中在某些生物過程上？</b></p>
+      <p>用彈珠來想：袋子裡有 <b>{N}</b> 顆彈珠（母體＝該資料庫收錄的全部基因），
+      其中某條通路佔了其中幾顆（＝「通路基因」欄）。你閉眼抓出 <b>{n}</b> 顆
+      （＝這個藥材有通路註解的靶點基因）。如果抓到的數量遠多於隨機預期，
+      這條通路就是「富集」了。</p>
+      <p>整份分析就是把這件事對 <b>{tested}</b> 條通路各做一次，再排序。</p>`,
+  },
+  rank: {
+    title: "# — 名次",
+    html: `<p>目前排序方式下的名次。<b>綠色</b>代表這一列達 FDR q&lt;0.05。</p>
+      <p>切成「依富集倍率」排序時，序號下方會多一行小字 <code>p #12</code>，
+      那是它在統計顯著性排序裡的名次。<b>兩種排序都看一次比較不會漏</b>——
+      理由見「倍率」欄的說明。</p>`,
+  },
+  pathway: {
+    title: "通路 — 識別碼",
+    html: `<p>KEGG 或 Reactome 給這條通路的唯一編號。<code>hsa</code> 代表人類（Homo sapiens）。</p>
+      <p>拿這個編號到 KEGG／Reactome 網站可以查到完整的通路圖，
+      看這些基因在通路裡實際的位置與上下游關係。</p>`,
+  },
+  name: {
+    title: "名稱 — 這條通路在做什麼",
+    html: `<p>通路名稱。底下灰字是資料庫自己的<b>分類階層</b>，例如
+      <code>Environmental Information Processing / Signaling molecules and interaction</code>
+      前半是大類、後半是次類。</p>
+      <p>分類很有用：一眼分辨這是核心訊號通路、代謝通路、還是疾病通路。
+      標成 <b>癌症相關</b> 的是 KEGG 官方癌症分類，加上本平台另外標記的核心腫瘤訊號通路。</p>
+      <p>標成 <b>重複</b> 的，代表它命中的基因有 80% 以上已經出現在更高名次的通路裡——
+      <span class="warn">那不是一項獨立發現</span>，詳見「命中的基因」欄說明。</p>`,
+  },
+  hit: {
+    title: "命中 — 這個藥材打中這條通路的幾個基因",
+    html: `<p>這個藥材的 <b>{n}</b> 個靶點基因裡，有幾個落在這條通路內。</p>
+      <p>它跟「通路基因」一起決定後面所有的數字。<b>命中數太少（例如 2、3 個）時，
+      就算倍率很高也不穩</b>——換一份資料很可能就不見了。</p>`,
+  },
+  size: {
+    title: "通路基因 — 這條通路總共有幾個基因",
+    html: `<p>這條通路在母體裡的總成員數，也就是富集計算的分母之一。</p>
+      <p><b>這個數字會隨你選的母體改變。</b>選「全人類基因」時是該通路在全基因體中的大小；
+      選「全部中藥靶點」時，只算其中有被中藥靶點涵蓋到的部分，所以會小很多。
+      兩者不能直接互相比較。</p>`,
+  },
+  fold: {
+    title: "倍率 — 效果有多強",
+    html: `<p>實際命中數 ÷ 隨機抽樣的期望命中數。</p>
+      <span class="formula">倍率 =（命中 ÷ {n}）÷（通路基因 ÷ {N}）</span>
+      <p>倍率 1.0 表示跟隨機一樣、完全沒有富集；3.0 表示比隨機預期多了三倍。</p>
+      <p><b>倍率是「效果有多強」，p 值是「有多不可能是巧合」——這兩件事最常被混為一談。</b>
+      一條有五百個基因的大通路很容易命中很多、p 值很小，但倍率可能只有兩倍。</p>
+      <p class="warn">注意：p 值同時取決於倍率與絕對命中數，而命中數多則統計檢定力高，
+      所以<b>依 p 值排序會系統性偏袒基因數多的大通路</b>，把高特異性的小通路往後推。
+      這是富集分析的固有特性，不是程式問題——所以本頁提供「依倍率排序」。</p>`,
+  },
+  p: {
+    title: "p 值 — 有多不可能是巧合",
+    html: `<p>如果這個藥材的靶點其實是隨機抽的，抓到這麼多（或更多）命中的機率有多大。
+      用的是超幾何分布。</p>
+      <p><code>1.73e-9</code> 就是 0.00000000173，約十億分之 1.7——
+      機率極低，代表「隨機碰巧」這個解釋站不住腳。</p>
+      <p class="warn"><b>但判讀時請不要用 p 值，要用 q 值。</b>原因見下一欄。</p>`,
+  },
+  q: {
+    title: "q 值（FDR）— 判讀請看這一欄",
+    html: `<p>p 值有一個陷阱：你不是只檢驗一條通路，這次同時檢驗了 <b>{tested}</b> 條。</p>
+      <p>如果用 p&lt;0.05 當標準，<b>就算這些通路全部都是雜訊</b>，光靠運氣也會有
+      約 5% 通過。你會很開心地把它們寫進報告——而它們全是假的。</p>
+      <p>q 值（false discovery rate，Benjamini–Hochberg 校正）已經把
+      「你做了 {tested} 次檢定」這件事算進去了。</p>
+      <span class="formula">判讀規則：看 q 值，不看 p 值。q &lt; 0.05 才算顯著。</span>
+      <p>q 值一定大於或等於同一列的 p 值，這是校正的本質。</p>`,
+  },
+  genes: {
+    title: "命中的基因 — 以及為什麼「顯著通路數」會騙人",
+    html: `<p>這條通路裡被這個藥材打中的基因。<b>粗體綠色</b>是新出現的、
+      <span class="sym-old">灰色</span>是更高名次已經出現過的，下方標「新增 N / M 個基因」。</p>
+      <p><b>為什麼要這樣標：</b>KEGG／Reactome 的通路定義大量重疊，
+      同一組基因會同時落在好幾條通路裡。實測人參的例子：</p>
+      <span class="formula">Apoptosis 命中　BAX、BCL2、CASP3、CASP8、CASP9、MAPK8
+p53 signaling　BAX、BCL2、CASP3、CASP8、CASP9、CDK1
+　　　　　　　→ 六個裡有五個完全相同</span>
+      <p>並列成兩項發現會被讀成交叉印證，<span class="warn">實際上是同一個觀察被算了兩次</span>。</p>
+      <p>所以摘要行除了「顯著通路數」還會給「<b>獨立發現數</b>」——
+      扣掉與更高名次重疊 ≥80% 的之後還剩幾條。
+      <b class="warn">寫進報告要引用的是獨立發現數，不是顯著通路數。</b></p>`,
+  },
+};
+
+const HELP_ORDER = ["overview", "rank", "pathway", "name", "hit", "size",
+                    "fold", "p", "q", "genes"];
+
+function fillHelpNumbers(html) {
+  return html.replace(/\{n\}/g, esc(lastStats.n))
+             .replace(/\{N\}/g, esc(lastStats.N))
+             .replace(/\{tested\}/g, esc(lastStats.tested));
+}
+
+function openHelp(key) {
+  const body = document.getElementById("helpBody");
+  body.innerHTML = HELP_ORDER.map(k => `
+    <div class="help-sec" id="help-${k}">
+      <h4>${esc(HELP[k].title)}</h4>
+      ${fillHelpNumbers(HELP[k].html)}
+    </div>`).join("");
+  document.getElementById("helpModal").style.display = "flex";
+  const target = document.getElementById(`help-${key}`);
+  if (target) {
+    target.scrollIntoView({ block: "start" });
+    target.classList.add("flash");
+    setTimeout(() => target.classList.remove("flash"), 1500);
+  }
+}
+
+function bindHelp() {
+  document.querySelectorAll("[data-help]").forEach(btn => {
+    btn.addEventListener("click", ev => {
+      ev.preventDefault();
+      openHelp(btn.dataset.help);
+    });
+  });
+  document.getElementById("helpClose").addEventListener("click", () => {
+    document.getElementById("helpModal").style.display = "none";
+  });
+  document.getElementById("helpModal").addEventListener("click", ev => {
+    // 點背景關閉，但點到內容區不要關
+    if (ev.target.id === "helpModal") ev.target.style.display = "none";
+  });
+  document.addEventListener("keydown", ev => {
+    if (ev.key === "Escape") document.getElementById("helpModal").style.display = "none";
+  });
+}
+
 // ---------------------------------------------------------------- 覆蓋率
 
 async function loadStats() {
@@ -296,6 +439,7 @@ async function runEnrichment() {
     });
     const r = await api(`/pathways/herb/${encodeURIComponent(herbId)}?${params}`);
 
+    lastStats = { n: r.study_gene_count, N: r.background_total, tested: r.total_tested };
     renderIngredientNote(r);
     renderBackgroundNote(r.background, r.background_total, r.study_gene_count);
 
@@ -367,6 +511,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("runBtn").addEventListener("click", runEnrichment);
   document.getElementById("sortSelect").addEventListener("change", runEnrichment);
   bindHerbSearch();
+  bindHelp();
 
   try {
     await Promise.all([loadStats(), loadHerbs()]);

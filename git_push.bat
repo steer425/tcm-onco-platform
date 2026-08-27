@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.39.4 flag redundant pathway findings that reuse the same genes, and add fold-enrichment sorting so specific small pathways are not buried by p-value"
+set "DEFAULT_MSG=v1.39.5 add per-column help icons explaining how to read the enrichment table, with the current analysis numbers filled in"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

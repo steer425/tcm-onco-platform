@@ -34,6 +34,25 @@
   .sym-new { font-weight:700; color:#1f4f37; }
   .sym-old { color:#999; }
   .newcount { font-size:11px; color:#666; margin-top:3px; }
+  /* 欄位說明小圖示 */
+  .help-btn {
+    all:unset; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+    width:15px; height:15px; margin-left:4px; border-radius:50%; font-size:10.5px; font-weight:700;
+    background:#dfe5ec; color:#41556b; line-height:1; vertical-align:middle;
+  }
+  .help-btn:hover, .help-btn:focus-visible { background:#2f5c8a; color:#fff; }
+  .help-sec { padding:12px 4px; border-bottom:1px solid rgba(128,128,128,.18); }
+  .help-sec:last-child { border-bottom:none; }
+  .help-sec h4 { margin:0 0 6px; font-size:14px; }
+  .help-sec p { margin:0 0 6px; font-size:13px; line-height:1.75; }
+  .help-sec .formula {
+    font-family:ui-monospace, Menlo, Consolas, monospace; font-size:12.5px;
+    background:rgba(47,92,138,.08); padding:7px 10px; border-radius:5px; margin:6px 0;
+    display:block; overflow-x:auto;
+  }
+  .help-sec .warn { color:#a83232; }
+  .help-sec.flash { animation:helpflash 1.4s ease-out; }
+  @keyframes helpflash { 0%,55% { background:rgba(255,225,120,.5); } 100% { background:transparent; } }
   /* 藥材搜尋：502 種藥材用下拉選單根本找不到，改成輸入即時模糊比對 */
   .herb-picker { position:relative; width:300px; }
   .herb-picker input { width:100%; }
@@ -107,7 +126,7 @@
     </div>
 
     <div class="card">
-      <h3 style="margin-top:0;">藥材通路富集</h3>
+      <h3 style="margin-top:0;">藥材通路富集<button type="button" class="help-btn" data-help="overview" title="這張表在說什麼">i</button></h3>
       <div class="controls">
         <div class="herb-picker">
           <input id="herbSearch" placeholder="輸入藥材名稱搜尋（中文／英文／拼音）" autocomplete="off" />
@@ -142,17 +161,31 @@
       <table class="enrich">
         <thead>
           <tr>
-            <th style="width:44px;">#</th>
-            <th style="width:100px;">通路</th><th>名稱</th><th style="width:70px;">命中</th>
-            <th style="width:80px;">通路基因</th><th style="width:80px;">倍率</th>
-            <th style="width:90px;">p 值</th><th style="width:90px;">q 值 (FDR)</th>
-            <th>命中的基因</th>
+            <th style="width:48px;">#<button type="button" class="help-btn" data-help="rank" title="說明">i</button></th>
+            <th style="width:104px;">通路<button type="button" class="help-btn" data-help="pathway" title="說明">i</button></th>
+            <th>名稱<button type="button" class="help-btn" data-help="name" title="說明">i</button></th>
+            <th style="width:74px;">命中<button type="button" class="help-btn" data-help="hit" title="說明">i</button></th>
+            <th style="width:86px;">通路基因<button type="button" class="help-btn" data-help="size" title="說明">i</button></th>
+            <th style="width:84px;">倍率<button type="button" class="help-btn" data-help="fold" title="說明">i</button></th>
+            <th style="width:94px;">p 值<button type="button" class="help-btn" data-help="p" title="說明">i</button></th>
+            <th style="width:104px;">q 值 (FDR)<button type="button" class="help-btn" data-help="q" title="說明">i</button></th>
+            <th>命中的基因<button type="button" class="help-btn" data-help="genes" title="說明">i</button></th>
           </tr>
         </thead>
         <tbody id="enrichBody"></tbody>
       </table>
     </div>
   </main>
+</div>
+
+<div id="helpModal" class="modal-backdrop" style="display:none;">
+  <div class="modal" style="max-width:720px; max-height:82vh; overflow-y:auto;">
+    <h3 style="margin-top:0;">欄位說明：怎麼讀這張表</h3>
+    <div id="helpBody"></div>
+    <div style="margin-top:16px; display:flex; justify-content:flex-end;">
+      <button class="secondary" id="helpClose">關閉</button>
+    </div>
+  </div>
 </div>
 
 <script src="js/api.js"></script>
