@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.39.6 make the pathway ID open the original KEGG map with the herb hit genes highlighted in red, or the Reactome pathway browser"
+set "DEFAULT_MSG=v1.39.7 fix the KEGG map URL (gene highlighting lives on kegg-bin/show_pathway, not /pathway/) and say so on screen when highlighting is unavailable"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

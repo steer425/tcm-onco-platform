@@ -37,20 +37,38 @@ async function loadUserInfo() {
 
 // ---------------------------------------------------------------- 外部通路圖連結
 
-// KEGG 的通路圖網址可以在後面接基因編號把它們標紅：
-//   https://www.kegg.jp/pathway/hsa04082+367+2099
-// 對研究者來說這才是關鍵——不是「這條通路顯著」，而是「這些靶點落在圖上哪裡」。
+// KEGG 有兩個不同的通路端點，用途不一樣，**弄混就是 404**（v1.39.6 踩過）：
+//
+//   https://www.kegg.jp/pathway/hsa04080
+//       → 只吃單純的通路編號。後面接東西一律 Not Found。
+//
+//   https://www.kegg.jp/kegg-bin/show_pathway?hsa04080+116+146+147
+//       → 這個才吃 `+基因編號`，開啟後把指定的基因標色。
+//
+// 對研究者來說標色那個才是關鍵——不是「這條通路顯著」，
+// 而是「這些靶點落在圖上哪裡、彼此的上下游關係是什麼」。
 //
 // Reactome 用 PathwayBrowser，基本網址一定可用；`FLG` 參數用來標示實體，
 // 若語法不被接受，最差的情況是通路照常開啟、只是沒有標示（不會壞掉）。
+
+const KEGG_PATHWAY_RE = /^[a-z]{2,4}\d{5}$/;      // hsa04080
+const REACTOME_PATHWAY_RE = /^R-[A-Z]{3}-\d+(\.\d+)?$/;  // R-HSA-383280
+
 function pathwayUrl(source, pathwayId, keggGenes, symbols) {
-  const pid = encodeURIComponent(String(pathwayId || "").trim());
+  const pid = String(pathwayId || "").trim();
   if (!pid) return null;
+
   if (source === "kegg") {
-    // 只收純數字的基因編號，其餘一律丟掉——網址是要交給外部網站的，不能夾帶意外內容
+    // 這裡是把字串直接串進查詢字串（`+` 不能被編碼，否則 KEGG 收到的是空白），
+    // 所以改用嚴格白名單驗證，而不是靠 encodeURIComponent
+    if (!KEGG_PATHWAY_RE.test(pid)) return null;
     const genes = (keggGenes || []).filter(g => /^\d+$/.test(String(g))).slice(0, 60);
-    return `https://www.kegg.jp/pathway/${pid}` + (genes.length ? "+" + genes.join("+") : "");
+    return genes.length
+      ? `https://www.kegg.jp/kegg-bin/show_pathway?${pid}+${genes.join("+")}`
+      : `https://www.kegg.jp/pathway/${pid}`;
   }
+
+  if (!REACTOME_PATHWAY_RE.test(pid)) return null;
   const flags = (symbols || []).filter(x => /^[A-Za-z0-9_.-]+$/.test(String(x))).slice(0, 40);
   return `https://reactome.org/PathwayBrowser/#/${pid}` +
          (flags.length ? `&FLG=${encodeURIComponent(flags.join(","))}` : "");
@@ -84,7 +102,7 @@ const HELP = {
     title: "通路 — 識別碼",
     html: `<p>KEGG 或 Reactome 給這條通路的唯一編號。<code>hsa</code> 代表人類（Homo sapiens）。</p>
       <p><b>點一下編號就會在新分頁開啟原始通路圖。</b></p>
-      <p>KEGG 的連結會把<b>這個藥材命中的基因直接標紅</b>——
+      <p>KEGG 的連結會把<b>這個藥材命中的基因直接標色</b>——
       不只是「這條通路顯著」，而是看得到這些靶點落在通路圖的哪個位置、
       彼此的上下游關係是什麼。那才是判斷機轉是否說得通的依據。</p>
       <p>Reactome 的連結會開啟 PathwayBrowser。</p>`,
@@ -502,11 +520,18 @@ async function runEnrichment() {
           ${r.sort === "fold" && i.p_rank ? `<small>p #${esc(i.p_rank)}</small>` : ""}</td>
         <td>${(() => {
           const url = pathwayUrl(r.source, i.pathway_id, i.hit_kegg_genes, i.hit_symbols);
-          const label = `<span class="pill pill-${esc(r.source)}">${esc(i.pathway_id)}</span>`;
+          const noMark = r.source === "kegg" && !(i.hit_kegg_genes || []).length;
+          const label = `<span class="pill pill-${esc(r.source)}">${esc(i.pathway_id)}</span>` +
+                        (noMark ? `<div class="nomark">無法標色</div>` : "");
           if (!url) return label;
+          // 標不標得出來要講清楚。拿不到基因編號時照樣給一個可以點的連結、
+          // 點進去才發現沒標色，是最惱人的那種靜默降級
+          const marked = (i.hit_kegg_genes || []).length;
           const tip = r.source === "kegg"
-            ? `在 KEGG 開啟通路圖，命中的 ${i.hit_count} 個基因會標紅`
-            : `在 Reactome 開啟通路瀏覽器`;
+            ? (marked
+                ? `在 KEGG 開啟通路圖，命中的 ${marked} 個基因會標色`
+                : `在 KEGG 開啟通路圖（此列無法標示命中基因：後端未帶回 KEGG 基因編號）`)
+            : `在 Reactome 開啟通路瀏覽器，並嘗試標示命中的基因`;
           return `<a class="pw-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer"
                      title="${esc(tip)}">${label}</a>`;
         })()}</td>
