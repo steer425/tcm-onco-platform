@@ -566,6 +566,62 @@ git push
 push 到 `main` 之後，Render（後端）與 Cloudflare Pages（前端）會各自偵測到更新並自動部署。
 也可以直接雙擊 `git_push.bat`（它就是上面三行的包裝，會先要求輸入 Y 確認）。
 
+### 交付時必須明講「這次要不要跑批次檔」（v1.39.0 起，強制）
+
+**每一次交付新版，都要在交付訊息裡明確寫出下面兩件事的答案，不能省略、不能讓使用者自己猜：**
+
+1. 需不需要跑 `update_local_folder.bat`
+2. 需不需要跑 `git_push.bat`
+
+**不需要跑的時候更要講。** 只有「需要跑」時才提醒、「不需要」時就沉默，
+使用者無從分辨「不用跑」和「你忘了講」——這兩件事的後果差很多，
+而沉默對兩者長得一模一樣。
+
+判斷準則：
+
+| 這一版的檔案怎麼到使用者手上 | `update_local_folder.bat` | `git_push.bat` |
+|---|---|---|
+| Claude 直接寫進 `D:\tcm_backend`（裝置橋接可用時） | **不用**，檔案已經在正確位置 | **要** |
+| Claude 交付 zip（雲端沙箱、沒有橋接時） | **要**，先鏡射進去 | **要**（在鏡射之後） |
+| 只改了專案文件／對話說明，沒有動到 repo 檔案 | **不用** | **不用** |
+
+`git_push.bat` 幾乎一律要跑——沒有 push 就沒有部署，改動只存在於本機。
+唯一的例外是這一版根本沒有動到 repo 裡的檔案。
+
+### 打包 zip 時的必含清單（v1.39.0 的實際事故）
+
+`update_local_folder.bat` 用的是 `robocopy /MIR`（鏡射）：
+**目的地有、來源沒有的檔案會被刪掉，只有 `.git` 例外。**
+所以 zip 少放什麼，使用者的資料夾就會少什麼——而且不會有任何錯誤訊息。
+
+v1.39.0 第一次打包時漏了兩個隱藏項目，跑下去會被靜默刪除：
+
+- `.gitignore`
+- `.github/workflows/daily-news.yml`（每日新聞排程就是靠它）
+
+`zip -r` 預設**不會**收 `.` 開頭的項目，除非明確列出來。所以打包指令一定要明列：
+
+```bash
+zip -rq out.zip app frontend tests docs .claude .github .gitignore \
+    CHANGELOG.md README.md rules.md CLAUDE.md requirements.txt render.yaml \
+    git_push.bat update_local_folder.bat *.docx \
+    -x '*/__pycache__/*' '*.pyc' '*.db'
+```
+
+打包完**一定要驗一次頂層項目**（`unzip -l` 看有沒有 `.gitignore`、`.github/`），
+不要憑指令寫對了就當作收進去了。
+
+### 交付 zip 時要一併提醒使用者備份的檔案
+
+zip 裡不該有、但使用者本機可能有的東西，`/MIR` 都會刪掉。交付時要列出來：
+
+| 檔案 | 影響 |
+|---|---|
+| `tcm_platform.db` | 本機 SQLite，重新啟動會自動重建，不影響正式資料 |
+| `.env` | **會被刪，要先備份** |
+| `data_import/` | TCMSP／暗黑基因／GenCC 的匯入來源檔，**會被刪，要先備份** |
+| `backups/`、`_to_delete/` | 會被刪 |
+
 ### 版本號要同步的五個地方
 
 漏掉任何一個都會造成「版本資訊頁顯示的版本跟實際不符」：

@@ -96,6 +96,23 @@ BH 校正對照教科書範例。另外驗證「在基因符號空間去重」�
 剩下 486 筆（165 待確認 + 321 查無結果）暫緩——它們現在仍走名稱字詞比對當退路，
 並不是隱形的，解析完提升的是精確度與召回率兩邊，淨增加約幾十個基因的量級。
 
+### 上版流程補強（rules.md §9）
+
+打包 v1.39.0 時漏掉了 `.gitignore` 與 `.github/workflows/daily-news.yml`——
+`update_local_folder.bat` 用的是 `robocopy /MIR`（鏡射），**zip 少放什麼，
+使用者的資料夾就會少什麼，而且不會有任何錯誤訊息**。每日新聞的排程就掛在那個
+workflow 檔上。`zip -r` 預設不收 `.` 開頭的項目，這是根本原因。
+
+因此 rules.md §9 新增三條強制規定：
+
+1. **每次交付都必須明講「要不要跑 `update_local_folder.bat` / `git_push.bat`」**——
+   不需要跑的時候更要講。只在需要時提醒、不需要時沉默，使用者無從分辨
+   「不用跑」和「你忘了講」，而這兩件事的後果差很多。
+2. 打包 zip 的必含清單（明列 `.gitignore`、`.github`、`.claude`），
+   且打包後必須用 `unzip -l` 驗一次頂層項目，不能憑指令寫對就當作收進去了。
+3. 交付 zip 時要一併列出 `/MIR` 會刪掉、需要使用者先備份的檔案
+   （`.env`、`data_import/` 等）。
+
 ### 檔案
 
 - 新增：`app/pathways.py`、`app/routers/pathways.py`、`frontend/pathways.html`、
