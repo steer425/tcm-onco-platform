@@ -311,8 +311,9 @@ async function runEnrichment() {
       `共檢定 ${r.total_tested} 條通路${esc(dropped)}，其中 <b>${sig}</b> 條達 FDR q&lt;0.05；` +
       `以下顯示前 ${r.items.length} 條。`;
 
-    body.innerHTML = r.items.map(i => `
+    body.innerHTML = r.items.map((i, idx) => `
       <tr>
+        <td class="rank-cell ${i.q_value != null && i.q_value < 0.05 ? "rank-sig" : ""}">${esc(i.rank || idx + 1)}</td>
         <td><span class="pill pill-${esc(r.source)}">${esc(i.pathway_id)}</span></td>
         <td>${esc(i.name_tw || i.name)}
           ${i.is_cancer_related ? '<span class="pill pill-cancer" style="margin-left:6px;">癌症相關</span>' : ""}

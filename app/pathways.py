@@ -576,11 +576,30 @@ def enrich(db: Session, tar_ids, source: str = "kegg",
            exclude_noncancer_disease: bool = False, limit: int = 50) -> dict:
     """對一組靶點做通路過度代表分析（ORA）。
 
-    **在基因符號空間計算，不是 tar_id 空間**：TCMSP 有多個靶點指向同一個基因
-    （同工異構物、次單元），照 tar_id 數會把同一個基因重複計入，
-    命中數被灌水、p 值跟著失真。
+    ## 樣本數與母體，絕對不能被「只顯示哪些通路」影響（v1.39.3 修正的錯誤）
 
-    兩種背景集，差別很重要，畫面上要讓使用者看得到自己選了哪一種：
+    這是最容易寫錯、而且錯了不會有徵兆的地方。
+
+    `cancer_only` 與 `exclude_noncancer_disease` 是**要測哪些通路**的篩選，
+    不是**樣本怎麼算**的篩選。v1.39.2 之前把它們套在建立索引之前，
+    結果勾「只看癌症相關通路」時 n 從 92 掉到 60——因為 n 變成了
+    「只在癌症通路裡有註解的基因數」。
+
+    那等於先把樣本限縮到癌症通路的基因，再問「這些基因是不是集中在癌症通路」，
+    是循環論證。實測倍率被灌到 20 倍、q 值到 1e-15，看起來像重大發現，
+    其實是自己造出來的。
+
+    正確做法：
+      - `n`（樣本）與 `N`（母體）一律用**該來源全部的通路註解**計算，與顯示篩選無關
+      - 篩選只決定「哪些通路進入檢定與 BH 校正」
+      - 一條通路的 p 值，不會因為旁邊多顯示或少顯示幾條而改變
+
+    ## 在基因符號空間計算，不是 tar_id 空間
+
+    TCMSP 有多個靶點指向同一個基因（同工異構物、次單元），
+    照 tar_id 數會把同一個基因重複計入，命中數被灌水、p 值跟著失真。
+
+    ## 兩種背景集，畫面上要讓使用者看得到自己選了哪一種
 
     `genome`（預設，學界慣例）
         母體是 KEGG／Reactome 收錄的全部人類基因。回答的是
@@ -595,49 +614,42 @@ def enrich(db: Session, tar_ids, source: str = "kegg",
         缺點：不是慣例，寫進論文要額外說明。
     """
     tar_ids = set(tar_ids or ())
-    q = (db.query(models.TargetPathway, models.Pathway)
-         .join(models.Pathway, models.Pathway.id == models.TargetPathway.pathway_ref_id)
-         .filter(models.TargetPathway.source == source))
-    if cancer_only:
-        q = q.filter(models.Pathway.is_cancer_related.is_(True))
-    all_links = q.all()
 
-    excluded_disease = 0
-    if exclude_noncancer_disease:
-        kept = []
-        dropped: set = set()
-        for link, pathway in all_links:
-            if is_noncancer_disease_pathway(pathway.category):
-                dropped.add(pathway.id)
-                continue
-            kept.append((link, pathway))
-        excluded_disease = len(dropped)
-        all_links = kept
+    # 一律撈全部，不在這裡篩——篩選只影響「測哪些」，不影響 n 與 N
+    all_links = (db.query(models.TargetPathway, models.Pathway)
+                 .join(models.Pathway,
+                       models.Pathway.id == models.TargetPathway.pathway_ref_id)
+                 .filter(models.TargetPathway.source == source).all())
 
-    # 通路 → 這個藥材命中的基因符號；以及母體側的統計
     study_hits: dict = {}
     study_symbols: set = set()
     tcmsp_pathway_symbols: dict = {}
     tcmsp_symbols: set = set()
     pathway_meta: dict = {}
 
-    for link, pw in all_links:
+    for link, pathway in all_links:
         sym = (link.via_symbol or "").upper()
         if not sym:
             continue
-        pathway_meta[pw.id] = pw
-        tcmsp_pathway_symbols.setdefault(pw.id, set()).add(sym)
+        pathway_meta[pathway.id] = pathway
+        tcmsp_pathway_symbols.setdefault(pathway.id, set()).add(sym)
         tcmsp_symbols.add(sym)
         if link.tar_id in tar_ids:
-            study_hits.setdefault(pw.id, set()).add(sym)
+            study_hits.setdefault(pathway.id, set()).add(sym)
             study_symbols.add(sym)
 
     n = len(study_symbols)
-    if n == 0:
-        return {"source": source, "background": background, "study_gene_count": 0,
-                "background_total": 0, "total_tested": 0, "items": [],
-                "excluded_disease_pathways": excluded_disease,
-                "note": "這個藥材的靶點沒有任何一個對應到通路註解（可能尚未標準化，或篩選條件過嚴）"}
+
+    # 決定哪些通路要進入檢定（只影響 BH 的 m，不影響 n／N）
+    testable = set(pathway_meta.keys())
+    excluded_disease = 0
+    if cancer_only:
+        testable = {pid for pid in testable if pathway_meta[pid].is_cancer_related}
+    if exclude_noncancer_disease:
+        before = len(testable)
+        testable = {pid for pid in testable
+                    if not is_noncancer_disease_pathway(pathway_meta[pid].category)}
+        excluded_disease = before - len(testable)
 
     if background == "tcmsp":
         N = len(tcmsp_symbols)
@@ -647,8 +659,17 @@ def enrich(db: Session, tar_ids, source: str = "kegg",
         pathway_K = {pid: (pathway_meta[pid].background_gene_count or 0)
                      for pid in pathway_meta}
 
+    if n == 0:
+        return {"source": source, "background": background, "study_gene_count": 0,
+                "background_total": N, "total_tested": 0, "significant_count": 0,
+                "excluded_disease_pathways": excluded_disease, "items": [],
+                "note": "這個藥材的靶點沒有任何一個對應到通路註解"
+                        "（可能尚未標準化，或活性成分篩選後沒有剩下有註解的靶點）"}
+
     raw = []
     for pid, syms in study_hits.items():
+        if pid not in testable:
+            continue
         K = pathway_K.get(pid, 0)
         k = len(syms)
         if K <= 0:
@@ -663,6 +684,7 @@ def enrich(db: Session, tar_ids, source: str = "kegg",
 
     raw.sort(key=lambda r: (r["p_value"], -r["k"]))
     items = [{
+        "rank": i + 1,
         "pathway_id": r["pathway"].pathway_id,
         "name": r["pathway"].name,
         "name_tw": r["pathway"].name_tw,
@@ -674,7 +696,7 @@ def enrich(db: Session, tar_ids, source: str = "kegg",
         "p_value": r["p_value"],
         "q_value": r["q_value"],
         "fold_enrichment": round((r["k"] / n) / (r["K"] / N), 3) if N and r["K"] else None,
-    } for r in raw[:limit]]
+    } for i, r in enumerate(raw[:limit])]
 
     return {"source": source, "background": background,
             "study_gene_count": n, "background_total": N,

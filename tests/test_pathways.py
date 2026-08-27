@@ -421,6 +421,47 @@ def main():
     check("不合法的 source → 422",
           client.get("/pathways/herb/9001?source=wikipathways", headers=U).status_code == 422)
 
+    # ---------- 篩選不得影響 n 與 N（v1.39.3 修正的循環論證）----------
+    print("\n【樣本數與母體不受顯示篩選影響】")
+    base = client.get("/pathways/herb/9001?source=kegg&apply_adme=true"
+                      "&exclude_noncancer_disease=false", headers=U).json()
+    only_cancer = client.get("/pathways/herb/9001?source=kegg&apply_adme=true"
+                             "&cancer_only=true&exclude_noncancer_disease=false",
+                             headers=U).json()
+    no_disease = client.get("/pathways/herb/9001?source=kegg&apply_adme=true"
+                            "&exclude_noncancer_disease=true", headers=U).json()
+
+    check("勾「只看癌症通路」不會改變樣本數 n"
+          "（否則等於先把樣本限縮到癌症通路的基因，再問它們是不是集中在癌症通路）",
+          only_cancer["study_gene_count"] == base["study_gene_count"],
+          (base["study_gene_count"], only_cancer["study_gene_count"]))
+    check("勾「排除疾病類通路」也不會改變 n",
+          no_disease["study_gene_count"] == base["study_gene_count"],
+          (base["study_gene_count"], no_disease["study_gene_count"]))
+    check("母體 N 也不受篩選影響",
+          only_cancer["background_total"] == base["background_total"] ==
+          no_disease["background_total"],
+          (base["background_total"], only_cancer["background_total"]))
+
+    base_by_id = {i["pathway_id"]: i for i in base["items"]}
+    cancer_by_id = {i["pathway_id"]: i for i in only_cancer["items"]}
+    shared = set(base_by_id) & set(cancer_by_id)
+    check("同一條通路的 p 值不因旁邊少顯示幾條而改變", shared and all(
+              abs(base_by_id[pid]["p_value"] - cancer_by_id[pid]["p_value"]) < 1e-12
+              for pid in shared), sorted(shared))
+    check("同一條通路的倍率也不變", all(
+              base_by_id[pid]["fold_enrichment"] == cancer_by_id[pid]["fold_enrichment"]
+              for pid in shared))
+    check("篩選確實減少了受檢通路數（BH 的 m 變小是合理的）",
+          only_cancer["total_tested"] <= base["total_tested"],
+          (base["total_tested"], only_cancer["total_tested"]))
+    check("只看癌症通路時結果全部是癌症相關",
+          all(i["is_cancer_related"] for i in only_cancer["items"]))
+
+    check("每一列都有 rank 序號且從 1 開始連號",
+          [i["rank"] for i in base["items"]] == list(range(1, len(base["items"]) + 1)),
+          [i["rank"] for i in base["items"]])
+
     print("\n【通用富集入口與單一靶點查詢】")
     r = client.post("/pathways/enrich", headers=U,
                     json={"tar_ids": ["TARP003", "TARP004"], "source": "kegg"}).json()

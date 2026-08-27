@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.39.2 replace the 502-item herb dropdown with a fuzzy search box, and add the missing OpenCC script to six pages where simplified-Chinese mode silently did nothing"
+set "DEFAULT_MSG=v1.39.3 stop pathway display filters from shrinking the study set (which inflated fold enrichment up to 20x), and number the result rows"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

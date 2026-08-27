@@ -25,6 +25,8 @@
   .controls label { margin:0; }
   .bgnote { border-left:3px solid #2f5c8a; padding:8px 12px; margin-top:10px; background:rgba(47,92,138,.06); font-size:12.5px; line-height:1.7; }
   table.enrich td { vertical-align:top; }
+  .rank-cell { font-weight:700; color:#777; text-align:right; padding-right:10px !important; }
+  .rank-sig { color:#1f4f37; }
   /* 藥材搜尋：502 種藥材用下拉選單根本找不到，改成輸入即時模糊比對 */
   .herb-picker { position:relative; width:300px; }
   .herb-picker input { width:100%; }
@@ -129,6 +131,7 @@
       <table class="enrich">
         <thead>
           <tr>
+            <th style="width:44px;">#</th>
             <th style="width:100px;">通路</th><th>名稱</th><th style="width:70px;">命中</th>
             <th style="width:80px;">通路基因</th><th style="width:80px;">倍率</th>
             <th style="width:90px;">p 值</th><th style="width:90px;">q 值 (FDR)</th>
