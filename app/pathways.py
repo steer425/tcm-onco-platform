@@ -665,7 +665,22 @@ def enrich(db: Session, tar_ids, source: str = "kegg",
                        models.Pathway.id == models.TargetPathway.pathway_ref_id)
                  .filter(models.TargetPathway.source == source).all())
 
+    # KEGG 的通路圖網址可以把指定基因標紅（/pathway/hsa04082+367+2099），
+    # 那正是研究者最想看的東西：「這個藥材的靶點落在通路圖的哪個位置」。
+    # 需要的是 KEGG 基因編號，v1.38.0 解析 UniProt 時已經存在映射表裡了。
+    kegg_gene_by_tar: dict = {}
+    if source == "kegg":
+        rows = (db.query(models.TcmspTargetUniprot.tar_id, models.TcmspTargetUniprot.kegg_id)
+                .filter(models.TcmspTargetUniprot.status.in_(("auto", "confirmed")),
+                        models.TcmspTargetUniprot.kegg_id.isnot(None)).all())
+        for tar_id, kegg_id in rows:
+            # `hsa:367` → `367`，通路圖網址只吃數字部分
+            num = (kegg_id or "").split(":")[-1].strip()
+            if num.isdigit():
+                kegg_gene_by_tar[tar_id] = num
+
     study_hits: dict = {}
+    study_kegg: dict = {}
     study_symbols: set = set()
     tcmsp_pathway_symbols: dict = {}
     tcmsp_symbols: set = set()
@@ -681,6 +696,9 @@ def enrich(db: Session, tar_ids, source: str = "kegg",
         if link.tar_id in tar_ids:
             study_hits.setdefault(pathway.id, set()).add(sym)
             study_symbols.add(sym)
+            gene = kegg_gene_by_tar.get(link.tar_id)
+            if gene:
+                study_kegg.setdefault(pathway.id, set()).add(gene)
 
     n = len(study_symbols)
 
@@ -720,6 +738,7 @@ def enrich(db: Session, tar_ids, source: str = "kegg",
             continue
         raw.append({"pathway": pathway_meta[pid], "k": k, "K": K,
                     "symbols": sorted(syms),
+                    "kegg_genes": sorted(study_kegg.get(pid, set()), key=int),
                     "p_value": hypergeom_sf(k, N, K, n)})
 
     qs = benjamini_hochberg([r["p_value"] for r in raw])
@@ -750,6 +769,7 @@ def enrich(db: Session, tar_ids, source: str = "kegg",
         "hit_count": r["k"],
         "pathway_gene_count": r["K"],
         "hit_symbols": r["symbols"],
+        "hit_kegg_genes": r.get("kegg_genes") or [],
         "new_symbols": r["new_symbols"],
         "redundant_with": r["redundant_with"],
         "p_value": r["p_value"],

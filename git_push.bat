@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.39.5 add per-column help icons explaining how to read the enrichment table, with the current analysis numbers filled in"
+set "DEFAULT_MSG=v1.39.6 make the pathway ID open the original KEGG map with the herb hit genes highlighted in red, or the Reactome pathway browser"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

@@ -34,6 +34,28 @@ async function loadUserInfo() {
 }
 
 
+
+// ---------------------------------------------------------------- 外部通路圖連結
+
+// KEGG 的通路圖網址可以在後面接基因編號把它們標紅：
+//   https://www.kegg.jp/pathway/hsa04082+367+2099
+// 對研究者來說這才是關鍵——不是「這條通路顯著」，而是「這些靶點落在圖上哪裡」。
+//
+// Reactome 用 PathwayBrowser，基本網址一定可用；`FLG` 參數用來標示實體，
+// 若語法不被接受，最差的情況是通路照常開啟、只是沒有標示（不會壞掉）。
+function pathwayUrl(source, pathwayId, keggGenes, symbols) {
+  const pid = encodeURIComponent(String(pathwayId || "").trim());
+  if (!pid) return null;
+  if (source === "kegg") {
+    // 只收純數字的基因編號，其餘一律丟掉——網址是要交給外部網站的，不能夾帶意外內容
+    const genes = (keggGenes || []).filter(g => /^\d+$/.test(String(g))).slice(0, 60);
+    return `https://www.kegg.jp/pathway/${pid}` + (genes.length ? "+" + genes.join("+") : "");
+  }
+  const flags = (symbols || []).filter(x => /^[A-Za-z0-9_.-]+$/.test(String(x))).slice(0, 40);
+  return `https://reactome.org/PathwayBrowser/#/${pid}` +
+         (flags.length ? `&FLG=${encodeURIComponent(flags.join(","))}` : "");
+}
+
 // ---------------------------------------------------------------- 欄位說明
 // 這個平台的使用者包含生技研發與醫院研究單位，不見得熟悉 ORA 的判讀陷阱。
 // 把說明放在欄位旁邊而不是另開文件——會去翻文件的人，通常是已經知道要小心的人。
@@ -61,8 +83,11 @@ const HELP = {
   pathway: {
     title: "通路 — 識別碼",
     html: `<p>KEGG 或 Reactome 給這條通路的唯一編號。<code>hsa</code> 代表人類（Homo sapiens）。</p>
-      <p>拿這個編號到 KEGG／Reactome 網站可以查到完整的通路圖，
-      看這些基因在通路裡實際的位置與上下游關係。</p>`,
+      <p><b>點一下編號就會在新分頁開啟原始通路圖。</b></p>
+      <p>KEGG 的連結會把<b>這個藥材命中的基因直接標紅</b>——
+      不只是「這條通路顯著」，而是看得到這些靶點落在通路圖的哪個位置、
+      彼此的上下游關係是什麼。那才是判斷機轉是否說得通的依據。</p>
+      <p>Reactome 的連結會開啟 PathwayBrowser。</p>`,
   },
   name: {
     title: "名稱 — 這條通路在做什麼",
@@ -475,7 +500,16 @@ async function runEnrichment() {
       <tr>
         <td class="rank-cell ${isSig ? "rank-sig" : ""}">${esc(i.rank || idx + 1)}
           ${r.sort === "fold" && i.p_rank ? `<small>p #${esc(i.p_rank)}</small>` : ""}</td>
-        <td><span class="pill pill-${esc(r.source)}">${esc(i.pathway_id)}</span></td>
+        <td>${(() => {
+          const url = pathwayUrl(r.source, i.pathway_id, i.hit_kegg_genes, i.hit_symbols);
+          const label = `<span class="pill pill-${esc(r.source)}">${esc(i.pathway_id)}</span>`;
+          if (!url) return label;
+          const tip = r.source === "kegg"
+            ? `在 KEGG 開啟通路圖，命中的 ${i.hit_count} 個基因會標紅`
+            : `在 Reactome 開啟通路瀏覽器`;
+          return `<a class="pw-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer"
+                     title="${esc(tip)}">${label}</a>`;
+        })()}</td>
         <td>${esc(i.name_tw || i.name)}
           ${i.is_cancer_related ? '<span class="pill pill-cancer" style="margin-left:6px;">癌症相關</span>' : ""}
           ${dup ? `<span class="dup-tag">重複</span>` : ""}

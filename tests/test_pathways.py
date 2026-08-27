@@ -421,6 +421,27 @@ def main():
     check("不合法的 source → 422",
           client.get("/pathways/herb/9001?source=wikipathways", headers=U).status_code == 422)
 
+    # ---------- 通路圖連結所需的 KEGG 基因編號 ----------
+    print("\n【外部通路圖連結：KEGG 基因編號】")
+    kres = client.get("/pathways/herb/9001?source=kegg&apply_adme=true"
+                      "&exclude_noncancer_disease=false", headers=U).json()
+    kmap = {i["pathway_id"]: i for i in kres["items"]}
+    check("KEGG 結果帶出命中基因的 KEGG 編號（通路圖標紅要用）",
+          kmap["hsa04915"]["hit_kegg_genes"] == ["367", "2099"],
+          kmap["hsa04915"]["hit_kegg_genes"])
+    check("編號已剝掉 `hsa:` 前綴且純數字",
+          all(g.isdigit() for i in kres["items"] for g in i["hit_kegg_genes"]),
+          [i["hit_kegg_genes"] for i in kres["items"]])
+    check("編號數量不超過命中數（同基因多靶點要去重）",
+          all(len(i["hit_kegg_genes"]) <= i["hit_count"] for i in kres["items"]),
+          [(i["pathway_id"], len(i["hit_kegg_genes"]), i["hit_count"]) for i in kres["items"]])
+
+    rres = client.get("/pathways/herb/9001?source=reactome&apply_adme=true"
+                      "&exclude_noncancer_disease=false", headers=U).json()
+    check("Reactome 結果不帶 KEGG 編號（它用基因符號標示）",
+          all(i["hit_kegg_genes"] == [] for i in rres["items"]),
+          [i["hit_kegg_genes"] for i in rres["items"]])
+
     # ---------- 篩選不得影響 n 與 N（v1.39.3 修正的循環論證）----------
     print("\n【樣本數與母體不受顯示篩選影響】")
     base = client.get("/pathways/herb/9001?source=kegg&apply_adme=true"
