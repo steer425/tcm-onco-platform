@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.39.7 fix the KEGG map URL (gene highlighting lives on kegg-bin/show_pathway, not /pathway/) and say so on screen when highlighting is unavailable"
+set "DEFAULT_MSG=v1.39.8 rules.md: always open the pathway map for top hits, because scattered highlights mean annotation bias while a connected cascade means mechanism"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%
