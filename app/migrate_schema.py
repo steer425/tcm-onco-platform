@@ -48,6 +48,7 @@ ALTER_STATEMENTS = [
     # v1.38.0 的 tcmsp_target_uniprot 是全新資料表，create_all() 會自動建立，
     # 不需要在這裡加 ALTER——只有「既有資料表新增欄位」才需要。
     # v1.39.0 的 pathways / target_pathways 同理，也是全新資料表。
+    # v1.40.0 的 tcmsp_ingredient_pubchem 同理。
 ]
 
 

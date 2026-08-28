@@ -1093,3 +1093,65 @@ class TargetPathway(Base):
     via_symbol = Column(String, nullable=True)            # 靠哪個基因符號連上的
     via_accession = Column(String, nullable=True)         # 對應的 UniProt accession
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class TcmspIngredientPubchem(Base):
+    """TCMSP 成分 → PubChem 標準化映射（目標一 Step 2）。第 45 張表。
+
+    跟 `TcmspTargetUniprot` 完全對稱的問題：靶點那側已經標準化了，
+    **成分那側目前只有名稱**——沒有 SMILES、沒有 InChIKey、沒有 CAS、沒有結構。
+    後果是成分無法跨資料庫比對，也做不了結構相似性分析，
+    而那是往「細胞株驗證」與「研究報告」走的前提。
+
+    ## 這張表跟靶點映射最大的不同：有一個獨立的驗算依據
+
+    靶點標準化只能靠名稱比對，對不對只能靠人看。但成分不一樣——
+    **TCMSP 自己就存了分子量（`tcmsp_ingredients.mw`）**。
+
+    所以每一筆解析都可以拿 PubChem 回傳的分子量跟 TCMSP 原本的值對照：
+
+      - 兩者相符 → 名稱解析到的幾乎確定是同一個化合物
+      - 兩者不符 → **名稱雖然對上了，但很可能是不同的化合物**
+        （同名異物、鹽類 vs 游離態、水合物、立體異構物）
+
+    這種情況一律進待確認，不自動採用。名稱對上就當作解析成功，
+    是這類工作最容易犯而且最難發現的錯——畫面上一切正常，
+    只是那個 SMILES 屬於別的分子。
+
+    `mw_delta` 把差值存下來，讓審核的人一眼看到差多少、以及差的量級
+    像不像鹽類（幾十 Da）或水合物（18 的倍數）。
+    """
+    __tablename__ = "tcmsp_ingredient_pubchem"
+    __table_args__ = (
+        UniqueConstraint("mol_id", "cid", name="uq_tcmsp_ingredient_pubchem"),
+    )
+
+    id = Column(String, primary_key=True, default=gen_id)
+    mol_id = Column(String, ForeignKey("tcmsp_ingredients.mol_id"), nullable=False, index=True)
+
+    cid = Column(String, nullable=True, index=True)          # PubChem CID，例如 5280343
+    canonical_smiles = Column(Text, nullable=True)
+    isomeric_smiles = Column(Text, nullable=True)            # 帶立體資訊，天然物常常需要
+    inchikey = Column(String, nullable=True, index=True)     # 跨資料庫比對的標準鍵
+    molecular_formula = Column(String, nullable=True)
+    molecular_weight = Column(String, nullable=True)         # PubChem 的值（字串存，維持可攜）
+    iupac_name = Column(Text, nullable=True)
+    cas_number = Column(String, nullable=True, index=True)
+    synonyms = Column(Text, nullable=True)                   # JSON 陣列字串（取前幾個）
+
+    # 分子量交叉驗證：TCMSP 原本的值、與 PubChem 的差
+    tcmsp_mw = Column(String, nullable=True)
+    mw_delta = Column(String, nullable=True)                 # 絕對差值，字串存
+
+    # exact（原名精確命中）/ cleaned（清理後命中）/ cas（以 CAS 反查）/ manual（人工指定）
+    method = Column(String, nullable=False, default="exact")
+    confidence = Column(String, nullable=False, default="0")
+    # auto / pending / confirmed / rejected / unresolved / error
+    status = Column(String, nullable=False, default="auto", index=True)
+    candidates = Column(Text, nullable=True)
+    note = Column(Text, nullable=True)
+
+    reviewed_by = Column(String, ForeignKey("users.id"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    resolved_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

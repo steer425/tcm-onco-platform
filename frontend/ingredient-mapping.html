@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ccircle cx=%2750%27 cy=%2750%27 r=%2745%27 fill=%27%232f5c8a%27/%3E%3Ctext x=%2750%27 y=%2768%27 font-size=%2760%27 text-anchor=%27middle%27 fill=%27white%27%3E%E8%97%A5%3C/text%3E%3C/svg%3E" />
+<title>成分標準化（PubChem） - TCM 平台</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/theme.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+<style>
+  .stat-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; }
+  .stat-box { background:var(--card-bg,#fff); border:1px solid var(--border-color,#e2e6ea); border-radius:8px; padding:12px 14px; }
+  .stat-box .num { font-size:22px; font-weight:700; }
+  .stat-box .lbl { font-size:12px; color:#777; margin-top:2px; }
+  .stat-box.alert .num { color:#a83232; }
+  .bar { height:10px; border-radius:999px; background:#eceff3; overflow:hidden; margin-top:10px; }
+  .bar > span { display:block; height:100%; background:#2f5c8a; width:0; transition:width .3s; }
+  .st-pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:600; }
+  .st-auto, .st-confirmed { background:#e8f3ec; color:#1f4f37; }
+  .st-pending { background:#f5ecdc; color:#7a5420; }
+  .st-unresolved { background:#f0f0f0; color:#777; }
+  .st-rejected, .st-error { background:#fdecea; color:#a83232; }
+  .mono { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:11.5px; word-break:break-all; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; align-items:center; }
+  .tabs button { background:#eceff3; color:#444; }
+  .tabs button.on { background:#2f5c8a; color:#fff; }
+  .struct { width:110px; height:110px; object-fit:contain; background:#fff; border:1px solid var(--border-color,#e2e6ea); border-radius:6px; }
+  .mw-bad { color:#a83232; font-weight:700; }
+  .mw-ok { color:#1f4f37; }
+  .cand { border:1px solid var(--border-color,#e2e6ea); border-radius:6px; padding:8px 10px; margin-bottom:8px; display:flex; gap:12px; align-items:flex-start; }
+  .cand.sel { border-color:#2f5c8a; background:#f2f6fb; }
+  .cand .meta { flex:1; min-width:0; }
+</style>
+</head>
+<body data-current-page="ingredient-mapping.html">
+<div class="layout">
+  <aside class="sidebar">
+    <h1>TCM 中藥腫瘤篩選平台</h1>
+    <nav id="navContainer"></nav>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 style="margin:0;">成分標準化（PubChem）</h2>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <p class="hint-msg" style="margin-top:0;">
+        分析鏈路第二站。靶點那側（F1-4）已經標準化了，<b>成分這側目前只有名稱</b>——
+        沒有 SMILES、沒有 InChIKey、沒有 CAS、沒有結構。
+        後果是成分無法跟任何外部資料庫比對，也做不了結構相似性分析，
+        而那是往「腫瘤細胞株驗證」與「AI 研究報告」走的前提。
+      </p>
+      <p class="hint-msg">
+        <b>這一步有一個靶點標準化沒有的驗算依據：分子量。</b>
+        TCMSP 自己就存了每個成分的分子量，所以每一筆解析都會拿它跟 PubChem 回傳的值對照。
+        兩者不符代表<b>名稱雖然對上了，但很可能是不同的化合物</b>
+        （同名異物、鹽類 vs 游離態、水合物）——這種一律進待確認，不會自動採用。
+        <b class="mw-bad">名稱對上就當作解析成功，是這類工作最容易犯、也最難發現的錯。</b>
+      </p>
+      <p class="hint-msg" style="color:#a83232;">
+        ⚠️ 解析需要對外連線到 pubchem.ncbi.nlm.nih.gov，請在已部署的 Render 環境操作。
+        每筆之間間隔 0.25 秒（PubChem 要求每秒不超過 5 次請求）。
+      </p>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="margin:0;">覆蓋率</h3>
+        <button class="secondary" id="refreshBtn">重新整理</button>
+      </div>
+      <div class="stat-grid" id="statGrid"></div>
+      <div class="bar"><span id="coverageBar"></span></div>
+      <p class="hint-msg" id="coverageHint"></p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">批次解析</h3>
+      <p class="hint-msg" style="margin-top:0;">
+        <b>預設只解析活性成分</b>（通過 OB ≥ 30%、DL ≥ 0.18 的那些）。
+        TCMSP 收錄近三萬個成分，絕大多數口服吸收率極低或不具類藥性、
+        根本不會出現在任何分析裡，而每筆要打兩次 PubChem——全跑一遍是好幾個小時。
+      </p>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <label style="margin:0;">每批筆數</label>
+        <select id="batchLimit" style="max-width:110px;">
+          <option value="20">20</option><option value="50" selected>50</option>
+          <option value="100">100</option><option value="200">200</option>
+        </select>
+        <label style="margin:0; display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="activeOnly" checked style="width:auto; margin:0;" /> 只解析活性成分
+        </label>
+        <label style="margin:0; display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="retryErrors" style="width:auto; margin:0;" /> 連上次失敗的一起重跑
+        </label>
+        <button id="resolveBtn">執行一批</button>
+        <span class="hint-msg" id="resolveMsg"></span>
+      </div>
+      <div id="resolveLog" class="hint-msg" style="margin-top:10px; white-space:pre-wrap;"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">人工審核</h3>
+      <div class="tabs" id="queueTabs">
+        <button data-status="pending" class="on">待確認</button>
+        <button data-status="unresolved">查無結果</button>
+        <button data-status="error">連線失敗</button>
+        <button data-status="rejected">已否決</button>
+        <label style="margin:0 0 0 10px; display:flex; align-items:center; gap:6px; font-size:12.5px;">
+          <input type="checkbox" id="mwOnly" style="width:auto; margin:0;" /> 只看分子量不符的
+        </label>
+      </div>
+      <p class="hint-msg" style="margin-top:0;" id="queueHint"></p>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:120px;">結構</th><th style="width:100px;">mol_id</th>
+            <th>TCMSP 成分名稱</th><th>PubChem 解析結果</th>
+            <th style="width:130px;">分子量比對</th><th style="width:80px;">狀態</th>
+            <th style="width:90px;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="queueBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">以 InChIKey／CAS／CID 反查成分</h3>
+      <p class="hint-msg" style="margin-top:0;">
+        <b>這才是標準化的目的。</b>有了 InChIKey，別的資料庫（DepMap 藥物、臨床試驗用藥、文獻）
+        提到的化合物才對得回 TCMSP 的成分——用名稱是永遠對不起來的。
+      </p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <input id="lookupInput" placeholder="例如 REFJWTPEDVJJIY-UHFFFAOYSA-N、117-39-5、5280343" style="max-width:340px;" />
+        <button id="lookupBtn">反查</button>
+      </div>
+      <div id="lookupResult" style="margin-top:12px;"></div>
+    </div>
+  </main>
+</div>
+
+<div id="reviewModal" class="modal-backdrop" style="display:none;">
+  <div class="modal" style="max-width:680px; max-height:84vh; overflow-y:auto;">
+    <h3 id="reviewTitle">確認成分映射</h3>
+    <input type="hidden" id="reviewMolId" />
+    <p class="hint-msg" id="reviewName" style="margin-top:0;"></p>
+    <div id="reviewNote" class="hint-msg"></div>
+    <div id="reviewCandidates"></div>
+    <div><label>PubChem CID</label><input id="reviewCid" placeholder="例如 5280343" /></div>
+    <label>備註</label>
+    <textarea id="reviewComment" rows="2" placeholder="人工判斷的依據，之後看得懂為什麼這樣決定"></textarea>
+    <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="secondary" id="reviewCancel">關閉</button>
+      <button class="secondary" id="reviewReject" style="color:#a83232;">否決</button>
+      <button id="reviewConfirm">確認映射</button>
+    </div>
+    <div id="reviewMsg" class="hint-msg"></div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/i18n-dict.js"></script>
+<script src="js/site-lang.js"></script>
+<script src="js/ingredient-mapping.js"></script>
+</body>
+</html>
