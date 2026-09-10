@@ -127,7 +127,7 @@ jobs:
           ]
 
           status = d.get("status")
-          icon = {"ok": "✅", "partial": "⚠️", "failed": "❌"}.get(status, "ℹ️")
+          icon = {"success": "✅", "partial": "⚠️", "failed": "❌"}.get(status, "ℹ️")
 
           out = [f"## {icon} 每日重點新聞收集：{status}", "", "| 項目 | 數值 |", "|---|---|"]
           out += [f"| {k} | {v} |" for k, v in rows]
