@@ -1,0 +1,157 @@
+# 每日重點新聞收集 — 每天台北時間清晨 4:00 觸發後端收集
+#
+# 為什麼需要這個：Render free plan 沒有內建 Cron Job（付費方案才有），
+# 所以要由外部排程來打後端的收集端點。
+#
+# 設定方式：
+#   1. GitHub repo → Settings → Secrets and variables → Actions → New repository secret
+#   2. Name: NEWS_COLLECT_SECRET
+#      Value: 與 Render 環境變數 NEWS_COLLECT_SECRET 相同的字串
+#
+# 比起把密鑰寫在別處，這個做法的好處是密鑰存在 GitHub Secrets 裡，
+# 不會出現在程式碼、提示詞或任何人看得到的地方。
+#
+# ⚠️ v1.40.1 修正：`.gitignore` 原本有一行 `.github/workflows/`，
+# 導致這個檔案雖然存在於本機、卻從來沒有被推上 GitHub。
+# GitHub Actions 只執行 repo 裡實際存在的 workflow，所以這條排程一直沒有在跑，
+# 而且不會有任何錯誤訊息。那一行已經移除，這個檔案現在必須跟著版控走。
+
+name: 每日重點新聞收集
+
+run-name: >-
+  每日重點新聞收集${{ github.event_name == 'workflow_dispatch' && format('（{0}）', inputs.reason) || '' }}
+
+on:
+  schedule:
+    # GitHub Actions 的 cron 一律用 UTC。台灣全年 UTC+8 且無日光節約，
+    # 所以 UTC 20:00 = 台北隔日 04:00。
+    # GitHub 排程在尖峰時段可能延遲 5~30 分鐘，屬正常現象。
+    - cron: "0 20 * * *"
+  workflow_dispatch:      # 允許在 Actions 頁面手動觸發，方便補跑
+    inputs:
+      reason:
+        description: "執行原因（補跑 9/7、測試密鑰…）。只是讓執行紀錄看得懂，不影響行為。"
+        required: false
+        default: "手動補跑"
+
+concurrency:
+  # 避免手動觸發與排程重疊，同時跑兩次收集
+  group: daily-news-collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 觸發後端收集
+        id: collect
+        env:
+          SECRET: ${{ secrets.NEWS_COLLECT_SECRET }}
+          API: https://tcm-onco-backend.onrender.com
+        run: |
+          set -uo pipefail
+
+          if [ -z "${SECRET:-}" ]; then
+            echo "::error::尚未設定 repo secret NEWS_COLLECT_SECRET"
+            echo "設定路徑：repo → Settings → Secrets and variables → Actions → New repository secret" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          # Render free plan 閒置會休眠，冷啟動約 30~60 秒。
+          # 先打一次 /docs 把伺服器叫醒，再送實際請求，可大幅降低第一次逾時的機率。
+          echo "喚醒後端（Render free plan 休眠中的話約需 30~60 秒）..."
+          curl -s -o /dev/null --max-time 120 "$API/docs" || true
+
+          for attempt in 1 2 3; do
+            echo "::group::第 $attempt 次嘗試"
+            HTTP=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+              -X POST "$API/news/admin/collect/scheduled" \
+              -H "Authorization: Bearer $SECRET" \
+              -H "Content-Type: application/json" \
+              -d '{}' \
+              --max-time 600 --connect-timeout 90) || HTTP="000"
+
+            echo "HTTP $HTTP"
+            cat /tmp/resp.json 2>/dev/null || true
+            echo "::endgroup::"
+
+            # 401（密鑰錯）與 503（後端未設密鑰）重試也不會好，直接失敗
+            if [ "$HTTP" = "401" ] || [ "$HTTP" = "503" ]; then
+              echo "::error::HTTP $HTTP — 密鑰設定有問題，重試無益。請確認 Render 的 NEWS_COLLECT_SECRET 與 repo secret 一致。"
+              {
+                echo "## ❌ 密鑰設定有問題（HTTP $HTTP）"
+                echo ""
+                echo "- \`401\`：GitHub secret 與 Render 環境變數的值不一致"
+                echo "- \`503\`：Render 上根本沒設 \`NEWS_COLLECT_SECRET\`（端點刻意停用，不是變成公開端點）"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+
+            if [ "$HTTP" = "200" ]; then
+              echo "http_code=200" >> "$GITHUB_OUTPUT"
+              break
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              echo "失敗（HTTP $HTTP），60 秒後重試..."
+              sleep 60
+            else
+              echo "::error::連續 3 次觸發失敗，最後一次 HTTP $HTTP"
+              echo "## ❌ 連續 3 次觸發失敗，最後一次 HTTP $HTTP" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+          done
+
+      - name: 摘要執行結果
+        if: always() && steps.collect.outputs.http_code == '200'
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open("/tmp/resp.json", encoding="utf-8") as f:
+              d = json.load(f)
+
+          rows = [
+              ("日期", d.get("run_date")),
+              ("狀態", d.get("status")),
+              ("抓取", d.get("fetched")),
+              ("主題過濾", d.get("filtered_out")),
+              ("重複略過", d.get("duplicates")),
+              ("新增文章", d.get("new_articles")),
+              ("每日精選", d.get("digest_size")),
+              ("實體連結", d.get("linked_entities")),
+              ("耗時 (ms)", d.get("duration_ms")),
+          ]
+
+          status = d.get("status")
+          icon = {"ok": "✅", "partial": "⚠️", "failed": "❌"}.get(status, "ℹ️")
+
+          out = [f"## {icon} 每日重點新聞收集：{status}", "", "| 項目 | 數值 |", "|---|---|"]
+          out += [f"| {k} | {v} |" for k, v in rows]
+
+          errors = d.get("errors") or {}
+          if errors:
+              out += ["", "### 失敗的來源", "",
+                      "連續多天失敗代表對方網站改版，需到後台「新聞來源」更新選擇器。", "",
+                      "| 來源代碼 | 錯誤訊息 |", "|---|---|"]
+              for slug, msg in errors.items():
+                  out.append(f"| `{slug}` | {str(msg)[:160]} |")
+
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as f:
+                  f.write("\n".join(out) + "\n")
+          print("\n".join(out))
+
+          # 當天符合條件的新聞不足是常態，不該當成故障 —— 給黃字提醒就好
+          digest = d.get("digest_size")
+          if isinstance(digest, int) and digest < 10:
+              print(f"::warning::每日精選只有 {digest} 篇（少於 10），當天符合條件的新聞偏少")
+
+          # status=partial 屬正常（中國兩個官方站海外節點常不通），只有全失敗才視為錯誤
+          if status == "failed":
+              raise SystemExit("::error::所有來源都失敗，請檢查後端狀態")
+          PY
