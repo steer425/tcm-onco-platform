@@ -736,6 +736,15 @@ window.I18N_DICT = {
     "沒有符合條件的疾病資料": "No matching disease data",
     "疾病資料管理（CRUD/匯入）": "Disease Data Management (CRUD/Import)",
     "統計資料載入失敗": "Failed to load statistics",
+    // ---- 成分標準化（PubChem）覆蓋率卡片（v1.40.1） ----
+    "活性成分（母體）": "Active Ingredients (Denominator)",
+    "有名稱的成分（母體）": "Named Ingredients (Denominator)",
+    "已標準化": "Standardised",
+    "尚未處理（佇列內）": "Not Yet Processed (In Queue)",
+    "未納入（不排入佇列）": "Excluded (Never Queued)",
+    "有 SMILES": "With SMILES",
+    "有 CAS": "With CAS",
+    "分子量不符（待確認）": "MW Mismatch (Pending Review)",
   },
   ko: {
     // ---- 導覽選單 ----
@@ -1464,5 +1473,14 @@ window.I18N_DICT = {
     "沒有符合條件的疾病資料": "일치하는 질환 데이터가 없습니다",
     "疾病資料管理（CRUD/匯入）": "질환 데이터 관리(CRUD/가져오기)",
     "統計資料載入失敗": "통계 데이터 로드 실패",
+    // ---- 成分標準化（PubChem）覆蓋率卡片（v1.40.1） ----
+    "活性成分（母體）": "활성 성분 (모집단)",
+    "有名稱的成分（母體）": "명칭이 있는 성분 (모집단)",
+    "已標準化": "표준화 완료",
+    "尚未處理（佇列內）": "미처리 (대기열 내)",
+    "未納入（不排入佇列）": "제외됨 (대기열에 포함되지 않음)",
+    "有 SMILES": "SMILES 보유",
+    "有 CAS": "CAS 보유",
+    "分子量不符（待確認）": "분자량 불일치 (확인 대기)",
   },
 };

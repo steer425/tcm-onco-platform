@@ -54,13 +54,26 @@ async function loadUserInfo() {
 
 // ---------------------------------------------------------------- 覆蓋率
 
+// 覆蓋率的母體必須跟批次佇列同一個，所以這裡讀的是批次區塊那個 checkbox，
+// 而不是另外記一份狀態。母體不一致正是 v1.40.1 修掉的那個錯。
+function activeOnly() {
+  const el = document.getElementById("activeOnly");
+  return el ? el.checked : true;
+}
+
+let LAST_STATS = null;
+
 async function loadStats() {
-  const s = await api("/tcmsp/ingredient-mapping/stats");
+  const s = await api(`/tcmsp/ingredient-mapping/stats?active_only=${activeOnly()}`);
+  LAST_STATS = s;
   const bs = s.by_status;
+  const ex = s.excluded_breakdown || {};
+  const poolLabel = s.active_only ? "活性成分（母體）" : "有名稱的成分（母體）";
   const boxes = [
-    ["成分總數", s.total_ingredients, false],
+    [poolLabel, s.pool_total, false],
     ["已標準化", s.resolved, false],
-    ["尚未處理", s.remaining, false],
+    ["尚未處理（佇列內）", s.remaining, false],
+    ["未納入（不排入佇列）", s.excluded_total, false],
     ["有 SMILES", s.with_smiles, false],
     ["有 CAS", s.with_cas, false],
     ["分子量不符（待確認）", s.mw_mismatch_pending, true],
@@ -69,11 +82,24 @@ async function loadStats() {
     <div class="stat-box ${alert && num ? "alert" : ""}">
       <div class="num">${esc(num)}</div><div class="lbl">${esc(lbl)}</div></div>`).join("");
 
+  // 進度條吃母體，不吃全庫——吃全庫的話它永遠停在個位數，看起來像卡住。
   const pct = Math.round((s.coverage || 0) * 1000) / 10;
   document.getElementById("coverageBar").style.width = `${pct}%`;
   document.getElementById("coverageHint").textContent =
-    `覆蓋率 ${pct}%（自動採用 ${bs.auto}、已確認 ${bs.confirmed}、待確認 ${bs.pending}、` +
-    `查無結果 ${bs.unresolved}、已否決 ${bs.rejected}、連線失敗 ${bs.error}）`;
+    `覆蓋率 ${pct}%＝已標準化 ${s.resolved} ／ 母體 ${s.pool_total}` +
+    `（自動採用 ${bs.auto}、已確認 ${bs.confirmed}、待確認 ${bs.pending}、` +
+    `查無結果 ${bs.unresolved}、已否決 ${bs.rejected}、連線失敗 ${bs.error}；單位為不重複成分數）`;
+
+  const overallPct = Math.round(((s.overall || {}).coverage || 0) * 1000) / 10;
+  const parts = [];
+  if (ex.below_threshold) parts.push(`OB／DL 未達標 ${ex.below_threshold}`);
+  if (ex.adme_missing) parts.push(`ADME 缺值 ${ex.adme_missing}`);
+  if (ex.no_name) parts.push(`無名稱 ${ex.no_name}`);
+  document.getElementById("coverageSub").textContent =
+    `未納入 ${s.excluded_total} 筆` + (parts.length ? `（${parts.join("、")}）` : "") +
+    `，依設定不排入佇列，不是待處理進度。` +
+    `全庫 ${s.total_ingredients} 筆的覆蓋率為 ${overallPct}%` +
+    (s.active_only ? `；門檻 OB ≥ ${s.ob_min}%、DL ≥ ${s.dl_min}。` : "。");
 }
 
 // ---------------------------------------------------------------- 批次解析
@@ -99,7 +125,16 @@ async function runBatch() {
         `（其中 ${r.mw_mismatch} 筆是分子量不符）、查無結果 ${r.unresolved}、` +
         `連線失敗 ${r.error}；尚未處理 ${r.remaining} 筆。`;
     log.textContent = `${new Date().toLocaleTimeString()}  ${line}\n${log.textContent}`;
-    msg.textContent = r.remaining > 0 ? "還沒跑完，可以再按一次。" : "全部處理完畢。";
+    if (r.remaining > 0) {
+      msg.textContent = "還沒跑完，可以再按一次。";
+    } else {
+      // 「全部處理完畢」不講範圍，就是上一版那個誤會的來源：
+      // 使用者會拿它去對照卡片上的「未納入」，然後以為批次卡住了。
+      const scope = document.getElementById("activeOnly").checked ? "活性成分" : "有名稱的成分";
+      const left = LAST_STATS ? LAST_STATS.excluded_total : null;
+      msg.textContent = `${scope}已全部處理完畢。` +
+        (left ? `（另有 ${left} 筆依設定未納入，不會排進佇列）` : "");
+    }
     if (r.error && r.error === r.processed) {
       msg.textContent = "整批都連線失敗——這個環境可能連不到 PubChem，請改在 Render 上執行。";
     }
@@ -269,6 +304,10 @@ async function runLookup() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   loadUserInfo();
+  // 切換母體時卡片要跟著換，否則畫面又會出現兩個母體並存的狀態
+  const ao = document.getElementById("activeOnly");
+  if (ao) ao.addEventListener("change", () => { loadStats().catch(() => {}); });
+
   document.getElementById("refreshBtn").addEventListener("click", async () => {
     await loadStats(); await loadQueue();
   });

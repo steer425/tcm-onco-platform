@@ -50,38 +50,157 @@ def _row_out(row: models.TcmspIngredientPubchem, name: str | None = None) -> dic
     }
 
 
-@router.get("/stats", summary="（後台）成分標準化覆蓋率")
-def mapping_stats(current_user: models.User = Depends(require_admin),
-                  db: Session = Depends(get_db)):
-    total = db.query(models.TcmspIngredient).count()
-    rows = (db.query(models.TcmspIngredientPubchem.status,
-                     func.count(models.TcmspIngredientPubchem.id))
-            .group_by(models.TcmspIngredientPubchem.status).all())
-    by_status = {s: c for s, c in rows}
-    done = (db.query(func.count(func.distinct(models.TcmspIngredientPubchem.mol_id)))
-            .filter(models.TcmspIngredientPubchem.status.in_(ACCEPTED)).scalar() or 0)
-    touched = (db.query(func.count(func.distinct(
-        models.TcmspIngredientPubchem.mol_id))).scalar() or 0)
-    with_smiles = (db.query(models.TcmspIngredientPubchem)
-                   .filter(models.TcmspIngredientPubchem.canonical_smiles.isnot(None),
-                           models.TcmspIngredientPubchem.status.in_(ACCEPTED)).count())
-    with_cas = (db.query(models.TcmspIngredientPubchem)
-                .filter(models.TcmspIngredientPubchem.cas_number.isnot(None),
-                        models.TcmspIngredientPubchem.status.in_(ACCEPTED)).count())
-    # 分子量不符而被攔下來的筆數——這個數字本身就是驗證有沒有在運作的指標
-    mw_flagged = (db.query(models.TcmspIngredientPubchem)
-                  .filter(models.TcmspIngredientPubchem.status == "pending",
-                          models.TcmspIngredientPubchem.mw_delta.isnot(None)).count())
+def _adme_thresholds(db: Session):
+    from app import pathways as pw
+    return pw.adme_thresholds(db)
+
+
+def _active_reason(ob, dl, ob_min: float, dl_min: float):
+    """回傳 None 代表通過活性篩選；否則回傳被排除的原因代碼。
+
+    跟 `app/pathways.py` 的活性成分判定用同一套規則：ADME 缺值（空字串或 'NA'）
+    一律排除，不當成通過。但**缺值與不達標要分得開**——缺值是資料問題、
+    不達標是化合物本身的性質，混在一起看不出「這個庫有多少成分根本沒有 ADME 資料」。
+    """
+    a, b = pc._num(ob), pc._num(dl)
+    if a is None or b is None:
+        return "adme_missing"
+    if a < ob_min or b < dl_min:
+        return "below_threshold"
+    return None
+
+
+def _ingredient_pool(db: Session, active_only: bool):
+    """成分標準化的**母體**：`/stats` 與 `/resolve` 一律呼叫這一支。
+
+    ## 為什麼要有這個函式（v1.40.1 修的實際事故）
+
+    在此之前 `/stats` 自己數全表 13,728 筆、`/resolve` 另外套兩層篩選（名稱非空
+    ＋ OB／DL），兩支查詢的母體不同。結果是覆蓋率卡片顯示「尚未處理 11,096」，
+    而批次連按十三次都回「這一批沒有需要處理的成分了」——**程式跑得動、數字都在
+    合理範圍、畫面很合理，但兩個數字回答的是不同的問題**。
+
+    這跟 v1.38.0 把八處靶點比對邏輯收斂到 `app/target_index.py` 是同一個原則：
+    要改篩選條件就改這一處，不要在任何一邊就地重寫。
+
+    回傳 `(pool, excluded)`：
+      pool     —— 這個母體裡的成分列（含 mol_id / molecule_name / mw / ob / dl）
+      excluded —— 被排除的筆數，依原因分開，讓畫面可以說清楚「未納入」是哪來的
+    """
+    rows = (db.query(models.TcmspIngredient.mol_id, models.TcmspIngredient.molecule_name,
+                     models.TcmspIngredient.mw, models.TcmspIngredient.ob,
+                     models.TcmspIngredient.dl)
+            .order_by(models.TcmspIngredient.mol_id).all())
+
+    excluded = {"no_name": 0, "adme_missing": 0, "below_threshold": 0}
+
+    # 名稱是唯一的查詢鍵，空白名稱在任何模式下都解析不了——
+    # 舊版 `/resolve` 只擋 NULL，空字串會被送去查 PubChem，查了也一定查不到。
+    named = []
+    for r in rows:
+        if not (r.molecule_name or "").strip():
+            excluded["no_name"] += 1
+        else:
+            named.append(r)
+
+    if not active_only:
+        return named, excluded
+
+    ob_min, dl_min = _adme_thresholds(db)
+    pool = []
+    for r in named:
+        reason = _active_reason(r.ob, r.dl, ob_min, dl_min)
+        if reason is None:
+            pool.append(r)
+        else:
+            excluded[reason] += 1
+    return pool, excluded
+
+
+_STATUSES = ("auto", "confirmed", "pending", "rejected", "unresolved", "error")
+
+
+def _aggregate(maps, ids):
+    """把映射列彙總成**不重複成分數**。`ids` 為 None 代表不限母體。
+
+    一律用 distinct mol_id，不用筆數：`TcmspIngredientPubchem` 的唯一鍵是
+    `(mol_id, cid)`，同一個成分合法可以有多筆（人工確認時挑了不同 CID 就會出現）。
+    舊版 `with_smiles`／`with_cas`／`by_status` 數的是筆數，而 `total`／`remaining`
+    數的是成分數——同一張卡片混兩種單位，多筆映射一出現加總就對不起來。
+    """
+    by_status = {k: set() for k in _STATUSES}
+    touched, accepted, smiles, cas, mw = set(), set(), set(), set(), set()
+    for mol_id, status, smi, cas_no, delta in maps:
+        if ids is not None and mol_id not in ids:
+            continue
+        touched.add(mol_id)
+        by_status.setdefault(status, set()).add(mol_id)
+        if status in ACCEPTED:
+            accepted.add(mol_id)
+            if smi:
+                smiles.add(mol_id)
+            if cas_no:
+                cas.add(mol_id)
+        if status == "pending" and delta is not None:
+            mw.add(mol_id)
     return {
-        "total_ingredients": total,
-        "resolved": done,
-        "remaining": max(0, total - touched),
-        "coverage": round(done / total, 4) if total else 0,
-        "with_smiles": with_smiles,
-        "with_cas": with_cas,
-        "mw_mismatch_pending": mw_flagged,
-        "by_status": {k: by_status.get(k, 0) for k in
-                      ("auto", "confirmed", "pending", "rejected", "unresolved", "error")},
+        "touched": len(touched), "resolved": len(accepted),
+        "with_smiles": len(smiles), "with_cas": len(cas),
+        "mw_mismatch_pending": len(mw),
+        "by_status": {k: len(by_status.get(k, ())) for k in _STATUSES},
+    }
+
+
+@router.get("/stats", summary="（後台）成分標準化覆蓋率")
+def mapping_stats(active_only: bool = Query(
+                      True,
+                      description="母體只算活性成分（與批次解析的預設一致）。"
+                                  "關掉之後母體變成「所有有名稱的成分」。"),
+                  current_user: models.User = Depends(require_admin),
+                  db: Session = Depends(get_db)):
+    """覆蓋率。**母體與批次佇列必定一致**（兩邊都走 `_ingredient_pool`）。
+
+    `remaining` 的定義是「在佇列裡、還沒跑到的」，所以它會歸零；
+    被篩掉、預設就不會被排進佇列的算 `excluded`，那不是進度。
+    """
+    total_all = db.query(models.TcmspIngredient).count()
+    ob_min, dl_min = _adme_thresholds(db)
+    pool, excluded = _ingredient_pool(db, active_only)
+    pool_ids = {r.mol_id for r in pool}
+    pool_total = len(pool_ids)
+
+    maps = db.query(models.TcmspIngredientPubchem.mol_id,
+                    models.TcmspIngredientPubchem.status,
+                    models.TcmspIngredientPubchem.canonical_smiles,
+                    models.TcmspIngredientPubchem.cas_number,
+                    models.TcmspIngredientPubchem.mw_delta).all()
+
+    sel = _aggregate(maps, pool_ids)
+    whole = _aggregate(maps, None)
+
+    return {
+        "active_only": active_only,
+        "ob_min": ob_min, "dl_min": dl_min,
+        # 母體（畫面主要指標與進度條吃這一組）
+        "pool_total": pool_total,
+        "resolved": sel["resolved"],
+        "remaining": max(0, pool_total - sel["touched"]),
+        "coverage": round(sel["resolved"] / pool_total, 4) if pool_total else 0,
+        "with_smiles": sel["with_smiles"],
+        "with_cas": sel["with_cas"],
+        "mw_mismatch_pending": sel["mw_mismatch_pending"],
+        "by_status": sel["by_status"],
+        # 未納入：不是進度，是「照設定就不會被排進佇列」的
+        "excluded_total": max(0, total_all - pool_total),
+        "excluded_breakdown": excluded,
+        # 全庫視角，供對照
+        "total_ingredients": total_all,
+        "overall": {
+            "total": total_all,
+            "resolved": whole["resolved"],
+            "touched": whole["touched"],
+            "coverage": round(whole["resolved"] / total_all, 4) if total_all else 0,
+        },
     }
 
 
@@ -98,27 +217,16 @@ class ResolveIn(BaseModel):
 def resolve_batch(payload: ResolveIn,
                   current_user: models.User = Depends(require_admin),
                   db: Session = Depends(get_db)):
-    done_ids = db.query(models.TcmspIngredientPubchem.mol_id)
+    done_q = db.query(models.TcmspIngredientPubchem.mol_id)
     if payload.retry_errors:
-        done_ids = done_ids.filter(models.TcmspIngredientPubchem.status != "error")
+        done_q = done_q.filter(models.TcmspIngredientPubchem.status != "error")
+    done = {m for (m,) in done_q.all()}
 
-    # ob／dl 是 String 欄位（可攜型別規範，見 rules.md），資料庫端無法可靠地
-    # 做數值比較——SQLite 與 Postgres 的字串轉數字語法不同，而且遇到 'NA' 會炸。
-    # 所以撈出候選之後在 Python 端精確篩選，再取這一批。
-    # 先在 SQL 端限定欄位，避免把近三萬筆完整資料列全部載進記憶體。
-    rows = (db.query(models.TcmspIngredient.mol_id, models.TcmspIngredient.molecule_name,
-                     models.TcmspIngredient.mw, models.TcmspIngredient.ob,
-                     models.TcmspIngredient.dl)
-            .filter(~models.TcmspIngredient.mol_id.in_(done_ids),
-                    models.TcmspIngredient.molecule_name.isnot(None))
-            .order_by(models.TcmspIngredient.mol_id).all())
-
-    if payload.active_only:
-        # 只解析活性成分。TCMSP 收錄近三萬個成分，絕大多數口服吸收率極低或
-        # 不具類藥性，根本不會出現在任何分析裡——先花時間解析它們沒有意義，
-        # 而且每筆要打兩次 PubChem，全跑一遍是好幾個小時。
-        ob_min, dl_min = _adme_thresholds(db)
-        rows = [r for r in rows if _is_active(r.ob, r.dl, ob_min, dl_min)]
+    # 母體與覆蓋率卡片共用同一支（見 `_ingredient_pool` 的說明）。
+    # ob／dl 是 String 欄位（可攜型別規範，見 rules.md），資料庫端無法可靠地做數值
+    # 比較——SQLite 與 Postgres 的字串轉數字語法不同，遇到 'NA' 會炸，所以在 Python 端篩。
+    pool, _excluded = _ingredient_pool(db, payload.active_only)
+    rows = [r for r in pool if r.mol_id not in done]
 
     remaining_before = len(rows)
     items = rows[:payload.limit]
@@ -167,18 +275,6 @@ def resolve_batch(payload: ResolveIn,
     db.commit()
     return {"processed": len(items), **tally, "mw_mismatch": mw_mismatch,
             "remaining": max(0, remaining_before - len(items))}
-
-
-def _adme_thresholds(db: Session):
-    from app import pathways as pw
-    return pw.adme_thresholds(db)
-
-
-def _is_active(ob, dl, ob_min: float, dl_min: float) -> bool:
-    """跟 `app/pathways.py` 的活性成分判定用同一套規則：
-    ADME 缺值（空字串或 'NA'）一律排除，不當成通過。"""
-    a, b = pc._num(ob), pc._num(dl)
-    return a is not None and b is not None and a >= ob_min and b >= dl_min
 
 
 @router.get("/review", summary="（後台）待人工確認／查無結果的清單")

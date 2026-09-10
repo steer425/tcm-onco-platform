@@ -11,5 +11,8 @@ venv/
 backups/
 _to_delete/
 
-.github/workflows/
+# 注意：這裡曾經有一行 `.github/workflows/`（v1.40.1 移除）。
+# 那一行讓 daily-news.yml 雖然存在於本機、卻從來沒有被推上 GitHub，
+# 而 GitHub Actions 只執行 repo 裡實際存在的 workflow —— 排程因此一直沒在跑，
+# 且沒有任何錯誤訊息。CI 設定必須跟著版控走，不要再把它加回 .gitignore。
 .claude/settings.local.json

@@ -18,7 +18,7 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 set "PROJECT_DIR=D:\tcm_backend"
-set "DEFAULT_MSG=v1.40.0 standardise TCMSP ingredients against PubChem, using the molecular weight TCMSP already stores to catch name matches that resolved to the wrong compound"
+set "DEFAULT_MSG=v1.40.1 make the ingredient coverage card and the batch queue count the same population, and stop gitignoring .github/workflows so the daily news schedule actually reaches GitHub"
 
 if not exist "%PROJECT_DIR%" (
     echo Folder not found: %PROJECT_DIR%

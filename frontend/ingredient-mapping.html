@@ -69,17 +69,24 @@
         <h3 style="margin:0;">覆蓋率</h3>
         <button class="secondary" id="refreshBtn">重新整理</button>
       </div>
+      <p class="hint-msg" style="margin-top:0;">
+        <b>覆蓋率的母體＝批次佇列的母體</b>，跟著下方「只解析活性成分」的勾選連動。
+        「尚未處理」是<b>佇列裡還沒跑到的</b>（會歸零）；
+        被 OB／DL 篩掉或沒有名稱、依設定就不會排進佇列的算「<b>未納入</b>」，那不是進度。
+      </p>
       <div class="stat-grid" id="statGrid"></div>
       <div class="bar"><span id="coverageBar"></span></div>
       <p class="hint-msg" id="coverageHint"></p>
+      <p class="hint-msg" id="coverageSub"></p>
     </div>
 
     <div class="card">
       <h3 style="margin-top:0;">批次解析</h3>
       <p class="hint-msg" style="margin-top:0;">
-        <b>預設只解析活性成分</b>（通過 OB ≥ 30%、DL ≥ 0.18 的那些）。
-        TCMSP 收錄近三萬個成分，絕大多數口服吸收率極低或不具類藥性、
+        <b>預設只解析活性成分</b>（通過 OB ≥ 30%、DL ≥ 0.18，且 OB／DL 有值的那些）。
+        TCMSP 收錄的成分絕大多數口服吸收率極低或不具類藥性、
         根本不會出現在任何分析裡，而每筆要打兩次 PubChem——全跑一遍是好幾個小時。
+        勾選狀態會同時決定上方覆蓋率卡片的母體。
       </p>
       <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <label style="margin:0;">每批筆數</label>

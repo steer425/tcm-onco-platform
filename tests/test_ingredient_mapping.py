@@ -212,6 +212,29 @@ def main():
     check("未帶 token 反查 → 401",
           client.get("/tcmsp/ingredient-mapping/lookup?key=X").status_code == 401)
 
+    # ---------- 母體一致性（v1.40.1 的回歸斷言） ----------
+    # 這一組是這支測試裡最重要的結構性斷言：覆蓋率卡片與批次佇列**必須數同一件事**。
+    # v1.40.1 之前 /stats 數全表、/resolve 另外篩，卡片顯示「尚未處理 11096」而批次
+    # 一直回「沒有需要處理的成分了」。只要有人改動任何一邊的篩選條件而另一邊沒跟上，
+    # 下面兩條就會紅。
+    print("\n【母體一致性】")
+    pre = client.get("/tcmsp/ingredient-mapping/stats", headers=A).json()
+    check("**覆蓋率的母體＝批次佇列的母體**：解析前的『尚未處理』就是批次會處理的筆數",
+          pre["remaining"] == 4, pre["remaining"])
+    check("母體是活性成分（6 個裡 4 個）", pre["pool_total"] == 4, pre["pool_total"])
+    check("未納入不算進度，而且原因分得開（OB 不足 1、ADME 缺值 1）",
+          pre["excluded_total"] == 2
+          and pre["excluded_breakdown"]["below_threshold"] == 1
+          and pre["excluded_breakdown"]["adme_missing"] == 1,
+          pre["excluded_breakdown"])
+    check("全庫筆數仍然看得到，只是不當成母體",
+          pre["total_ingredients"] == 6, pre["total_ingredients"])
+
+    pre_all = client.get("/tcmsp/ingredient-mapping/stats?active_only=false",
+                         headers=A).json()
+    check("關掉活性篩選後，母體與『尚未處理』一起變成 6",
+          pre_all["pool_total"] == 6 and pre_all["remaining"] == 6, pre_all["remaining"])
+
     # ---------- 批次解析 ----------
     print("\n【批次解析】")
     pc.search_by_name, pc.fetch_synonyms = fake_search, fake_synonyms
@@ -245,10 +268,24 @@ def main():
     check("有存下 TCMSP 原本的分子量供對照", row.tcmsp_mw == "302.25", row.tcmsp_mw)
 
     stats = client.get("/tcmsp/ingredient-mapping/stats", headers=A).json()
-    check("覆蓋率只算 auto/confirmed", stats["resolved"] == 3, stats["resolved"])
-    check("統計有 SMILES 的筆數", stats["with_smiles"] >= 1, stats["with_smiles"])
+    check("覆蓋率只算 auto/confirmed，而且只算母體內的（活性成分裡只有 quercetin）",
+          stats["resolved"] == 1, stats["resolved"])
+    check("**活性成分跑完後『尚未處理』歸零**（未納入的 2 筆不算進度）",
+          stats["remaining"] == 0 and stats["excluded_total"] == 2, stats)
+    check("覆蓋率的分母是母體不是全庫", stats["coverage"] == 0.25, stats["coverage"])
+    check("統計有 SMILES 的成分數", stats["with_smiles"] >= 1, stats["with_smiles"])
     check("統計分子量不符的待確認筆數（這個數字代表驗證確實在運作）",
           stats["mw_mismatch_pending"] == 1, stats["mw_mismatch_pending"])
+
+    all_stats = client.get("/tcmsp/ingredient-mapping/stats?active_only=false",
+                           headers=A).json()
+    check("關掉活性篩選後，母體 6、已標準化 3（含兩筆非活性的 quercetin）",
+          all_stats["pool_total"] == 6 and all_stats["resolved"] == 3, all_stats["resolved"])
+    check("全庫視角在兩種模式下都一樣",
+          stats["overall"]["resolved"] == 3 and all_stats["overall"]["resolved"] == 3,
+          stats["overall"])
+    check("by_status 的單位是不重複成分數，加總等於已處理的成分數",
+          sum(all_stats["by_status"].values()) == 6, all_stats["by_status"])
 
     # ---------- 審核 ----------
     print("\n【人工審核】")
