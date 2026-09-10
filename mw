@@ -1,0 +1,49 @@
+# 分子量不符的成因分析
+
+帶分子量差值的映射列：**1575** 筆
+
+## 一、差值分類
+
+| 分類 | 筆數 | 其中名稱以 `_qt` 結尾 | 例子 |
+|---|---|---|---|
+| ≈0 相符 | 1311 | 2 | Oxysanguinarine（Δ0.04）；morin（Δ0.02）；Palmidin A（Δ0.02） |
+| 無法解釋 | 172 | 47 | alisol B（Δ27.98）；alisol C monoacetate（Δ13.93）；4,17(20)-(cis)-pregnadiene-3,16-dione（Δ298.38） |
+| 糖基 ×1 | 49 | 46 | Aristoloside_qt（Δ162.11）；phellamurin_qt（Δ162.1）；Populoside_qt（Δ162.1） |
+| 糖基 ×2 | 17 | 15 | neohesperidin_qt（Δ308.3）；Sennoside D_qt（Δ324.3）；Delphin_qt（Δ324.24） |
+| 糖基 ×3 | 9 | 8 | Sennoside E_qt（Δ410.3）；Timosaponin B III_qt（Δ486.39）；Anemarsaponin C_qt（Δ486.39） |
+| ≈1 質子 | 8 | 0 | GA120（Δ1.01）；Pratensein（Δ0.99）；Corydalmine（Δ0.95） |
+| 糖基 ×4 | 6 | 6 | methylprotodioscin_qt（Δ616.46）；pseudoprotodioscin_qt（Δ616.51）；Asparaside A_qt（Δ632.47） |
+| ≈18 水合 | 3 | 0 | Isotanshinone II（Δ18.07）；glyceryl linolenate（Δ17.93）；glucobrassicin（Δ18.02） |
+
+## 二、方向（假設檢定）
+
+若 TCMSP 指的是苷元、PubChem 查回母體苷，PubChem 那側應該**比較重**。
+
+- PubChem 比較重：**266**
+- TCMSP 比較重：1252
+- 有一邊沒有分子量、無法判定：0
+
+→ ⚠️ **方向與假設相反**，PubChem 那側比較輕。糖基差的解釋要重新想。
+
+## 三、結論
+
+| 性質 | 筆數 | 該怎麼處理 |
+|---|---|---|
+| 同一化合物的不同形式（≈0／≈1／≈18） | 1322 | **可以自動採用**，不需要人工逐筆看 |
+| 糖基差（苷 vs 苷元） | 81 | **查回來的是別的分子，要否決重解**——不是確認 |
+| 無法解釋 | 172 | 保留人工審核 |
+
+名稱以 `_qt`（苷元）結尾的共 124 筆，其中 75 筆落在糖基差分類。
+
+**這代表待確認佇列不是 N 個獨立問題。** 前兩類都可以整批處理，
+真正需要人看的只有「無法解釋」那一格。
+
+## 四、人参（herb_id=336）未採用的活性成分明細
+
+| mol_id | 成分名稱 | 狀態 | CID | TCMSP 分子量 | PubChem 分子量 | 差 | 判讀 |
+|---|---|---|---|---|---|---|---|
+| MOL005308 | Aposiopolamine | unresolved | - | 271.34 | - | - | 無差值 |
+| MOL005320 | arachidonate | pending | 5460265 | 304.52 | 303.5 | 1.02 | ≈1 質子：酸式 vs 陰離子式，同一化合物｜TCMSP 較重 |
+| MOL005348 | Ginsenoside-Rh4_qt | pending | 21599928 | 458.8 | 620.9 | 162.1 | 糖基 ×1：1×己糖/葡萄糖（差 162.14）｜PubChem 較重 |
+| MOL005399 | alexandrin_qt | pending | 5742590 | 414.79 | 576.8 | 162.01 | 糖基 ×1：1×己糖/葡萄糖（差 162.14）｜PubChem 較重 |
+| MOL005401 | ginsenoside Rg5_qt | pending | 11550001 | 442.8 | 767.0 | 324.2 | 糖基 ×2：2×己糖/葡萄糖（差 324.28）｜PubChem 較重 |
