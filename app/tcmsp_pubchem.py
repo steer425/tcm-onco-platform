@@ -15,6 +15,8 @@
   * 同名異物（不同來源用同一個俗名）
   * 鹽類 vs 游離態（差幾十 Da）
   * 水合物（差 18 的倍數）
+  * **糖苷 vs 苷元**（差糖基的整數倍，己糖 162.14／去氧己糖 146.14／戊糖 132.12）
+    —— 這是本資料集最常見的一種，見 cleaned_name() 對 `_qt` 的說明
   * 立體異構物混淆（分子量相同，這種靠 MW 抓不到，只能靠人）
 
 所以分子量不符時**一律進待確認**，不自動採用。
@@ -25,6 +27,7 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import logging
 import re
@@ -49,6 +52,23 @@ METHOD_CONFIDENCE = {"exact": 1.0, "cleaned": 0.8, "cas": 1.0, "manual": 1.0}
 # 超過這個值幾乎都代表是不同的化學實體（鹽、水合物、同名異物）。
 MW_TOLERANCE = 0.5
 
+# 天然物糖苷的糖基殘基質量（接上去時失去一分子水，所以是脫水後的值）。
+# 差值等於這些的整數倍或組合時，幾乎都代表 PubChem 回傳的是**帶糖基的母體苷**，
+# 而 TCMSP 那一筆要的是苷元——名稱對上了，但不是同一個分子。
+SUGAR_RESIDUES = {
+    "己糖（葡萄糖等）": 162.1424,
+    "去氧己糖（鼠李糖等）": 146.1430,
+    "戊糖（木糖、阿拉伯糖等）": 132.1161,
+}
+MAX_SUGAR_UNITS = 4        # 皂苷最多接到四個糖基
+
+PROTON_MASS = 1.008        # 酸式 vs 陰離子式
+WATER_MASS = 18.015
+MAX_HYDRATE_UNITS = 3      # 見 _hydrate_units() 的說明，不要放大
+
+# TCMSP 用 `_qt` 後綴表示苷元（aglycone）。**這不是 quantitative。**
+AGLYCONE_SUFFIX = "_qt"
+
 CAS_RE = re.compile(r"^\d{2,7}-\d{2}-\d$")
 
 
@@ -65,7 +85,16 @@ def cleaned_name(name: str) -> str:
     而那正是這整支程式最不能出的錯。
     """
     n = normalize(name)
-    n = re.sub(r"_qt$", "", n, flags=re.I)          # TCMSP 的 quantitative 後綴
+    # ⚠️ `_qt` 是**苷元**（aglycone），不是 quantitative——舊註解寫錯了。
+    # 剝掉它之後查到的必然是**帶糖基的母體苷**，也就是 TCMSP 不要的那一個。
+    # 實測：全庫 81 筆分子量不符屬於這個成因，其中 75 筆（93%）名稱以 _qt 結尾，
+    # 方向一致（PubChem 較重 80:1）。詳見
+    # `claude/成分標準化_人參Step2驗收與苷元誤配.md`。
+    #
+    # 這裡仍然剝除，因為那是目前唯一能拿到候選的方式；但 mw_check() 會在
+    # 分子量重出糖基組合時明講「這是苷元誤配、請否決」，避免被誤按確認。
+    # **真正的解法是 CAS／InChIKey 第二層查詢**，尚未實作。
+    n = re.sub(r"_qt$", "", n, flags=re.I)
     n = re.sub(r"\s*\[[^\]]*\]\s*", " ", n)         # 方括號註記
     n = re.sub(r"\s*\((?!\+|-|[0-9]*[RSEZ])[^)]*\)\s*", " ", n)  # 括號註記，但保留立體標示
     return normalize(n)
@@ -78,7 +107,40 @@ def _num(value):
         return None
 
 
-def mw_check(tcmsp_mw, pubchem_mw) -> dict:
+def _sugar_combination(delta: float):
+    """差值能不能用 1~MAX_SUGAR_UNITS 個糖基的組合解釋。
+
+    回傳 `(說明, 總質量)`，解釋不了則回 None。由少到多試，
+    先命中的組合糖基數最少，也最可能是真的。
+    """
+    names = list(SUGAR_RESIDUES)
+    for n in range(1, MAX_SUGAR_UNITS + 1):
+        for combo in itertools.combinations_with_replacement(names, n):
+            total = sum(SUGAR_RESIDUES[c] for c in combo)
+            if abs(delta - total) <= MW_TOLERANCE:
+                parts = " + ".join(f"{combo.count(c)}×{c}"
+                                   for c in dict.fromkeys(combo))
+                return parts, total
+    return None
+
+
+def _hydrate_units(delta: float):
+    """差值是不是 1~3 個水分子。是就回個數，否則 None。
+
+    **上限刻意壓在 3。** 舊版寫成 `delta % 18.015` 判斷「接近水的倍數」，
+    結果 162.1（一個葡萄糖）距離 9 個水只差 0.035、324.2 距離 18 個水差 0.07，
+    兩筆都會被判成水合物——而水合物暗示「同一個化合物」，
+    正好把審核的人往「按確認」推。**那比沒有提示更糟。**
+
+    三個水以上的水合物本來就罕見，而糖基差在這個資料集裡很常見。
+    """
+    for n in range(1, MAX_HYDRATE_UNITS + 1):
+        if abs(delta - n * WATER_MASS) <= 0.6:
+            return n
+    return None
+
+
+def mw_check(tcmsp_mw, pubchem_mw, name: str | None = None) -> dict:
     """分子量交叉驗證。回傳 {agree, delta, reason}。
 
     `agree` 只有三種值，不要簡化成布林值：
@@ -95,11 +157,38 @@ def mw_check(tcmsp_mw, pubchem_mw) -> dict:
     if delta <= MW_TOLERANCE:
         return {"agree": True, "delta": delta, "reason": ""}
 
+    # 提示的順序就是「這個差值最可能是什麼」的順序。
+    # 糖基要排在水合物前面：162.14（一個葡萄糖）與 9 個水只差 0.035，
+    # 先判水合物就會把苷元誤配講成水合物，而水合物暗示同一個化合物。
+    is_aglycone = (name or "").strip().lower().endswith(AGLYCONE_SUFFIX)
+    pubchem_heavier = b > a
     hint = ""
-    if abs(delta % 18.015) < 0.6 or abs(18.015 - (delta % 18.015)) < 0.6:
-        hint = "（差值接近水分子的倍數，可能是水合物與無水物的差別）"
-    elif delta > 20:
-        hint = "（差值偏大，可能是鹽類與游離態，或根本是同名異物）"
+
+    if abs(delta - PROTON_MASS) <= 0.2:
+        hint = ("（差一個氫，是酸式與陰離子式的差別，"
+                "通常是同一個化合物，可以確認）")
+    else:
+        sugar = _sugar_combination(delta)
+        hydrate = _hydrate_units(delta)
+        if sugar and pubchem_heavier:
+            parts, total = sugar
+            if is_aglycone:
+                hint = (f"（苷元誤配：名稱的 {AGLYCONE_SUFFIX} 表示苷元，"
+                        f"但 PubChem 這一筆重出 {parts}＝{total:.2f} Da，"
+                        f"查到的是帶糖基的母體苷，不是同一個分子。"
+                        f"請否決並重新解析，不要確認）")
+            else:
+                hint = (f"（差值等於 {parts}＝{total:.2f} Da 且 PubChem 較重，"
+                        f"很可能查到的是糖苷而非苷元，請先確認是不是同一個分子）")
+        elif hydrate:
+            hint = (f"（差值接近 {hydrate} 個水分子，"
+                    f"可能是水合物與無水物的差別）")
+        elif is_aglycone:
+            hint = (f"（名稱的 {AGLYCONE_SUFFIX} 表示苷元。"
+                    f"苷元常因名稱查詢而解析到母體苷，請特別確認分子是否相同）")
+        elif delta > 20:
+            hint = "（差值偏大，可能是鹽類與游離態，或根本是同名異物）"
+
     return {"agree": False, "delta": delta,
             "reason": f"分子量不符：TCMSP {a}、PubChem {b}，相差 {delta} Da{hint}"}
 
@@ -195,7 +284,7 @@ def resolve_name(client: httpx.Client, name: str, tcmsp_mw=None) -> dict:
                         "note": f"名稱命中 {len(parsed)} 筆化合物，需人工判斷是哪一個"}
 
             hit = parsed[0]
-            check = mw_check(tcmsp_mw, hit.get("molecular_weight"))
+            check = mw_check(tcmsp_mw, hit.get("molecular_weight"), name=name)
             hit["tcmsp_mw"] = tcmsp_mw
             hit["mw_delta"] = check["delta"]
 
