@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.41.5"
-set "DEFAULT_MSG=v1.41.5 count only screened cell lines as the enrichment background, because including the 900 that were never screened measured screening coverage rather than biology"
+set "EXPECTED_VER=1.41.6"
+set "DEFAULT_MSG=v1.41.6 compare the lineage enrichment against random gene sets of the same size, because a lineage that simply has more dependencies will look enriched for any herb"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

@@ -32,6 +32,7 @@ KEGG 那次是用「通路數與背景基因數對不對得上外部已知量級
 import argparse
 import io
 import os
+import random
 import sys
 
 from app import models, pathways
@@ -119,6 +120,8 @@ def main():
     ap.add_argument("--release", default=None, help="指定 release（預設取最近一次匯入）")
     ap.add_argument("--herb", default="336", help="要分析的藥材 herb_id（預設 336 人参）")
     ap.add_argument("--top", type=int, default=15, help="選擇性靶點列幾筆")
+    ap.add_argument("--permutations", type=int, default=200,
+                    help="對照基因集的抽樣次數（預設 200，設 0 關閉）")
     ap.add_argument("--max-ratio", type=float, default=0.20,
                     help="選擇性門檻：依賴株數佔母體的比例上限（預設 0.20）")
     ap.add_argument("--out", default=None, help="另存 markdown")
@@ -478,6 +481,79 @@ def main():
                     out("⚠️ 倍率高但 k 很小的 lineage 檢定力低，"
                         "且 q 值排序會系統性地把它們往後推（`rules.md` 既有規範）。"
                         "兩種排序都要看過再下結論。")
+
+                    # ---------- 五之二、對照基因集（經驗虛無分布） ----------
+                    #
+                    # 上面的超幾何檢定，虛無假設是「命中的細胞株隨機分佈」。
+                    # 但**正確的對照不是隨機細胞株，是可比的基因集合**。
+                    #
+                    # 淋巴系細胞株本來就可能有比較多的選擇性依賴。若隨便挑 68 個
+                    # 同樣通過選擇性門檻的基因也能得到 Lymphoid 約 73%，
+                    # 那這個富集就跟本藥材無關，只是該 lineage 的性質。
+                    #
+                    # 這與通路富集那次的教訓同一個形狀：拿一組全部都是藥物標靶的
+                    # 基因對比絕大多數不是藥物標靶的母體，結論必然顯著——
+                    # 但那只是在說「這些是藥物標靶」。
+                    if sig and args.permutations > 0:
+                        all_dep = db.query(D.gene_symbol, D.depmap_id).filter(
+                            D.release == release).all()
+                        gene_lines: dict = {}
+                        for g, mid in all_dep:
+                            if mid in lin_of:
+                                gene_lines.setdefault(g, set()).add(mid)
+
+                        # 對照池：同樣非泛必需、同樣通過選擇性門檻的基因
+                        pool = [x.gene_symbol for x in non_ess
+                                if x.n_dependent > 0
+                                and x.n_lines_total
+                                and x.n_dependent / x.n_lines_total <= args.max_ratio
+                                and x.gene_symbol in gene_lines]
+                        k_draw = len(gated_syms)
+
+                        if len(pool) > k_draw * 2:
+                            rng = random.Random(20260911)   # 固定種子，結果可重現
+                            lin_members: dict = {}
+                            for mid, lin in lin_of.items():
+                                lin_members.setdefault(lin, set()).add(mid)
+
+                            targets = [r["lineage"] for r in sig]
+                            dist = {lin: [] for lin in targets}
+                            for _ in range(args.permutations):
+                                pick = rng.sample(pool, k_draw)
+                                hit = set()
+                                for g in pick:
+                                    hit |= gene_lines.get(g, set())
+                                for lin in targets:
+                                    mem = lin_members.get(lin, set())
+                                    dist[lin].append(len(hit & mem) / len(mem) if mem else 0)
+
+                            out()
+                            out("### 五之二、對照基因集檢定（這是人參的性質，還是該 lineage 的性質？）")
+                            out()
+                            out(f"從**同樣通過選擇性門檻**的 {len(pool)} 個基因裡，"
+                                f"隨機抽 {k_draw} 個，重複 {args.permutations} 次，"
+                                f"看該 lineage 的命中率分布落在哪裡。")
+                            out()
+                            out("| Lineage | 人參 | 對照平均 | 對照 95 百分位 | 經驗 p | 判定 |")
+                            out("|---|---|---|---|---|---|")
+                            for r in sig:
+                                lin = r["lineage"]
+                                obs = r["k"] / r["K"]
+                                d = sorted(dist[lin])
+                                mean = sum(d) / len(d)
+                                p95 = d[int(len(d) * 0.95)] if d else 0
+                                ge = sum(1 for v in d if v >= obs)
+                                emp = (ge + 1) / (len(d) + 1)
+                                verdict = ("✓ 超出對照" if emp < 0.05
+                                           else "⚠️ **落在對照範圍內**")
+                                out(f"| {lin} | {obs * 100:.1f}% | {mean * 100:.1f}% | "
+                                    f"{p95 * 100:.1f}% | {emp:.3f} | {verdict} |")
+                            out()
+                            out("**「落在對照範圍內」代表那個 lineage 的富集不是本藥材的特性**——"
+                                "任何一組同樣大小的選擇性基因都會得到類似結果，"
+                                "反映的是該 lineage 本身依賴較多，不是這個藥材打中了它。")
+                            out()
+                            out("固定亂數種子，結果可重現。要調次數用 `--permutations`。")
 
             if hit_ess:
                 out()
