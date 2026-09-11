@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.40.2"
-set "DEFAULT_MSG=v1.40.2 tell reviewers a molecular weight gap of one sugar residue means PubChem returned the parent glycoside, not the aglycone TCMSP asked for, instead of calling it a hydrate"
+set "EXPECTED_VER=1.40.3"
+set "DEFAULT_MSG=v1.40.3 recompute the molecular weight hint live in the review queue, so the 81 rows resolved before v1.40.2 stop showing the old hydrate wording that invited a wrong confirm"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"
@@ -196,6 +196,8 @@ for %%F in (%JUNK%) do (
         echo   FAIL  %%F is tracked by git
         echo         run: git rm --cached %%F
         set "FAILED=1"
+    ) else (
+        echo   OK    %%F is not tracked
     )
 )
 

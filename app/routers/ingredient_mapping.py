@@ -32,6 +32,37 @@ FEATURE = "F1-6"
 ACCEPTED = ("auto", "confirmed")
 
 
+def _live_mw_hint(row: models.TcmspIngredientPubchem, name: str | None) -> str | None:
+    """以**現在**的判讀規則重算分子量提示。回傳 None 代表沒有話要說。
+
+    ## 為什麼不是直接修好 note
+
+    `note` 是**解析當下**寫進資料庫的，不會回頭更新。v1.40.2 把 `mw_check()`
+    的提示修對之後，只有之後新解析的筆數受惠——佇列裡既有的 81 筆糖基差
+    仍然顯示舊的說法（而且舊說法把苷元誤配講成水合物，等於在鼓勵按確認）。
+    **審核佇列正是誤按確認會發生的地方**，所以這裡即時重算。
+
+    ## 為什麼不覆寫 note 欄位
+
+    `confirm`／`reject` 會把審核者填的意見寫進同一個欄位
+    （`row.note = payload.note or row.note`）。覆寫它等於把人工審核意見洗掉——
+    修好一個誤導，換來一筆資料遺失。
+
+    所以兩個欄位並存，語意也不同：
+      note     當時記了什麼，或人工寫了什麼（歷史）
+      mw_hint  以現在的知識重看這筆是什麼（判讀）
+
+    並存其實比取代更有用：審核者會看到「當初寫水合物、現在判定是苷元誤配」。
+
+    判斷邏輯一律呼叫 `pc.mw_check()`，**不在這裡重寫一份**——
+    理由同 v1.40.1 的 `_ingredient_pool()`：同一個判定寫兩份就會分岔。
+    """
+    if not (row.tcmsp_mw and row.molecular_weight):
+        return None
+    check = pc.mw_check(row.tcmsp_mw, row.molecular_weight, name=name)
+    return check["reason"] if check["agree"] is False else None
+
+
 def _row_out(row: models.TcmspIngredientPubchem, name: str | None = None) -> dict:
     return {
         "id": row.id, "mol_id": row.mol_id, "molecule_name": name,
@@ -46,6 +77,8 @@ def _row_out(row: models.TcmspIngredientPubchem, name: str | None = None) -> dic
         "method": row.method, "confidence": float(row.confidence or 0),
         "status": row.status, "candidates": loads(row.candidates, []),
         "note": row.note,
+        # 即時重算，與 note 並存。見 _live_mw_hint() 的說明。
+        "mw_hint": _live_mw_hint(row, name),
         "reviewed_at": row.reviewed_at.isoformat() if row.reviewed_at else None,
     }
 
@@ -333,7 +366,10 @@ def confirm_mapping(payload: ConfirmIn,
                     target_type="tcmsp_ingredient_pubchem", target_id=payload.mol_id,
                     detail=dumps({"cid": row.cid, "inchikey": row.inchikey}))
     db.commit()
-    return {"ok": True, **_row_out(row)}
+    # 帶上成分名稱，否則 mw_hint 認不出 `_qt` 苷元，判讀會退化成一般提示
+    name = (db.query(models.TcmspIngredient.molecule_name)
+            .filter(models.TcmspIngredient.mol_id == row.mol_id).scalar())
+    return {"ok": True, **_row_out(row, name)}
 
 
 class RejectIn(BaseModel):

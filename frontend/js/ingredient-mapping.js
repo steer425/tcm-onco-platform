@@ -178,7 +178,8 @@ async function loadQueue() {
         <td class="mono">${esc(it.mol_id)}</td>
         <td>${esc(it.molecule_name || "")}
           <div class="hint-msg">${esc(METHOD_LABEL[it.method] || it.method)}</div>
-          ${it.note ? `<div class="hint-msg">${esc(it.note)}</div>` : ""}</td>
+          ${it.note ? `<div class="hint-msg">${esc(it.note)}</div>` : ""}
+          ${it.mw_hint ? `<div class="mw-hint">${esc(it.mw_hint)}</div>` : ""}</td>
         <td>${result}</td>
         <td>${mwCell(it)}</td>
         <td>${statusPill(it.status)}</td>
@@ -199,8 +200,11 @@ function openReview(idx) {
   document.getElementById("reviewMolId").value = it.mol_id;
   document.getElementById("reviewName").textContent =
     `${it.mol_id}　${it.molecule_name || ""}　（TCMSP 分子量 ${it.tcmsp_mw || "—"}）`;
+  // note 是解析當下（或人工審核時）寫下的，mw_hint 是以現在的規則重算的。
+  // 兩者並存，才看得出「當初寫水合物、現在判定是苷元誤配」這種差別。
   document.getElementById("reviewNote").innerHTML =
-    it.note ? `<b>解析註記：</b>${esc(it.note)}` : "";
+    (it.note ? `<b>解析註記：</b>${esc(it.note)}` : "") +
+    (it.mw_hint ? `<div class="mw-hint"><b>目前判讀：</b>${esc(it.mw_hint)}</div>` : "");
   document.getElementById("reviewCid").value = it.cid || "";
   document.getElementById("reviewComment").value = "";
   document.getElementById("reviewMsg").textContent = "";
