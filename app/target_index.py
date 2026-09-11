@@ -115,3 +115,20 @@ def mapping_coverage(db: Session):
               .filter(models.TcmspTargetUniprot.status.in_(ACCEPTED_STATUS))
               .distinct().count())
     return mapped, total
+
+
+def standardized_symbols(db: Session) -> set:
+    """只回**第一層**（UniProt 已標準化）的基因符號，不含名稱字詞退路。
+
+    `symbol_to_targets()` 的第二層會把靶點名稱拆成英數字詞，那對站內統計是
+    刻意保留的退路；但拿去跟**外部基因清單**取交集就會出事——
+    像 SET、MAX、JUN、REST 這些既是常見英文字、又是真實的 HGNC 基因符號，
+    會從「Prostaglandin G/H synthase」這類名稱裡被拆出來，然後假裝比對成功。
+
+    所以凡是「要跟外部資料庫的基因清單對接」的場景（DepMap 匯入是第一個），
+    一律用這一支，不要用 symbol_to_targets()。
+    """
+    syms = set()
+    for row in _uniprot_rows(db):
+        syms.update(_row_symbols(row))
+    return syms

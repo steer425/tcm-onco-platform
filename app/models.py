@@ -1155,3 +1155,127 @@ class TcmspIngredientPubchem(Base):
     reviewed_at = Column(DateTime, nullable=True)
     resolved_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# 目標一 Step 6：腫瘤細胞株（DepMap）
+#
+# ## 為什麼只存訊號，不存矩陣
+#
+# DepMap 的 CRISPRGeneEffect 是約 1,150 株細胞 × 18,400 個基因，兩千多萬個值。
+# 就算只留 TCMSP 的靶點基因（約 1,100 個）仍有 127 萬列，加上 UUID 主鍵與索引
+# 大概 350MB 以上——Neon 免費層放不下，何況已經有 44 張表。
+#
+# 所以只匯入**達到依賴門檻**的配對（DepMapGeneDependency），
+# 另外替每個基因存一份**全母體的摘要**（DepMapGeneSummary）。
+# 這樣即使沒存滿矩陣，仍答得出「這個基因在 1,150 株裡只有 3 株依賴」——
+# 而那正是「選擇性」的定義，也是規格 B 要的排序主軸。
+#
+# 代價說清楚：被門檻篩掉的值不會留下，之後若要重算分佈得重新匯入。
+# 摘要欄位就是為了讓這件事盡量不必發生。
+#
+# ## 為什麼數值存 String
+#
+# 沿用全站慣例（`database.py` 本機會退回 SQLite，型別一律用可攜型別；
+# models.py 至今 Float 使用數為 0）。門檻篩選發生在**匯入時**，
+# 所以執行期不需要對數值做範圍查詢，存字串不會造成困擾。
+# ---------------------------------------------------------------------------
+
+
+class DepMapModel(Base):
+    """細胞株主檔（DepMap Model.csv）。第 46 張表。
+
+    主鍵直接用 DepMap 的 ModelID（例如 ACH-000001），跟 TcmspHerb 沿用原始
+    herb_id 是同一個作法：外部資料庫已經有穩定識別碼時不要另發一組，
+    否則每次重新匯入都要處理對應關係。
+    """
+    __tablename__ = "depmap_models"
+
+    id = Column(String, primary_key=True)            # ModelID，例如 ACH-000001
+    cell_line_name = Column(String, nullable=True, index=True)
+    stripped_cell_line_name = Column(String, nullable=True, index=True)
+    oncotree_lineage = Column(String, nullable=True, index=True)
+    oncotree_primary_disease = Column(String, nullable=True, index=True)
+    oncotree_subtype = Column(String, nullable=True)
+    release = Column(String, nullable=True, index=True)   # 例如 24Q2，見 report_run 規格 D
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class DepMapGeneDependency(Base):
+    """達到依賴門檻的（細胞株 × 基因）配對。第 47 張表。
+
+    **不是完整矩陣**，只有 gene_effect ≤ 門檻的那些。門檻記在
+    DepMapImportRun.effect_threshold，判讀時務必一起看——
+    不然「這個基因只有 3 筆」會被誤讀成「只在 3 株細胞測過」。
+    """
+    __tablename__ = "depmap_gene_dependency"
+    __table_args__ = (
+        UniqueConstraint("depmap_id", "gene_symbol", name="uq_depmap_gene_dep"),
+    )
+
+    id = Column(String, primary_key=True, default=gen_id)
+    depmap_id = Column(String, ForeignKey("depmap_models.id"), nullable=False, index=True)
+    gene_symbol = Column(String, nullable=False, index=True)
+    gene_effect = Column(String, nullable=False)     # Chronos 分數，越負越依賴
+    release = Column(String, nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class DepMapGeneSummary(Base):
+    """每個基因跨全部細胞株的摘要。第 48 張表。
+
+    這張表是**選擇性**的判斷依據，也是稀疏儲存還能講清楚話的原因：
+
+      n_lines_total  這次匯入實際掃過幾株細胞（母體，不是達門檻數）
+      n_dependent    其中幾株達到依賴門檻
+      is_common_essential  DepMap 自己的泛必需名單
+
+    選擇性高 = n_dependent 佔 n_lines_total 的比例低，而且**不是泛必需基因**。
+    規格 B 寫得很清楚：命中泛必需基因不是抗腫瘤機轉，是細胞毒性。
+    少了這張表，整個排序會被泛必需基因洗版。
+    """
+    __tablename__ = "depmap_gene_summary"
+    __table_args__ = (
+        UniqueConstraint("gene_symbol", "release", name="uq_depmap_gene_summary"),
+    )
+
+    id = Column(String, primary_key=True, default=gen_id)
+    gene_symbol = Column(String, nullable=False, index=True)
+    release = Column(String, nullable=True, index=True)
+
+    n_lines_total = Column(Integer, default=0, nullable=False)
+    n_dependent = Column(Integer, default=0, nullable=False)
+    mean_effect = Column(String, nullable=True)
+    sd_effect = Column(String, nullable=True)
+    min_effect = Column(String, nullable=True)       # 最強依賴的那一株
+    min_effect_depmap_id = Column(String, nullable=True)
+
+    is_common_essential = Column(Boolean, default=False, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class DepMapImportRun(Base):
+    """每次匯入的參數與結果。第 49 張表。
+
+    規格 D（report_run）的同一個哲學，用在資料匯入端：DepMap 每季更新，
+    同一個查詢在不同季度會給出不同答案。沒有這張表，半年後就講不清楚
+    「當初那個結論用的是哪一版資料、哪個門檻」。
+
+    `effect_threshold` 尤其重要——換了門檻，n_dependent 的意義就變了，
+    兩次匯入的數字不能直接比較。
+    """
+    __tablename__ = "depmap_import_runs"
+
+    id = Column(String, primary_key=True, default=gen_id)
+    release = Column(String, nullable=True, index=True)
+    effect_threshold = Column(String, nullable=False)
+    gene_scope = Column(String, nullable=False)      # tcmsp_targets / all
+    n_models = Column(Integer, default=0, nullable=False)
+    n_genes_scanned = Column(Integer, default=0, nullable=False)
+    n_dependency_rows = Column(Integer, default=0, nullable=False)
+    n_common_essential = Column(Integer, default=0, nullable=False)
+    source_files = Column(Text, nullable=True)       # JSON 字串，含檔名與 md5
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

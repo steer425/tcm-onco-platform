@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.40.3"
-set "DEFAULT_MSG=v1.40.3 recompute the molecular weight hint live in the review queue, so the 81 rows resolved before v1.40.2 stop showing the old hydrate wording that invited a wrong confirm"
+set "EXPECTED_VER=1.41.0"
+set "DEFAULT_MSG=v1.41.0 add the DepMap data layer for step 6, storing only dependencies past the threshold plus a per-gene summary, because the full matrix does not fit the free tier"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"
