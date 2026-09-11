@@ -38,14 +38,26 @@ from app import models, pathways
 from app.database import SessionLocal
 from app.target_index import standardized_target_symbols
 
-# 非泛必需基因的選擇性分級（依賴株數佔母體的比例）
+# 非泛必需基因的選擇性分級（依賴株數佔母體的比例）。
+#
+# ⚠️ 這些區間**必須互斥且涵蓋全部**，加總要等於非泛必需基因數。
+# v1.41.1 的版本把 0 併進第一格、又另外印一列「完全無依賴」，
+# 於是同一群基因被數了兩次，看起來像六個互斥的列——
+# 「極高選擇性 835」裡其實含了 274 個**一株都不依賴**的基因，真正的是 561。
+# 這與 rules.md 記過的「尚未處理 vs 未納入」是同一族錯誤：
+# 一張表混兩種語意，加總就對不起來。
 SELECTIVE_BANDS = [
-    ("極高選擇性", 0.0, 0.01),
+    ("完全無依賴", 0.0, 1e-12),      # n_dependent == 0，單獨一格
+    ("極高選擇性", 1e-12, 0.01),
     ("高選擇性", 0.01, 0.05),
     ("中度", 0.05, 0.20),
     ("廣泛", 0.20, 0.60),
     ("近泛必需", 0.60, 1.01),
 ]
+
+# 「強依賴」的慣例界線。門檻 -0.5 只是「有依賴」，-1.0 才是明確的強依賴
+# （DepMap 的 Chronos 分數以 -1 對齊泛必需基因的中位數）。
+STRONG_EFFECT = -1.0
 
 
 def _fix_console():
@@ -168,12 +180,18 @@ def main():
         out("| 分級 | 依賴株數佔比 | 基因數 |")
         out("|---|---|---|")
         non_ess = [s for s in summaries if not s.is_common_essential]
+        banded = 0
         for label, lo, hi in SELECTIVE_BANDS:
             n = sum(1 for s in non_ess
                     if s.n_lines_total and lo <= s.n_dependent / s.n_lines_total < hi)
-            out(f"| {label} | {lo * 100:.0f}–{hi * 100:.0f}% | {n} |")
-        n_zero = sum(1 for s in non_ess if s.n_dependent == 0)
-        out(f"| 完全無依賴 | 0% | {n_zero} |")
+            banded += n
+            rng = "0%" if label == "完全無依賴" else f"{lo * 100:.0f}–{hi * 100:.0f}%"
+            out(f"| {label} | {rng} | {n} |")
+        out(f"| **合計** | | **{banded}** |")
+        out()
+        if banded != len(non_ess):
+            out(f"⚠️ 合計 {banded} 與非泛必需基因數 {len(non_ess)} 不符——分級區間有漏或重疊。")
+        out("各級互斥，合計必須等於非泛必需基因數。")
         out()
         out("「完全無依賴」不是資料有問題——TCMSP 靶點偏向可成藥蛋白，"
             "其中很多在任何細胞株都不是存活必需基因。")
@@ -215,17 +233,45 @@ def main():
             out()
 
             if hit_sel:
-                hit_sel.sort(key=lambda s: (s.n_dependent / s.n_lines_total
-                                            if s.n_lines_total else 9))
-                out(f"### 選擇性最高的 {min(args.top, len(hit_sel))} 個")
+                # 只按比例排序會失效：幾百個基因並列在「1 株」，
+                # 前 N 名等於從並列裡隨便切一段，而 1/1208 剛越過 -0.5 的多半是雜訊
+                # （1,143 基因 × 1,208 株，本來就有格子會靠隨機波動越線）。
+                # 所以另外數「強依賴」株數，並在同分時用效應量排序。
+                # 對應 rules.md 的「兩種排序都要看」。
+                deps = (db.query(D).filter(D.release == release,
+                                           D.gene_symbol.in_([s.gene_symbol for s in hit_sel]))
+                        .all())
+                strong = {}
+                for d in deps:
+                    v = _num(d.gene_effect)
+                    if v is not None and v <= STRONG_EFFECT:
+                        strong[d.gene_symbol] = strong.get(d.gene_symbol, 0) + 1
+
+                def ratio(x):
+                    return x.n_dependent / x.n_lines_total if x.n_lines_total else 9
+
+                rows = sorted(
+                    hit_sel,
+                    key=lambda x: (-strong.get(x.gene_symbol, 0),
+                                   _num(x.min_effect) if _num(x.min_effect) is not None else 0,
+                                   ratio(x)))
+
+                n_strong_genes = sum(1 for s in hit_sel if strong.get(s.gene_symbol))
+                out(f"### 依「強依賴」排序的前 {min(args.top, len(rows))} 個")
                 out()
-                out("| 基因 | 依賴株數／母體 | 佔比 | 最強效應 | 最依賴的細胞株 | 癌別 |")
-                out("|---|---|---|---|---|---|")
-                for s in hit_sel[:args.top]:
+                out(f"強依賴定義：gene effect ≤ {STRONG_EFFECT}（門檻 {run.effect_threshold} "
+                    f"只代表「有依賴」）。{len(hit_sel)} 個選擇性靶點裡，"
+                    f"**有 {n_strong_genes} 個至少在一株細胞達到強依賴**。")
+                out()
+                out("| 基因 | 強依賴株數 | 達門檻株數／母體 | 佔比 | 最強效應 | 最依賴的細胞株 | 癌別 |")
+                out("|---|---|---|---|---|---|---|")
+                for s in rows[:args.top]:
                     pct = (s.n_dependent / s.n_lines_total * 100) if s.n_lines_total else 0
                     m = (db.query(M).filter(M.id == s.min_effect_depmap_id).first()
                          if s.min_effect_depmap_id else None)
-                    out(f"| {s.gene_symbol} | {s.n_dependent}／{s.n_lines_total} | "
+                    ns = strong.get(s.gene_symbol, 0)
+                    out(f"| {s.gene_symbol} | {ns if ns else '—'} | "
+                        f"{s.n_dependent}／{s.n_lines_total} | "
                         f"{pct:.1f}% | {s.min_effect} | "
                         f"{(m.cell_line_name if m else s.min_effect_depmap_id) or '—'} | "
                         f"{(m.oncotree_primary_disease if m else '—') or '—'} |")
@@ -233,6 +279,10 @@ def main():
                 out("**怎麼用這張表**：每一列就是一個可執行的驗證方案的起點——")
                 out("具體基因、具體細胞株、具體癌別。這比「本方命中 200 個靶點」有用得多，")
                 out("而且**可以被否證**。")
+                out()
+                out(f"⚠️ **強依賴株數為「—」的列請當成雜訊看待。**"
+                    f"只在一株細胞、效應又剛越過 {run.effect_threshold} 的配對，"
+                    f"在這個規模的矩陣裡本來就會隨機出現。")
                 out()
                 out("⚠️ 但這張表**不是**「人參能治這些癌」。它說的是："
                     "人參的活性成分在 TCMSP 裡被註記為作用於這些靶點，"
@@ -252,6 +302,10 @@ def main():
         db.close()
 
     if args.out:
+        # 資料夾不存在時 open() 會在「全部內容都印完之後」才丟 FileNotFoundError，
+        # 看起來像整支失敗，其實報表是好的。自己建起來。
+        d = os.path.dirname(os.path.abspath(args.out))
+        os.makedirs(d, exist_ok=True)
         with open(args.out, "w", encoding="utf-8") as f:
             f.write(buf.getvalue())
         print(f"\n已寫入 {args.out}")

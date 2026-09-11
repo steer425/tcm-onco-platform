@@ -353,6 +353,9 @@ def main():
         db.close()
 
     if args.out:
+        # 資料夾不存在時 open() 會在「全部內容都印完之後」才丟 FileNotFoundError，
+        # 看起來像整支失敗，其實報表是好的。自己建起來。
+        os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
         with open(args.out, "w", encoding="utf-8") as f:
             f.write(buf.getvalue())
         print(f"\n已寫入 {args.out}")

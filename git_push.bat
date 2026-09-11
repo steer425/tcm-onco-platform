@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.41.1"
-set "DEFAULT_MSG=v1.41.1 add a DepMap sanity check that quantifies how much of the dependency table is just common essential genes, and turn ginseng targets into named cell lines worth testing"
+set "EXPECTED_VER=1.41.2"
+set "DEFAULT_MSG=v1.41.2 stop the depmap report double counting genes with no dependency at all, and rank selective targets by effect size so a single line barely past the threshold stops topping the list"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"
