@@ -35,6 +35,10 @@ import os
 import sys
 
 from app import models, pathways
+# 超幾何檢定與 BH 校正一律沿用 app/pathways.py 的實作，不在這裡重寫一份。
+# 理由同 v1.38.0 把八處靶點比對收斂到 target_index.py：
+# 同一個統計寫兩份就會分岔，而且分岔的那天不會有人發現。
+from app.pathways import hypergeom_sf, benjamini_hochberg
 from app.database import SessionLocal
 from app.target_index import standardized_target_symbols
 
@@ -58,6 +62,33 @@ SELECTIVE_BANDS = [
 # 「強依賴」的慣例界線。門檻 -0.5 只是「有依賴」，-1.0 才是明確的強依賴
 # （DepMap 的 Chronos 分數以 -1 對齊泛必需基因的中位數）。
 STRONG_EFFECT = -1.0
+
+# 方向性警示用的受體類別（**啟發式、非完整清單**）。
+#
+# CRISPR 依賴分數量的是「移除這個基因，細胞會不會死」。要把它轉成治療假說，
+# 前提是那個化合物**抑制**該靶點——但 TCMSP 的成分–靶點關係沒有方向性，
+# 只記錄關聯，不分抑制、活化或單純結合。
+#
+# 核受體與配體門控受體的天然配體**通常是活化劑**。人參皂苷結合 AHR
+# 很可能是活化它而不是抑制它，那麼「AHR 是依賴基因」加上「皂苷結合 AHR」
+# 推不出「皂苷會殺死那株細胞」——方向反了效果可能相反。
+#
+# 這份清單只用來**提醒**，不用來下結論。沒被標記不代表方向就沒問題。
+RECEPTOR_PREFIXES = (
+    "NR1", "NR2", "NR3", "NR4", "NR5", "NR6",      # 核受體命名系統
+    "RXR", "RAR", "PPAR", "THR", "ESR",
+    "ADRA", "ADRB", "CHRM", "CHRN", "HTR", "DRD",  # GPCR 與配體門控離子通道
+    "OPR", "ADORA", "GABR", "GRIN", "GRM", "CNR",
+)
+RECEPTOR_EXACT = {
+    "AR", "PGR", "VDR", "AHR", "ESR1", "ESR2", "NR3C1", "NR3C2",
+    "PPARG", "PPARA", "PPARD", "RXRA", "RXRB", "RXRG",
+}
+
+
+def is_receptor(sym: str) -> bool:
+    s = (sym or "").upper()
+    return s in RECEPTOR_EXACT or s.startswith(RECEPTOR_PREFIXES)
 
 
 def _fix_console():
@@ -278,18 +309,42 @@ def main():
                 out(f"{len(hit_sel)} 個選擇性靶點 → 通過門檻 {len(gated)} 個，"
                     f"其中 **{n_strong_genes} 個**至少在一株細胞達到強依賴。")
                 out()
-                out("| 基因 | 強依賴株數 | 達門檻株數／母體 | 佔比 | 最強效應 | 最依賴的細胞株 | 癌別 |")
-                out("|---|---|---|---|---|---|---|")
+                out("| 基因 | 強依賴株數 | 達門檻株數／母體 | 佔比 | 最強效應 | 最依賴的細胞株 | 癌別 | 方向 |")
+                out("|---|---|---|---|---|---|---|---|")
+                n_recep = 0
                 for s in rows[:args.top]:
                     pct = (s.n_dependent / s.n_lines_total * 100) if s.n_lines_total else 0
                     m = (db.query(M).filter(M.id == s.min_effect_depmap_id).first()
                          if s.min_effect_depmap_id else None)
                     ns = strong.get(s.gene_symbol, 0)
+                    rec = is_receptor(s.gene_symbol)
+                    if rec:
+                        n_recep += 1
                     out(f"| {s.gene_symbol} | {ns if ns else '—'} | "
                         f"{s.n_dependent}／{s.n_lines_total} | "
                         f"{pct:.1f}% | {s.min_effect} | "
                         f"{(m.cell_line_name if m else s.min_effect_depmap_id) or '—'} | "
-                        f"{(m.oncotree_primary_disease if m else '—') or '—'} |")
+                        f"{(m.oncotree_primary_disease if m else '—') or '—'} | "
+                        f"{'⚠️ 受體' if rec else ''} |")
+                out()
+                out("#### ⚠️ 方向性：依賴 ≠ 可以用這個化合物抑制")
+                out()
+                out("CRISPR 依賴分數量的是「**移除**這個基因，細胞會不會死」。"
+                    "要把它轉成治療假說，前提是那個化合物**抑制**該靶點。")
+                out()
+                out("但 **TCMSP 的成分–靶點關係沒有方向性**——只記錄關聯，"
+                    "不分抑制、活化或單純結合。")
+                out()
+                if n_recep:
+                    out(f"本表前 {min(args.top, len(rows))} 名中有 **{n_recep} 個標為「受體」**："
+                        f"核受體與配體門控受體的天然配體**通常是活化劑**。"
+                        f"若化合物是活化而非抑制，"
+                        f"「這個靶點是依賴基因」推不出「這個化合物會殺死那株細胞」，"
+                        f"**方向反了效果可能相反**。")
+                    out()
+                out("受體標記是啟發式的、非完整清單，**只用來提醒，不用來下結論**；"
+                    "沒被標記也不代表方向就沒問題。要真正解決這件事，"
+                    "需要成分–靶點邊的作用方向與證據分層（借鏡文件規格 C）。")
                 out()
                 out("**怎麼用這張表**：每一列就是一個可執行的驗證方案的起點——")
                 out("具體基因、具體細胞株、具體癌別。這比「本方命中 200 個靶點」有用得多，")
@@ -322,6 +377,77 @@ def main():
                     "而這些靶點在那些細胞株是選擇性依賴。"
                     "**兩件事之間還缺實際的結合與活性驗證**——"
                     "TCMSP 的成分–靶點關係有相當比例是對接預測，不是實測結合。")
+
+            # ---------- 五、lineage 富集 ----------
+            if hit_sel:
+                gated_syms = [x.gene_symbol for x in gated]
+                dep_rows = (db.query(D.depmap_id).filter(
+                    D.release == release, D.gene_symbol.in_(gated_syms)).all()
+                    if gated_syms else [])
+                study_lines = {r[0] for r in dep_rows}
+
+                all_models = db.query(M.id, M.oncotree_lineage).filter(
+                    M.release == release).all()
+                lin_of = {mid: (lin or "（未標註）") for mid, lin in all_models}
+                N = len(lin_of)
+                n = len(study_lines)
+
+                if N and n:
+                    pop, study = {}, {}
+                    for mid, lin in lin_of.items():
+                        pop[lin] = pop.get(lin, 0) + 1
+                    for mid in study_lines:
+                        lin = lin_of.get(mid)
+                        if lin:
+                            study[lin] = study.get(lin, 0) + 1
+
+                    raw = []
+                    for lin, K in pop.items():
+                        k = study.get(lin, 0)
+                        if k == 0:
+                            continue
+                        raw.append({
+                            "lineage": lin, "k": k, "K": K,
+                            "fold": (k / n) / (K / N) if K else 0,
+                            "p": hypergeom_sf(k, N, K, n),
+                        })
+                    qs = benjamini_hochberg([r["p"] for r in raw])
+                    for r, q in zip(raw, qs):
+                        r["q"] = q
+
+                    out()
+                    out(f"## 五、{herb.herb_cn_name or herb.herb_en_name}"
+                        f"的選擇性依賴集中在哪些 lineage")
+                    out()
+                    out(f"問的是：**帶有這些選擇性依賴的細胞株，"
+                        f"在 lineage 上的分佈有沒有偏離全母體？**")
+                    out()
+                    out(f"母體 {N} 株；其中 **{n} 株**至少帶一個本藥材的選擇性依賴。")
+                    out()
+                    out("依 `rules.md` 的富集規範：**看 q 值不看 p 值**，"
+                        "背景取自 DepMap 全母體而非我方子集。")
+                    out()
+                    sig = [r for r in raw if r["q"] < 0.05]
+                    raw.sort(key=lambda r: r["q"])
+                    out("| Lineage | 命中株／該 lineage 總株數 | 倍率 | q 值 | |")
+                    out("|---|---|---|---|---|")
+                    for r in raw[:10]:
+                        mark = "**顯著**" if r["q"] < 0.05 else ""
+                        out(f"| {r['lineage']} | {r['k']}／{r['K']} | "
+                            f"{r['fold']:.2f} | {r['q']:.2e} | {mark} |")
+                    out()
+                    if sig:
+                        out(f"達 FDR 顯著的 lineage 有 **{len(sig)}** 個。"
+                            f"這回答了規格 B 說的附帶產出：**該做哪一類細胞的實驗。**")
+                    else:
+                        out("**沒有任何 lineage 達 FDR 顯著。** 這代表選擇性依賴"
+                            "大致均勻散佈，先前看到的淋巴系集中很可能只是"
+                            "DepMap 母體組成造成的錯覺——"
+                            "**這正是需要跟母體比的原因**。")
+                    out()
+                    out("⚠️ 倍率高但 k 很小的 lineage 檢定力低，"
+                        "且 q 值排序會系統性地把它們往後推（`rules.md` 既有規範）。"
+                        "兩種排序都要看過再下結論。")
 
             if hit_ess:
                 out()

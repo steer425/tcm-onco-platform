@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.41.3"
-set "DEFAULT_MSG=v1.41.3 make selectivity the gate and effect size the ranking, so a gene depended on in half the cell lines stops topping a list that is supposed to be about selectivity"
+set "EXPECTED_VER=1.41.4"
+set "DEFAULT_MSG=v1.41.4 warn that a crispr dependency only becomes a therapeutic hypothesis if the compound inhibits the target, and test whether the lineage clustering survives comparison with the full depmap population"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"
