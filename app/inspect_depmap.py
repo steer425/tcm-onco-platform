@@ -386,11 +386,31 @@ def main():
                     if gated_syms else [])
                 study_lines = {r[0] for r in dep_rows}
 
+                # 背景**只能**是實際做過 CRISPR 篩選的細胞株。
+                #
+                # Model.csv 收的是 DepMap 全部細胞株（約 2,154 株），
+                # 但 CRISPRGeneEffect 只涵蓋其中約 1,208 株。拿全部當背景，
+                # 等於把 900 多株「不可能出現在命中集合裡」的細胞算進母體——
+                # 而且各 lineage 的**篩選覆蓋率不同**，於是測到的是覆蓋率而不是生物學。
+                # 實測差別：基準命中率 571/2154=26.5% vs 571/1208=47.3%，
+                # 膀胱／泌尿道從「倍率 2.13、q=1.7e-3 顯著」掉到倍率約 1.19。
+                #
+                # 判定「篩選過」的方式：在 depmap_gene_dependency 裡出現過。
+                # 每一株篩過的細胞都必然依賴那 96 個泛必需基因，
+                # 所以這個集合實務上等於篩選母體——下面有自檢確認這個假設。
+                screened = {r[0] for r in
+                            db.query(D.depmap_id).filter(D.release == release)
+                            .distinct().all()}
                 all_models = db.query(M.id, M.oncotree_lineage).filter(
                     M.release == release).all()
-                lin_of = {mid: (lin or "（未標註）") for mid, lin in all_models}
+                lin_of = {mid: (lin or "（未標註）") for mid, lin in all_models
+                          if mid in screened}
                 N = len(lin_of)
                 n = len(study_lines)
+
+                expected_lines = max((x.n_lines_total for x in summaries), default=0)
+                coverage_warn = (expected_lines and
+                                 abs(N - expected_lines) > expected_lines * 0.05)
 
                 if N and n:
                     pop, study = {}, {}
@@ -422,10 +442,20 @@ def main():
                     out(f"問的是：**帶有這些選擇性依賴的細胞株，"
                         f"在 lineage 上的分佈有沒有偏離全母體？**")
                     out()
-                    out(f"母體 {N} 株；其中 **{n} 株**至少帶一個本藥材的選擇性依賴。")
+                    out(f"母體 **{N} 株**（實際做過 CRISPR 篩選的細胞株，"
+                        f"非 Model.csv 的 {len(all_models)} 株全體）；"
+                        f"其中 **{n} 株**至少帶一個本藥材的選擇性依賴"
+                        f"（基準命中率 {n / N * 100:.1f}%）。")
                     out()
-                    out("依 `rules.md` 的富集規範：**看 q 值不看 p 值**，"
-                        "背景取自 DepMap 全母體而非我方子集。")
+                    if coverage_warn:
+                        out(f"⚠️ 篩選母體 {N} 與摘要記錄的 {expected_lines} 差距超過 5%，"
+                            f"請確認匯入是否完整。")
+                        out()
+                    out("**背景只算篩選過的細胞株。** 拿 Model.csv 全體當背景，"
+                        "會把不可能出現在命中集合裡的細胞算進母體，"
+                        "而各 lineage 的篩選覆蓋率不同——那樣測到的是覆蓋率，不是生物學。")
+                    out()
+                    out("依 `rules.md` 的富集規範：**看 q 值不看 p 值**。")
                     out()
                     sig = [r for r in raw if r["q"] < 0.05]
                     raw.sort(key=lambda r: r["q"])

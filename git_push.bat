@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.41.4"
-set "DEFAULT_MSG=v1.41.4 warn that a crispr dependency only becomes a therapeutic hypothesis if the compound inhibits the target, and test whether the lineage clustering survives comparison with the full depmap population"
+set "EXPECTED_VER=1.41.5"
+set "DEFAULT_MSG=v1.41.5 count only screened cell lines as the enrichment background, because including the 900 that were never screened measured screening coverage rather than biology"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"
