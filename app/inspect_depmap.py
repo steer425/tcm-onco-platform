@@ -88,6 +88,8 @@ def main():
     ap.add_argument("--release", default=None, help="指定 release（預設取最近一次匯入）")
     ap.add_argument("--herb", default="336", help="要分析的藥材 herb_id（預設 336 人参）")
     ap.add_argument("--top", type=int, default=15, help="選擇性靶點列幾筆")
+    ap.add_argument("--max-ratio", type=float, default=0.20,
+                    help="選擇性門檻：依賴株數佔母體的比例上限（預設 0.20）")
     ap.add_argument("--out", default=None, help="另存 markdown")
     args = ap.parse_args()
 
@@ -250,18 +252,31 @@ def main():
                 def ratio(x):
                     return x.n_dependent / x.n_lines_total if x.n_lines_total else 9
 
-                rows = sorted(
-                    hit_sel,
-                    key=lambda x: (-strong.get(x.gene_symbol, 0),
-                                   _num(x.min_effect) if _num(x.min_effect) is not None else 0,
-                                   ratio(x)))
+                # 選擇性是**門檻**，效應量才是**排序**。
+                #
+                # v1.41.2 用「強依賴株數」排序，結果 PSMG1（653／1208＝54.1%）
+                # 排第一——在一半細胞株都依賴的基因當然累積最多強依賴株數，
+                # 但那是廣度不是選擇性，已經接近泛必需只是沒進 DepMap 名單。
+                # 規格 B 要的正是「排序主軸從命中數翻轉為選擇性」，
+                # 用另一種命中數排序等於繞回原點。
+                gated = [x for x in hit_sel if ratio(x) <= args.max_ratio]
+                dropped = [x for x in hit_sel if ratio(x) > args.max_ratio]
+                rows = sorted(gated,
+                              key=lambda x: (_num(x.min_effect)
+                                             if _num(x.min_effect) is not None else 0))
 
-                n_strong_genes = sum(1 for s in hit_sel if strong.get(s.gene_symbol))
-                out(f"### 依「強依賴」排序的前 {min(args.top, len(rows))} 個")
+                n_strong_genes = sum(1 for s in gated if strong.get(s.gene_symbol))
+                out(f"### 選擇性門檻內、依效應量排序的前 "
+                    f"{min(args.top, len(rows))} 個")
                 out()
-                out(f"強依賴定義：gene effect ≤ {STRONG_EFFECT}（門檻 {run.effect_threshold} "
-                    f"只代表「有依賴」）。{len(hit_sel)} 個選擇性靶點裡，"
-                    f"**有 {n_strong_genes} 個至少在一株細胞達到強依賴**。")
+                out(f"- **門檻**：依賴株數佔母體 ≤ {args.max_ratio * 100:.0f}%"
+                    f"（超過就不是選擇性，見下方被刷掉的清單）")
+                out(f"- **排序**：最強效應由強到弱")
+                out(f"- 強依賴定義：gene effect ≤ {STRONG_EFFECT}"
+                    f"（門檻 {run.effect_threshold} 只代表「有依賴」）")
+                out()
+                out(f"{len(hit_sel)} 個選擇性靶點 → 通過門檻 {len(gated)} 個，"
+                    f"其中 **{n_strong_genes} 個**至少在一株細胞達到強依賴。")
                 out()
                 out("| 基因 | 強依賴株數 | 達門檻株數／母體 | 佔比 | 最強效應 | 最依賴的細胞株 | 癌別 |")
                 out("|---|---|---|---|---|---|---|")
@@ -283,6 +298,24 @@ def main():
                 out(f"⚠️ **強依賴株數為「—」的列請當成雜訊看待。**"
                     f"只在一株細胞、效應又剛越過 {run.effect_threshold} 的配對，"
                     f"在這個規模的矩陣裡本來就會隨機出現。")
+
+                if dropped:
+                    # 規格 A：要顯示「本次排序刷掉了什麼、為什麼」，不只顯示留下來的
+                    dropped.sort(key=lambda x: -ratio(x))
+                    out()
+                    out(f"#### 被選擇性門檻刷掉的 {len(dropped)} 個")
+                    out()
+                    out("| 基因 | 達門檻株數／母體 | 佔比 | 為什麼刷掉 |")
+                    out("|---|---|---|---|")
+                    for x in dropped[:10]:
+                        out(f"| {x.gene_symbol} | {x.n_dependent}／{x.n_lines_total} | "
+                            f"{ratio(x) * 100:.1f}% | 依賴範圍過廣，接近泛必需 |")
+                    if len(dropped) > 10:
+                        out(f"| …另 {len(dropped) - 10} 個 | | | |")
+                    out()
+                    out("這些不是沒有訊號，而是**訊號不具選擇性**——"
+                        "在一半細胞株都依賴的基因，抑制它比較像細胞毒性而不是機轉。"
+                        "要看它們請調 `--max-ratio`。")
                 out()
                 out("⚠️ 但這張表**不是**「人參能治這些癌」。它說的是："
                     "人參的活性成分在 TCMSP 裡被註記為作用於這些靶點，"
