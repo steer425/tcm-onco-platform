@@ -132,3 +132,18 @@ def standardized_symbols(db: Session) -> set:
     for row in _uniprot_rows(db):
         syms.update(_row_symbols(row))
     return syms
+
+
+def standardized_target_symbols(db: Session) -> dict:
+    """回傳 {tar_id: {符號, ...}}，**只含第一層**（UniProt 已標準化）。
+
+    `target_to_symbols()` 對未標準化的靶點會回傳名稱字詞，那在站內是退路，
+    但要跟外部基因清單接起來時會製造假比對——理由與 `standardized_symbols()`
+    相同，見那支函式的說明。凡是「靶點 → 外部資料庫」的方向用這一支。
+    """
+    out: dict = {}
+    for row in _uniprot_rows(db):
+        syms = _row_symbols(row)
+        if syms:
+            out.setdefault(row.tar_id, set()).update(syms)
+    return out

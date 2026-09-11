@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.41.0"
-set "DEFAULT_MSG=v1.41.0 add the DepMap data layer for step 6, storing only dependencies past the threshold plus a per-gene summary, because the full matrix does not fit the free tier"
+set "EXPECTED_VER=1.41.1"
+set "DEFAULT_MSG=v1.41.1 add a DepMap sanity check that quantifies how much of the dependency table is just common essential genes, and turn ginseng targets into named cell lines worth testing"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"
