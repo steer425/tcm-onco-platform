@@ -29,6 +29,55 @@ const STATUS_CN = {
 };
 const ACCEPTED = ['auto', 'confirmed'];
 
+/* 四個識別碼的欄位說明。**這一頁的重點就是「本地編號 → 國際編號」**，
+ * 不講清楚 Mol ID 只在 TCMSP 裡有意義，使用者會以為它跟 CID 一樣可以拿去別的資料庫查。
+ * 沿用 tcmsp_query.html 的同一套說明視窗（class term-link + #termInfoModal），不要另外發明一套。 */
+const TERM_INFO = {
+  mol_id: {
+    title: 'Mol ID（TCMSP 成分編號）',
+    body: 'TCMSP 自己發給每個成分的編號，格式是 MOL 加 6 碼數字（例如 MOL000098）。'
+        + '它只在 TCMSP 這一套系統裡有意義——拿 Mol ID 去 PubChem、UniProt 或任何其他資料庫都查不到東西，'
+        + '也沒有化學結構的資訊在裡面。正因為如此，本平台才要做「成分標準化」，'
+        + '把每個 Mol ID 對應到下面那三個國際通用的編號。點編號可到中藥關聯查詢站看這個成分的靶點與疾病關聯。'
+  },
+  cid: {
+    title: 'PubChem CID — PubChem Compound ID（化合物編號）',
+    body: '美國國家生物技術資訊中心（NCBI）旗下 PubChem 資料庫發給每個化合物的編號，是一串純數字。'
+        + '這是國際通用的編號，拿著它可以到 PubChem 查到分子結構、物化性質、生物活性試驗與文獻。'
+        + '本頁的 CID 是由成分名稱比對後對應過來的，狀態要是「自動採用」或「已確認」才算數。'
+  },
+  inchikey: {
+    title: 'InChIKey — International Chemical Identifier Key（國際化學標識符雜湊碼）',
+    body: '由 IUPAC（國際純化學暨應用化學聯合會）制定，直接從分子結構算出來的 27 碼固定長度指紋，'
+        + '格式是 14 碼-10 碼-1 碼。它不是誰發的號碼，而是結構的計算結果，'
+        + '所以同一個分子在任何資料庫算出來都一樣，是跨資料庫比對最可靠的鍵值，也可以直接丟進 Google 搜尋。'
+  },
+  cas: {
+    title: 'CAS 號 — CAS Registry Number（化學文摘社登記號）',
+    body: '美國化學文摘社（Chemical Abstracts Service，隸屬美國化學會）發給每一個已登錄物質的編號，'
+        + '格式是「數字-數字-檢查碼」（例如 50-00-0）。化工、法規、安全資料表（SDS）與採購上最常用這個編號，'
+        + '要跟法規清單或試劑供應商對照時，CAS 號通常比 CID 更通用。它是商業資料庫，並非所有化合物都有登錄號。'
+  },
+};
+
+/* 欄位名稱旁的驚嘆號標記 */
+function help(key) {
+  return ` <a class="term-link" onclick="showTermInfo('${key}')" title="欄位說明">❗</a>`;
+}
+
+function showTermInfo(key) {
+  const info = TERM_INFO[key];
+  if (!info) return;
+  $('termInfoTitle').textContent = info.title;
+  $('termInfoBody').textContent = info.body;
+  $('termInfoModal').style.display = 'flex';
+}
+function closeTermInfo() {
+  $('termInfoModal').style.display = 'none';
+}
+window.showTermInfo = showTermInfo;
+window.closeTermInfo = closeTermInfo;
+
 let HERBS = [];
 let currentHerbId = null;
 let currentData = null;
@@ -177,10 +226,10 @@ function renderTable() {
   }).join('');
 
   $('tbl').innerHTML = `<thead><tr>
-      <th>#</th><th>Mol ID</th><th>成分名稱（TCMSP 英文原名）</th>
+      <th>#</th><th>Mol ID${help('mol_id')}</th><th>成分名稱（TCMSP 英文原名）</th>
       <th>OB %</th><th>DL</th><th>分子量</th>
-      <th>標準化狀態</th><th>PubChem CID</th>
-      <th>SMILES</th><th>CAS</th><th>InChIKey</th><th>分子量差</th>
+      <th>標準化狀態</th><th>PubChem CID${help('cid')}</th>
+      <th>SMILES</th><th>CAS${help('cas')}</th><th>InChIKey${help('inchikey')}</th><th>分子量差</th>
     </tr></thead><tbody>${body}</tbody>`;
 }
 
@@ -197,6 +246,13 @@ $('toolbar').addEventListener('click', (e) => {
   filter = btn.dataset.f;
   document.querySelectorAll('#toolbar button').forEach(b => b.classList.toggle('on', b === btn));
   renderTable();
+});
+
+$('termInfoModal').addEventListener('click', (e) => {
+  if (e.target.id === 'termInfoModal') closeTermInfo();   // 點視窗外面關掉
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeTermInfo();
 });
 
 /* 查詢站類頁面沒有掛 nav.js，語系要自己呼叫（見 rules.md 第五之二章） */

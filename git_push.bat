@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.42.0"
-set "DEFAULT_MSG=v1.42.0 add a per-herb active-ingredient query page, because the library-wide coverage number cannot tell whether one herb's ingredients all got their structures"
+set "EXPECTED_VER=1.42.1"
+set "DEFAULT_MSG=v1.42.1 explain Mol ID / PubChem CID / InChIKey / CAS next to the column headers, because a local-only ID looks exactly like an international one until someone says otherwise"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

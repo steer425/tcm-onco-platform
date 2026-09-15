@@ -1,5 +1,36 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.42.1 — 2026-09-15（四個識別碼加上欄位說明）
+
+### 為什麼加這個
+
+F1-7 這一頁同時列出四個編號：Mol ID、PubChem CID、InChIKey、CAS。
+**畫面上它們長得一模一樣，實際上意義差很多：**
+
+- `Mol ID` 是 TCMSP **自己的**編號，只在 TCMSP 生態系裡有意義。拿它去 PubChem、UniProt
+  或任何外部資料庫都查不到東西，裡面也沒有任何化學結構資訊。
+- 另外三個是**國際通用**的：CID 是 NCBI／PubChem 發的、CAS 號是美國化學文摘社發的、
+  InChIKey 則根本不是「發」的，而是從分子結構直接算出來的 27 碼指紋。
+
+不講清楚，使用者很容易把 Mol ID 當成跟 CID 同一個等級的東西——
+而「本地編號對不到國際編號」正是整個成分標準化（Step 2）要解決的問題本身。
+欄位說明擺在這裡，等於把這一頁在做什麼講明白。
+
+### 改了什麼
+
+- `frontend/js/herb-ingredients.js`
+  - 新增 `TERM_INFO`（mol_id／cid／inchikey／cas 四則說明）與 `showTermInfo()`／`closeTermInfo()`。
+  - 表頭四個欄位名稱旁加上驚嘆號標記 `❗`，點擊彈出說明視窗。
+  - 視窗支援點背景關閉與 Esc 關閉。
+- `frontend/herb-ingredients.html` — 加入 `#termInfoModal` 視窗本體與 `a.term-link` 樣式。
+- `frontend/js/i18n-dict.js` — en／ko 各補 8 條（4 個標題 + 4 段內文），兩語系筆數維持一致。
+
+### 沿用而非另造
+
+說明視窗的結構（`a.term-link` ＋ `#termInfoModal` ＋ `showTermInfo(key)`）與
+`tcmsp_query.html` **完全相同**，只是換成驚嘆號標記。同一個平台不要有兩套欄位說明機制。
+
+
 ## v1.42.0 — 2026-09-15（F1-7 藥材活性成分查詢站，前台可隨時查）
 
 ### 這一版在補什麼
