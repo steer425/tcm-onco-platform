@@ -22,3 +22,7 @@ ginseng_step2.md
 mw
 mw.md
 reports/
+
+# 交付成品（報告、簡報等）——留在本機，不進版控。
+# git 對二進位檔沒有差異壓縮，每改一版就整份存一次，repo 會持續膨脹。
+Claude outputs/

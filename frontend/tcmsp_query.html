@@ -400,6 +400,7 @@ async function bootstrapData(){
       renderHerbList();
       setProgress(null);
       selectHerb(defaultHerb.herb_id);
+      focusUrlMolecule();
     } catch (e) {
       setProgress(null);
     }
@@ -1064,6 +1065,26 @@ function renderPicker(){
     };
   });
 }
+
+// 深層連結：?herb=336&mol=MOL000358
+// 由 F1-7「藥材活性成分」頁點成分編號進來時，直接勾選並捲到那個成分。
+// 刻意只勾選、不自動套用顯示——使用者可能想再多勾幾個一起看，
+// 自動套用會把他剛才的選擇洗掉。
+function focusUrlMolecule(){
+  const molId = new URLSearchParams(window.location.search).get('mol');
+  if(!molId) return;
+  const inp = document.querySelector(`#pickerCol input[data-mol="${CSS.escape(molId)}"]`);
+  if(!inp) return;                      // 這個成分不在目前藥材裡，安靜略過
+  if(!inp.checked){ inp.checked = true; selectedMols.add(molId); markPending(); }
+  const row = inp.closest('.pick-row');
+  if(row){
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    row.style.transition = 'background-color .35s';
+    row.style.backgroundColor = 'rgba(59,130,196,.35)';
+    setTimeout(() => { row.style.backgroundColor = ''; }, 2200);
+  }
+}
+
 function markPending(){
   const btn = document.getElementById('showBtn');
   if(btn) btn.textContent = `▶ 顯示 Selected（${selectedMols.size} 個已勾選，尚未套用）`;

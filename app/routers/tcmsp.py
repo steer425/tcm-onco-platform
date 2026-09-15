@@ -111,6 +111,95 @@ def public_get_herb_detail(herb_id: int, current_user: models.User = Depends(get
     }
 
 
+@router.get("/herbs/public/{herb_id}/active-ingredients",
+            summary="（前台）藥材的活性成分清單與 PubChem 標準化狀態（目標一 Step 1＋Step 2）")
+def public_herb_active_ingredients(
+        herb_id: int,
+        current_user: models.User = Depends(get_current_user),
+        db: Session = Depends(get_query_db)):
+    """回答一句話：**這味藥材的活性成分，每一個都拿到化學結構了嗎？**
+
+    F1-6 頁面的覆蓋率是**全庫**數字（例：1,303／2,632），它回答不了目標一真正的
+    驗收條件——那是逐一藥材、逐一成分的問題。全庫 49.5% 可能代表某味藥 22 筆全中，
+    也可能一筆都沒中，兩者在全庫卡片上長得一模一樣。
+
+    活性成分判定一律呼叫 `pathways.active_ingredients()`、最佳映射一律呼叫
+    `tcmsp_pubchem.best_mapping_by_mol()`，**兩者都不在這裡重寫**
+    （見 `rules.md`「進度數字與批次佇列必須共用同一支母體判定」）。
+
+    ⚠️ 回傳的成分名稱是 TCMSP 的英文原名。**資料庫沒有成分的中文名稱，也沒有化學
+    分類欄位**，所以這裡不提供——要顯示就得另建對照表，那是另一件事，不能在端點裡
+    臨時湊。
+    """
+    from app import pathways, tcmsp_pubchem as pc
+
+    herb = (db.query(models.TcmspHerb)
+            .filter(models.TcmspHerb.id == herb_id,
+                    models.TcmspHerb.status == "active").first())
+    if not herb:
+        raise HTTPException(status_code=404, detail="找不到這個藥材，或它已被下架。")
+
+    ob_min, dl_min = pathways.adme_thresholds(db)
+    meta = pathways.active_ingredients(db, herb_id, ob_min, dl_min)
+    mol_ids = meta["passed"]
+
+    ings = {}
+    if mol_ids:
+        ings = {i.mol_id: i for i in
+                db.query(models.TcmspIngredient)
+                .filter(models.TcmspIngredient.mol_id.in_(mol_ids)).all()}
+    mapping = pc.best_mapping_by_mol(db, mol_ids)
+
+    def _has(v):
+        return bool((v or "").strip())
+
+    items = []
+    for mol_id in sorted(mol_ids):
+        ing = ings.get(mol_id)
+        m = mapping.get(mol_id)
+        items.append({
+            "mol_id": mol_id,
+            "molecule_name": ing.molecule_name if ing else None,
+            "mw": _val(ing.mw) if ing else None,
+            "ob": _val(ing.ob) if ing else None,
+            "dl": _val(ing.dl) if ing else None,
+            # 沒有映射列代表這個成分還沒被批次解析處理過，與「查無結果」不同
+            "status": m.status if m else "untouched",
+            "cid": m.cid if m else None,
+            "inchikey": m.inchikey if m else None,
+            "cas_number": m.cas_number if m else None,
+            "has_smiles": _has(m.canonical_smiles) if m else False,
+            "has_cas": _has(m.cas_number) if m else False,
+            "has_inchikey": _has(m.inchikey) if m else False,
+            "mw_delta": _val(m.mw_delta) if m else None,
+            "note": m.note if m else None,
+        })
+
+    accepted = [i for i in items if i["status"] in pc.ACCEPTED_STATUS]
+    by_status = {}
+    for i in items:
+        by_status[i["status"]] = by_status.get(i["status"], 0) + 1
+
+    return {
+        "herb": {
+            "herb_id": herb.id, "herb_cn_name": herb.herb_cn_name,
+            "herb_en_name": herb.herb_en_name, "herb_pinyin": herb.herb_pinyin,
+        },
+        "thresholds": {"ob_min": ob_min, "dl_min": dl_min},
+        "totals": {
+            "all_ingredients": meta["total"],
+            "active": meta["passed_count"],
+            "missing_adme": meta["missing_adme"],
+            "standardised": len(accepted),
+            "with_smiles": sum(1 for i in accepted if i["has_smiles"]),
+            "with_cas": sum(1 for i in accepted if i["has_cas"]),
+            "with_inchikey": sum(1 for i in accepted if i["has_inchikey"]),
+        },
+        "by_status": by_status,
+        "items": items,
+    }
+
+
 @router.get("/data/full", summary="取得完整 TCMSP 關聯資料（前台查詢站使用，內建快取）")
 def get_full_data(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_query_db)):
     now = time.time()

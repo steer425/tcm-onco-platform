@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.41.6"
-set "DEFAULT_MSG=v1.41.6 compare the lineage enrichment against random gene sets of the same size, because a lineage that simply has more dependencies will look enriched for any herb"
+set "EXPECTED_VER=1.42.0"
+set "DEFAULT_MSG=v1.42.0 add a per-herb active-ingredient query page, because the library-wide coverage number cannot tell whether one herb's ingredients all got their structures"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

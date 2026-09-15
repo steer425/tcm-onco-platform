@@ -48,7 +48,7 @@ import sys
 
 from sqlalchemy import or_
 
-from app import models, pathways
+from app import models, pathways, tcmsp_pubchem as pc
 from app.database import SessionLocal
 
 # 與 app/routers/ingredient_mapping.py 的 ACCEPTED 一致：
@@ -179,20 +179,12 @@ def _find_herb(db, keyword: str):
 
 
 def _mapping_by_mol(db, mol_ids):
-    """mol_id → 映射列。同一個成分合法可有多筆（唯一鍵是 mol_id+cid），
-    已採用的優先，其次才是 pending 之類的候選。"""
-    if not mol_ids:
-        return {}
-    rows = (db.query(models.TcmspIngredientPubchem)
-            .filter(models.TcmspIngredientPubchem.mol_id.in_(mol_ids)).all())
-    best = {}
-    for r in rows:
-        cur = best.get(r.mol_id)
-        if cur is None:
-            best[r.mol_id] = r
-        elif r.status in ACCEPTED and cur.status not in ACCEPTED:
-            best[r.mol_id] = r
-    return best
+    """mol_id → 最佳映射列。
+
+    v1.42.0 起改呼叫 `tcmsp_pubchem.best_mapping_by_mol()`——前台的
+    活性成分端點要用同一份判定，寫兩份遲早會漂移。
+    """
+    return pc.best_mapping_by_mol(db, mol_ids)
 
 
 def _has(v) -> bool:

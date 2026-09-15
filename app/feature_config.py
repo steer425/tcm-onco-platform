@@ -147,6 +147,13 @@ FEATURE_CONFIG = [
      "nav_label": "成分標準化", "page_url": "ingredient-mapping.html",
      "show_frontend": False, "show_backend": True, "sort_order": 75},
 
+    # F1-6 是全庫層級的批次作業頁（後台）；F1-7 是逐一藥材的查詢站（前台）。
+    # 兩者回答的問題不同：前者「全庫還有多少沒解析」，後者「這味藥材的活性成分
+    # 是不是每一個都拿到結構了」。目標一的驗收條件是後者。
+    {"code": "F1-7", "module": "目標一/二", "name": "藥材活性成分與結構標準化查詢站（預設人參）",
+     "nav_label": "藥材活性成分", "page_url": "herb-ingredients.html",
+     "show_frontend": True, "show_backend": True, "sort_order": 76},
+
     # ---- 其餘目標零基礎建設項目：現在都有對應頁面可查看/設定 ----
     {"code": "F0-1", "module": "目標零", "name": "前後台架構規劃",
      "nav_label": "系統架構規劃", "page_url": "architecture.html",

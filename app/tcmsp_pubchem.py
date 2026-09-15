@@ -321,6 +321,36 @@ def resolve_name(client: httpx.Client, name: str, tcmsp_mw=None) -> dict:
                 "note": f"查詢失敗：{str(exc)[:200]}"}
 
 
+# 只有這兩種狀態算「已標準化」，與 app/routers/ingredient_mapping.py 的 ACCEPTED 一致。
+ACCEPTED_STATUS = ("auto", "confirmed")
+
+
+def best_mapping_by_mol(db, mol_ids):
+    """回傳 {mol_id: 最佳映射列}。**全站唯一一份判定，不要再各自寫一次。**
+
+    `tcmsp_ingredient_pubchem` 的唯一鍵是 `(mol_id, cid)`，同一個成分合法可以有
+    多筆（人工確認時挑了不同 CID 就會出現）。「哪一筆代表這個成分」必須只有一個
+    答案——已採用（auto／confirmed）優先，其次才是 pending 之類的候選。
+
+    v1.40.1 的事故就是同一個母體判定被寫了兩份、兩邊回答了不同的問題
+    （見 `rules.md`「進度數字與批次佇列必須共用同一支母體判定」）。這裡先把
+    「最佳映射」收斂成一支，避免驗收腳本與前台端點日後各自漂移。
+    """
+    from app import models
+    if not mol_ids:
+        return {}
+    rows = (db.query(models.TcmspIngredientPubchem)
+            .filter(models.TcmspIngredientPubchem.mol_id.in_(list(mol_ids))).all())
+    best = {}
+    for r in rows:
+        cur = best.get(r.mol_id)
+        if cur is None:
+            best[r.mol_id] = r
+        elif r.status in ACCEPTED_STATUS and cur.status not in ACCEPTED_STATUS:
+            best[r.mol_id] = r
+    return best
+
+
 def resolve_many(items: list, *, timeout: float = 25.0, pause: float = 0.25,
                  with_synonyms: bool = True) -> dict:
     """批次解析。`items` 是 [(mol_id, name, mw), ...]，回傳 {mol_id: 結果}。

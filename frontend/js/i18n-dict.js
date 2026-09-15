@@ -745,6 +745,19 @@ window.I18N_DICT = {
     "有 SMILES": "With SMILES",
     "有 CAS": "With CAS",
     "分子量不符（待確認）": "MW Mismatch (Pending Review)",
+    // ---- F1-7 藥材活性成分與結構標準化（v1.42.0） ----
+    "藥材活性成分": "Herb Active Ingredients",
+    "藥材活性成分與結構標準化": "Herb Active Ingredients & Structure Standardisation",
+    "全部成分": "All Ingredients",
+    "活性成分（本頁母體）": "Active Ingredients (Denominator)",
+    "有 InChIKey": "With InChIKey",
+    "ADME 缺值而排除": "Excluded (ADME Missing)",
+    "標準化狀態": "Standardisation Status",
+    "成分名稱（TCMSP 英文原名）": "Ingredient Name (TCMSP Original, English)",
+    "分子量": "Molecular Weight",
+    "分子量差": "MW Difference",
+    "未完成": "Not Completed",
+    "在關聯查詢站開啟 →": "Open in Association Query Site →",
   },
   ko: {
     // ---- 導覽選單 ----
@@ -1482,5 +1495,18 @@ window.I18N_DICT = {
     "有 SMILES": "SMILES 보유",
     "有 CAS": "CAS 보유",
     "分子量不符（待確認）": "분자량 불일치 (확인 대기)",
+    // ---- F1-7 藥材活性成分與結構標準化（v1.42.0） ----
+    "藥材活性成分": "약재 활성 성분",
+    "藥材活性成分與結構標準化": "약재 활성 성분 및 구조 표준화",
+    "全部成分": "전체 성분",
+    "活性成分（本頁母體）": "활성 성분 (모집단)",
+    "有 InChIKey": "InChIKey 보유",
+    "ADME 缺值而排除": "ADME 결측으로 제외",
+    "標準化狀態": "표준화 상태",
+    "成分名稱（TCMSP 英文原名）": "성분명 (TCMSP 원문, 영문)",
+    "分子量": "분자량",
+    "分子量差": "분자량 차이",
+    "未完成": "미완료",
+    "在關聯查詢站開啟 →": "연관 조회 사이트에서 열기 →",
   },
 };
