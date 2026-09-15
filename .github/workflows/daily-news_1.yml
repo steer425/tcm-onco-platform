@@ -1,0 +1,314 @@
+# 每日重點新聞收集 — 每天台北時間清晨 4:00 觸發後端收集
+#
+# 為什麼需要這個：Render free plan 沒有內建 Cron Job（付費方案才有），
+# 所以要由外部排程來打後端的收集端點。
+#
+# 設定方式：
+#   1. GitHub repo → Settings → Secrets and variables → Actions → New repository secret
+#   2. Name: NEWS_COLLECT_SECRET
+#      Value: 與 Render 環境變數 NEWS_COLLECT_SECRET 相同的字串
+#
+# 比起把密鑰寫在別處，這個做法的好處是密鑰存在 GitHub Secrets 裡，
+# 不會出現在程式碼、提示詞或任何人看得到的地方。
+#
+# ⚠️ v1.40.1 修正：`.gitignore` 原本有一行 `.github/workflows/`，
+# 導致這個檔案雖然存在於本機、卻從來沒有被推上 GitHub。
+# GitHub Actions 只執行 repo 裡實際存在的 workflow，所以這條排程一直沒有在跑，
+# 而且不會有任何錯誤訊息。那一行已經移除，這個檔案現在必須跟著版控走。
+#
+# ⚠️ v1.41.7 新增「回寫執行紀錄」步驟：
+# 每天清晨的 Cowork 排程工作跑在雲端沙箱裡，該沙箱**連不出去**
+# （onrender.com 被 egress proxy 擋掉、GitHub Actions API 也不開放），
+# 所以它既打不到後端、也查不到 Actions 執行紀錄，只能用猜的回報，
+# 結果是連續多天送出「GitHub Actions 仍未上線或紅燈」這種**沒有根據**的警報。
+# 沙箱唯一做得到的是 `git clone` 這個 repo，因此本 workflow 每次執行完
+# 都把結果寫回 `news-run-log` 分支。之後任何人（或排程）只要 clone 該分支，
+# 就能看到每天到底跑了沒、成功還失敗，不需要 Actions API 也不需要開網頁。
+#
+# 為什麼寫到獨立分支而不是 main：避免每天一筆機器人 commit 讓本機落後遠端，
+# 那會害 `git_push.bat` 被拒（這個專案已經栽過兩次）。`news-run-log` 是
+# 孤立分支（orphan），與 main 沒有共同歷史，平常不會被碰到。
+
+name: 每日重點新聞收集
+
+run-name: >-
+  每日重點新聞收集${{ github.event_name == 'workflow_dispatch' && format('（{0}）', inputs.reason) || '' }}
+
+on:
+  schedule:
+    # GitHub Actions 的 cron 一律用 UTC。台灣全年 UTC+8 且無日光節約，
+    # 所以 UTC 20:00 = 台北隔日 04:00。
+    # GitHub 排程在尖峰時段可能延遲 5~30 分鐘，屬正常現象。
+    - cron: "0 20 * * *"
+  workflow_dispatch:      # 允許在 Actions 頁面手動觸發，方便補跑
+    inputs:
+      reason:
+        description: "執行原因（補跑 9/7、測試密鑰…）。只是讓執行紀錄看得懂，不影響行為。"
+        required: false
+        default: "手動補跑"
+      target_date:
+        description: "回補日期 YYYY-MM-DD（留空＝當天）。注意：抓取視窗仍由後端 lookback_days 決定，指定舊日期只會把這次的結果標記成那一天，不保證取得回當天的舊文章。"
+        required: false
+        default: ""
+
+concurrency:
+  # 避免手動觸發與排程重疊，同時跑兩次收集
+  group: daily-news-collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # 回寫 news-run-log 分支需要寫入權限；其餘一律唯讀
+    permissions:
+      contents: write
+
+    steps:
+      - name: 觸發後端收集
+        id: collect
+        env:
+          SECRET: ${{ secrets.NEWS_COLLECT_SECRET }}
+          API: https://tcm-onco-backend.onrender.com
+          TARGET_DATE: ${{ inputs.target_date }}
+        run: |
+          set -uo pipefail
+
+          if [ -z "${SECRET:-}" ]; then
+            echo "::error::尚未設定 repo secret NEWS_COLLECT_SECRET"
+            echo "設定路徑：repo → Settings → Secrets and variables → Actions → New repository secret" >> "$GITHUB_STEP_SUMMARY"
+            echo "http_code=missing_secret" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          # 回補用：有填 target_date 就帶進 body，沒填就送空物件（＝後端取台北當日）
+          if [ -n "${TARGET_DATE:-}" ]; then
+            BODY="{\"target_date\":\"${TARGET_DATE}\"}"
+            echo "指定回補日期：${TARGET_DATE}"
+          else
+            BODY='{}'
+          fi
+
+          # Render free plan 閒置會休眠，冷啟動約 30~60 秒。
+          # 先打一次 /docs 把伺服器叫醒，再送實際請求，可大幅降低第一次逾時的機率。
+          echo "喚醒後端（Render free plan 休眠中的話約需 30~60 秒）..."
+          curl -s -o /dev/null --max-time 120 "$API/docs" || true
+
+          for attempt in 1 2 3; do
+            echo "::group::第 $attempt 次嘗試"
+            HTTP=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+              -X POST "$API/news/admin/collect/scheduled" \
+              -H "Authorization: Bearer $SECRET" \
+              -H "Content-Type: application/json" \
+              -d "$BODY" \
+              --max-time 600 --connect-timeout 90) || HTTP="000"
+
+            echo "HTTP $HTTP"
+            cat /tmp/resp.json 2>/dev/null || true
+            echo "::endgroup::"
+
+            # 401（密鑰錯）與 503（後端未設密鑰）重試也不會好，直接失敗
+            if [ "$HTTP" = "401" ] || [ "$HTTP" = "503" ]; then
+              echo "http_code=$HTTP" >> "$GITHUB_OUTPUT"
+              echo "::error::HTTP $HTTP — 密鑰設定有問題，重試無益。請確認 Render 的 NEWS_COLLECT_SECRET 與 repo secret 一致。"
+              {
+                echo "## ❌ 密鑰設定有問題（HTTP $HTTP）"
+                echo ""
+                echo "- \`401\`：GitHub secret 與 Render 環境變數的值不一致"
+                echo "- \`503\`：Render 上根本沒設 \`NEWS_COLLECT_SECRET\`（端點刻意停用，不是變成公開端點）"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+
+            if [ "$HTTP" = "200" ]; then
+              echo "http_code=200" >> "$GITHUB_OUTPUT"
+              break
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              echo "失敗（HTTP $HTTP），60 秒後重試..."
+              sleep 60
+            else
+              echo "http_code=$HTTP" >> "$GITHUB_OUTPUT"
+              echo "::error::連續 3 次觸發失敗，最後一次 HTTP $HTTP"
+              echo "## ❌ 連續 3 次觸發失敗，最後一次 HTTP $HTTP" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+          done
+
+      - name: 摘要執行結果
+        if: always() && steps.collect.outputs.http_code == '200'
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open("/tmp/resp.json", encoding="utf-8") as f:
+              d = json.load(f)
+
+          rows = [
+              ("日期", d.get("run_date")),
+              ("狀態", d.get("status")),
+              ("抓取", d.get("fetched")),
+              ("主題過濾", d.get("filtered_out")),
+              ("重複略過", d.get("duplicates")),
+              ("新增文章", d.get("new_articles")),
+              ("每日精選", d.get("digest_size")),
+              ("實體連結", d.get("linked_entities")),
+              ("耗時 (ms)", d.get("duration_ms")),
+          ]
+
+          status = d.get("status")
+          icon = {"success": "✅", "partial": "⚠️", "failed": "❌"}.get(status, "ℹ️")
+
+          out = [f"## {icon} 每日重點新聞收集：{status}", "", "| 項目 | 數值 |", "|---|---|"]
+          out += [f"| {k} | {v} |" for k, v in rows]
+
+          errors = d.get("errors") or {}
+          if errors:
+              out += ["", "### 失敗的來源", "",
+                      "連續多天失敗代表對方網站改版，需到後台「新聞來源」更新選擇器。", "",
+                      "| 來源代碼 | 錯誤訊息 |", "|---|---|"]
+              for slug, msg in errors.items():
+                  out.append(f"| `{slug}` | {str(msg)[:160]} |")
+
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as f:
+                  f.write("\n".join(out) + "\n")
+          print("\n".join(out))
+
+          # 當天符合條件的新聞不足是常態，不該當成故障 —— 給黃字提醒就好
+          digest = d.get("digest_size")
+          if isinstance(digest, int) and digest < 10:
+              print(f"::warning::每日精選只有 {digest} 篇（少於 10），當天符合條件的新聞偏少")
+
+          # status=partial 屬正常（中國兩個官方站海外節點常不通），只有全失敗才視為錯誤
+          if status == "failed":
+              raise SystemExit("::error::所有來源都失敗，請檢查後端狀態")
+          PY
+
+      # ---------------------------------------------------------------------
+      # 回寫執行紀錄：把這次的結果追加到 news-run-log 分支的 runs/YYYY-MM.md
+      #
+      # 這一步**永遠不能讓整個 job 變紅或變綠**——它只是紀錄。
+      # 因此最後一行是 `|| true`：紀錄寫失敗（例如權限被收回）不該蓋掉
+      # 上面真正的收集結果，但會在 log 裡留下 ::warning::。
+      # ---------------------------------------------------------------------
+      - name: 回寫執行紀錄到 news-run-log 分支
+        if: always()
+        env:
+          HTTP_CODE: ${{ steps.collect.outputs.http_code }}
+          JOB_EVENT: ${{ github.event_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+
+          python3 - <<'PY' > /tmp/logrow.txt
+          import json
+          import os
+          import datetime
+
+          http = os.environ.get("HTTP_CODE") or "000"
+          event = os.environ.get("JOB_EVENT", "")
+          run_url = os.environ.get("RUN_URL", "")
+
+          taipei = datetime.timezone(datetime.timedelta(hours=8))
+          now = datetime.datetime.now(taipei).strftime("%Y-%m-%d %H:%M")
+
+          d = {}
+          if http == "200":
+              try:
+                  with open("/tmp/resp.json", encoding="utf-8") as f:
+                      d = json.load(f)
+              except Exception:  # noqa: BLE001
+                  d = {}
+
+          if http == "200":
+              status = d.get("status") or "unknown"
+          elif http == "missing_secret":
+              status = "secret 未設"
+          elif http in ("401", "503"):
+              status = f"密鑰問題 HTTP {http}"
+          else:
+              status = f"觸發失敗 HTTP {http}"
+
+          def cell(key):
+              v = d.get(key)
+              return "—" if v is None else str(v)
+
+          errors = d.get("errors") or {}
+          if errors:
+              failed = "、".join(f"`{s}`" for s in sorted(errors))
+          elif http == "200":
+              failed = "無"
+          else:
+              failed = "—"
+
+          dur = d.get("duration_ms")
+          dur = f"{dur / 1000:.1f}s" if isinstance(dur, (int, float)) else "—"
+
+          row = " | ".join([
+              "", now, ("排程" if event == "schedule" else "手動"),
+              cell("run_date"), status, cell("fetched"), cell("new_articles"),
+              cell("digest_size"), cell("linked_entities"), dur, failed,
+              f"[log]({run_url})", "",
+          ])
+          print(row.strip())
+          PY
+
+          WORK=/tmp/newslog
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          rm -rf "$WORK"
+
+          if git clone --quiet --depth 1 --branch news-run-log "$REMOTE" "$WORK" 2>/dev/null; then
+            echo "news-run-log 分支已存在，接續追加"
+          else
+            echo "news-run-log 分支不存在，建立孤立分支"
+            mkdir -p "$WORK"
+            git -C "$WORK" init --quiet -b news-run-log
+            git -C "$WORK" remote add origin "$REMOTE"
+            cat > "$WORK/README.md" <<'EOF'
+          # 每日重點新聞收集：執行紀錄
+
+          這個分支由 `.github/workflows/daily-news.yml` 自動寫入，**不要手動編輯**，
+          也不要合併回 `main`（它是孤立分支，與 main 沒有共同歷史）。
+
+          存在的理由：每天清晨的 Cowork 排程工作跑在雲端沙箱裡，那個沙箱連不到
+          後端（onrender.com 被擋）也用不了 GitHub Actions API，唯一做得到的是
+          `git clone` 這個 repo。把每次執行結果寫進這裡之後，它就能讀到事實，
+          不必再用猜的。
+
+          查看方式：
+
+          ```bash
+          git clone --depth 1 --branch news-run-log <repo> log && tail -20 log/runs/$(date +%Y-%m).md
+          ```
+          EOF
+          fi
+
+          MONTH=$(TZ=Asia/Taipei date +%Y-%m)
+          FILE="$WORK/runs/${MONTH}.md"
+          mkdir -p "$WORK/runs"
+
+          if [ ! -f "$FILE" ]; then
+            {
+              echo "# ${MONTH} 每日重點新聞收集執行紀錄"
+              echo ""
+              echo "| 台北時間 | 觸發 | 收集日期 | 狀態 | 抓取 | 新增 | 精選 | 實體 | 耗時 | 失敗來源 | 執行 |"
+              echo "|---|---|---|---|---|---|---|---|---|---|---|"
+            } > "$FILE"
+          fi
+
+          cat /tmp/logrow.txt >> "$FILE"
+
+          git -C "$WORK" add -A
+          git -C "$WORK" \
+            -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet -m "news run $(TZ=Asia/Taipei date +%F)" || true
+          git -C "$WORK" push --quiet origin HEAD:news-run-log \
+            || echo "::warning::執行紀錄回寫失敗（不影響本次收集結果）"
+          true
