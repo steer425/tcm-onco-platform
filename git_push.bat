@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.42.1"
-set "DEFAULT_MSG=v1.42.1 explain Mol ID / PubChem CID / InChIKey / CAS next to the column headers, because a local-only ID looks exactly like an international one until someone says otherwise"
+set "EXPECTED_VER=1.42.2"
+set "DEFAULT_MSG=v1.42.2 make every Chinese name search traditional-simplified insensitive, because the database stores simplified and the UI defaults to traditional, and a failed match looks exactly like an empty result"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

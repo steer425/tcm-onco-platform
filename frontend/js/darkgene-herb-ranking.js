@@ -43,7 +43,7 @@ function renderTable() {
   const kw = document.getElementById("herbSearchInput").value.trim().toLowerCase();
   let rows = herbStatsData;
   if (kw) {
-    rows = rows.filter(h => [h.herb_cn_name, h.herb_pinyin, h.herb_en_name].some(v => (v || "").toLowerCase().includes(kw)));
+    rows = rows.filter(h => window.zhMatchAny([h.herb_cn_name, h.herb_pinyin, h.herb_en_name], kw));
   }
   document.getElementById("herbCountHint").textContent = `顯示 ${rows.length} / ${herbStatsData.length} 筆`;
 

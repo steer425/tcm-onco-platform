@@ -7,6 +7,7 @@
 <title>TCMSP 藥材關聯查詢站</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/standalone/umd/vis-network.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+<script src="js/zh-match.js"></script>
 <script src="js/i18n-dict.js"></script>
 <script src="js/site-lang.js"></script>
 <style>
@@ -831,7 +832,8 @@ function renderHerbStats(){
 }
 
 function renderHerbList(filter=''){
-  const q = filter.trim().toLowerCase();
+  // 比對一律走 zh-match.js：資料庫存的是簡體，使用者多半打繁體（見那支檔案開頭的說明）
+  const q = window.zhNorm(filter);
   const list = document.getElementById('herbList');
   list.innerHTML = '';
 
@@ -847,7 +849,8 @@ function renderHerbList(filter=''){
   }
 
   DATA.herbs
-    .filter(h => !q || [h.herb_cn_name, h.herb_pinyin, h.herb_en_name].some(v => (v||'').toLowerCase().includes(q)))
+    .filter(h => window.zhMatchAny([h.herb_cn_name, h.herb_pinyin, h.herb_en_name,
+                                    h.child_cn_name, h.child_en_name], filter))
     .forEach(h => appendHerbRow(list, h));
 }
 

@@ -7,6 +7,7 @@
 <title>TCMSP 疾病關聯查詢站</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/standalone/umd/vis-network.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+<script src="js/zh-match.js"></script>
 <script src="js/i18n-dict.js"></script>
 <script src="js/site-lang.js"></script>
 <style>
@@ -413,7 +414,7 @@ function renderDiseaseStats() {
 
 function renderDiseaseList(filter) {
   const listEl = document.getElementById("disList");
-  const kw = (filter || "").trim().toLowerCase();
+  const kw = window.zhNorm(filter);
 
   if (!kw && defaultDisId && !allDataLoaded) {
     listEl.innerHTML = '<div style="padding:8px 12px; color:var(--muted); font-size:11px;">僅顯示預設疾病，輸入上方搜尋框可找其他疾病，或按「載入全部」看完整清單</div>';
@@ -426,9 +427,8 @@ function renderDiseaseList(filter) {
   let list = DATA.diseases.slice().sort((a, b) => (a.disease_name || "").localeCompare(b.disease_name || ""));
   if (kw) {
     list = list.filter(d =>
-      (d.disease_name || "").toLowerCase().includes(kw) ||
-      (d.disease_cn_name || "").toLowerCase().includes(kw) ||
-      String(d.dis_id).includes(kw)
+      window.zhMatchAny([d.disease_name, d.disease_cn_name], filter) ||
+      String(d.dis_id).toLowerCase().includes(kw)
     );
   }
   listEl.innerHTML = list.map(d => buildDiseaseRowHtml(d)).join("");

@@ -271,26 +271,10 @@ async function runSync(source) {
 let allHerbs = [];
 let selectedHerbId = null;
 let activeIndex = -1;
-let toCn = null;   // OpenCC 繁→簡轉換器
-
-function initConverter() {
-  // 藥材名稱在資料庫裡是簡體（猫爪草、鱼腥草）。使用者用繁體輸入「貓爪草」
-  // 直接比對會找不到——這不是使用者輸錯，是我們的比對沒處理字形差異。
-  // OpenCC 已經是全站語系機制在用的東西，這裡直接沿用。
-  try {
-    if (!toCn && window.OpenCC) toCn = OpenCC.Converter({ from: "tw", to: "cn" });
-  } catch (e) { toCn = null; }
-}
-
-function normalize(text) {
-  const t = String(text == null ? "" : text).toLowerCase().trim();
-  if (!t) return "";
-  try {
-    return toCn ? toCn(t) : t;
-  } catch (e) {
-    return t;   // 轉換失敗就用原文比，不要讓搜尋整個壞掉
-  }
-}
+// v1.42.2：這一頁原本自己有一份繁簡折疊的實作，已抽到 js/zh-match.js 全站共用。
+// 同一段邏輯寫兩次，就會出現「這一頁查得到、那一頁查不到」——實際上就發生了
+// （藥材關聯查詢站輸入繁體查無結果，這一頁卻正常），見 rules.md 的單一事實來源原則。
+const normalize = (text) => window.zhNorm(text);
 
 function herbHaystack(h) {
   return [h.herb_cn_name, h.herb_en_name, h.herb_pinyin,
@@ -318,14 +302,7 @@ function searchHerbs(query) {
 }
 
 function highlight(text, query) {
-  const raw = String(text == null ? "" : text);
-  const q = normalize(query);
-  if (!q) return esc(raw);
-  const idx = normalize(raw).indexOf(q);
-  // 轉換後長度可能與原字串不同，只有長度一致時才安全地標記
-  if (idx < 0 || normalize(raw).length !== raw.length) return esc(raw);
-  return esc(raw.slice(0, idx)) + "<mark>" + esc(raw.slice(idx, idx + q.length)) +
-         "</mark>" + esc(raw.slice(idx + q.length));
+  return window.zhHighlight(text, query, esc);
 }
 
 function renderHerbResults(query) {
@@ -407,7 +384,6 @@ function bindHerbSearch() {
 async function loadHerbs() {
   const input = document.getElementById("herbSearch");
   try {
-    initConverter();
     allHerbs = await api("/tcmsp/herbs/public/list");
     allHerbs.sort((a, b) => (b.target_count || 0) - (a.target_count || 0));
     input.placeholder = `輸入藥材名稱搜尋（共 ${allHerbs.length} 種，可用中文／英文／拼音）`;

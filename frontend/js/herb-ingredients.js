@@ -122,9 +122,10 @@ async function loadHerbs() {
 }
 
 function renderHerbList() {
-  const kw = ($('herbSearch').value || '').trim().toLowerCase();
-  const rows = HERBS.filter(h => !kw || [h.herb_cn_name, h.herb_pinyin, h.herb_en_name, h.child_cn_name]
-    .join(' ').toLowerCase().includes(kw));
+  // 資料庫存的是簡體、畫面預設繁體，比對一律走 zh-match.js（見那支檔案開頭的說明）
+  const kw = ($('herbSearch').value || '').trim();
+  const rows = HERBS.filter(h => window.zhMatchAny(
+    [h.herb_cn_name, h.herb_pinyin, h.herb_en_name, h.child_cn_name], kw));
   $('herbList').innerHTML = rows.map(h => `
     <div class="herbRow${h.herb_id === currentHerbId ? ' active' : ''}" data-id="${h.herb_id}">
       <div class="name">${esc(h.herb_cn_name || h.herb_en_name || h.herb_id)}</div>

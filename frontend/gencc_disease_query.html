@@ -7,6 +7,7 @@
 <title>可編碼蛋白區中藥與疾病關聯</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/standalone/umd/vis-network.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+<script src="js/zh-match.js"></script>
 <script src="js/i18n-dict.js"></script>
 <script src="js/site-lang.js"></script>
 <style>
@@ -311,7 +312,7 @@ function renderList(filter){
   const kw = (filter || document.getElementById("herbSearch").value || "").trim().toLowerCase();
   let list = allHerbs;
   if (kw) {
-    list = list.filter(h => [h.herb_cn_name, h.herb_pinyin, h.herb_en_name].some(v => (v||'').toLowerCase().includes(kw)));
+    list = list.filter(h => window.zhMatchAny([h.herb_cn_name, h.herb_pinyin, h.herb_en_name], kw));
   }
   const listEl = document.getElementById("herbList");
   listEl.innerHTML = list.map(h => `
