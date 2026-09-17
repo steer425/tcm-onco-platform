@@ -99,6 +99,37 @@ Dashboard 頁面的六張卡片（主機資訊／版本資訊／專案文件／2
 - 後台「系統設定」頁面有手動觸發按鈕（`POST /system-settings/recompute-stats`），供只是透過後台介面手動編輯了少量資料、不想重新匯入整批檔案時使用
 - **之後如果又要新增一個「查詢站清單要顯示的統計數字」，一律照這個模式做**：加資料庫欄位 → 寫進 `recompute_stats.py` → 兩個匯入腳本與 `migrate_schema.py` 都要記得觸發 → 端點直接讀欄位回傳。不要為了圖方便，又寫一段「每次請求都重新掃一次全部關聯資料」的即時運算邏輯，那樣會讓查詢站的清單載入變慢（這正是這次改版要解決的問題本身）
 
+### 查詢站的關聯圖不可以是「不肯讓步」的固定高度（v1.42.3 起）
+
+**背景。** 五個查詢站共用同一個版型：`#main`（overflow-y:auto）→ `#body`（flex:1）→
+`#contentCol`（flex column）→ 關聯圖 ＋ 拖曳把手 ＋ 分頁 ＋ 表格。
+
+關聯圖原本是 `height:380px; flex-shrink:0`。視窗一矮，`#contentCol` 裡可以壓縮的
+就只剩分頁與表格，兩個被壓成 0——右下角的資料表整個消失。
+
+**最惡劣的是連捲軸都沒有。** `#main` 是 `overflow-y:auto`，但 `#body{min-height:0}`
+讓瀏覽器選擇「把 `#body` 縮小」而不是「溢出」。內容沒有超出容器就不會有捲軸，
+使用者**沒有任何方法看到那張表**。實測 840px 高的視窗，表格只剩 24px 的 padding。
+
+**規則一：關聯圖用 `height` 表示「想要的高度」，但必須 `flex-shrink:1` 並給 `min-height`。**
+空間不夠時該讓步的是圖，不是資料。
+
+**規則二：任何「flex:1 的內容區」都要給 `min-height` 地板。**
+`flex:1` 不保證看得見——`min-height` 預設是 `auto`，在 flex 容器裡常被解成可壓縮到 0。
+
+```css
+#network  { height:380px; min-height:150px; flex-shrink:1; }
+#tableWrap{ flex:1; min-height:110px; overflow:auto; }
+#contentCol{ flex:1; display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
+```
+
+**規則三：版面改動要量過，不要用眼睛看一個視窗大小就算數。**
+用 Chromium 掃一遍 700～1000px 的視窗高度，量 `getBoundingClientRect().height`。
+這個 bug 在開發者常用的 1080p 視窗上完全看不出來。
+
+**規則四：五個查詢站是同一個版型，發現版面問題一律五頁一起改。**
+只修回報的那一頁，另外四頁會留著同樣的地雷（v1.42.2 的中文比對也是同一個教訓）。
+
 ### 中文名稱的比對只有一份：`frontend/js/zh-match.js`（v1.42.2 起）
 
 **背景。** TCMSP 匯入的中文名稱是**簡體**（当归、猫爪草、鱼腥草），

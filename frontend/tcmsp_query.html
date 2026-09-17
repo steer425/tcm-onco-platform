@@ -49,13 +49,16 @@ select{background:#1c1f26;color:#eee;border:1px solid #3a3d44;border-radius:6px;
 #pickerCol{width:260px;flex-shrink:0;border-right:1px solid var(--line);overflow-y:auto;}
 #pickerCol .pick-row{display:flex;gap:6px;padding:5px 12px;font-size:12px;cursor:pointer;}
 #pickerCol .pick-row:hover{background:#1a1d23;}
-#contentCol{flex:1;display:flex;flex-direction:column;min-width:0;}
-#network{height:380px;border-bottom:1px solid var(--line);position:relative;flex-shrink:0;}
+#contentCol{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;}
+/* v1.42.3：關聯圖以前是 flex-shrink:0 的固定高度，視窗一矮就把分頁與表格整個擠成 0，
+   而且 #main 是把 #body 縮小而不是溢出，所以連捲都捲不到（見 rules.md）。
+   改成：關聯圖可以讓步（保留最小高度），表格永遠留得住至少兩三列。 */
+#network{height:380px;min-height:150px;border-bottom:1px solid var(--line);position:relative;flex-shrink:1;}
 #network .placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:20px;}
 .tabs{display:flex;gap:6px;padding:8px 16px 0;}
 .tabs button{background:#1c1f26;}
 .tabs button.active{background:#2f5c8a;border-color:#3d70a3;}
-#tableWrap{flex:1;overflow:auto;padding:8px 16px 16px;}
+#tableWrap{flex:1;min-height:110px;overflow:auto;padding:8px 16px 16px;}
 table{width:100%;border-collapse:collapse;font-size:12px;}
 th{position:sticky;top:0;background:#1c1f26;text-align:left;padding:7px 8px;color:#bcd;border-bottom:1px solid var(--line);white-space:nowrap;}
 td{padding:6px 8px;border-bottom:1px solid #23262c;vertical-align:top;}

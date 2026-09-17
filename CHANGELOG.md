@@ -1,5 +1,72 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.42.3 — 2026-09-17（查詢站的分頁與表格在矮視窗被擠成 0）
+
+### 症狀
+
+藥材關聯查詢站右下角的 Ingredients／Related Targets／Related Diseases **分頁與表格整個不見**，
+疾病關聯查詢站也一樣。**而且捲不到**——頁面沒有捲軸可以捲到它們。
+
+### 這不是程式壞了，是版面被擠掉
+
+五個查詢站都是同一個版型：
+
+```
+#main（overflow-y:auto）
+  └ #body（flex:1; min-height:0）        ← 可以縮到 0
+      └ #contentCol（flex column）
+          ├ #network        height:380px; flex-shrink:0   ← 不讓步
+          ├ #netResizeHandle 7px          flex-shrink:0
+          ├ .tabs                                          ← 只能犧牲它
+          └ #tableWrap      flex:1                         ← 和它
+```
+
+關聯圖是**不肯讓步的固定高度**，所以視窗一矮，可以壓縮的只剩分頁與表格，兩個被壓成 0。
+
+**最惡劣的是連捲軸都沒有。** `#main` 雖然是 `overflow-y:auto`，
+但 `#body{min-height:0}` 讓它選擇「把 #body 縮小」而不是「溢出」——
+內容沒有超出容器，瀏覽器就不會給捲軸。使用者不是看不到，是**沒有任何方法看到**。
+
+### 實測（Chromium，1841px 寬，改動前）
+
+| 視窗高 | #body | 關聯圖需要 | 表格實際高度 |
+|---|---|---|---|
+| 900px | 498px | 389px | 73px |
+| 880px | 478px | 389px | **53px** |
+| 840px | 438px | 389px | **24px（只剩 padding，一列都看不到）** |
+| 760px | 358px | 389px | **24px** |
+
+24px 是 `#tableWrap` 的上下 padding。**表格本體一列都沒露出來。**
+
+### 做法：讓關聯圖讓步，並給表格一個地板
+
+```css
+#network  { height:380px; min-height:150px; flex-shrink:1; }   /* 原本 flex-shrink:0 */
+#tableWrap{ flex:1; min-height:110px; overflow:auto; }          /* 原本沒有地板 */
+#contentCol{ …; min-height:0; overflow:hidden; }                /* 別畫到框外 */
+```
+
+`height` 保留成「想要的高度」，`flex-shrink:1` 讓它在空間不足時先讓步；
+拖曳調整比例的功能不受影響（`initNetworkResize()` 設的是 inline height，仍然有效）。
+vis-network 是 `autoResize:true`，容器高度變了會自己重畫。
+
+### 實測（改動後）
+
+700～1000px 的每一個高度，表格都穩定保有 134px（約三到四列），關聯圖降到 150px 地板為止。
+
+### 改了哪五頁
+
+`tcmsp_query.html`（380px）、`disease_query.html`、`darkgene_query.html`、
+`gencc_disease_query.html`、`ginseng_darkgene.html`（都是 340px）。
+**五頁是同一個版型，所以一起改**——只修使用者回報的那一頁，另外四頁會留著同樣的地雷。
+
+### 順帶釐清：這不是 v1.42.x 造成的
+
+v1.42.0／v1.42.1／v1.42.2 對 `tcmsp_query.html` 的改動只有欄位說明與搜尋比對，
+`git diff` 確認沒有碰過關聯圖或表格。**這個版面問題是高度相依的**——
+視窗變矮、瀏覽器縮放改變，或工具列多折一行，都會讓它突然出現，看起來就像功能消失。
+
+
 ## v1.42.2 — 2026-09-16（中文搜尋不再分繁簡）
 
 ### 症狀
