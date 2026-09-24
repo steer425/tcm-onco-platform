@@ -220,12 +220,21 @@ function renderLinksBody(data) {
 
   body.innerHTML = `
     <h4 style="margin-bottom:6px;">比對到的 TCMSP 靶點（${data.matched_targets.length} 個）</h4>
-    <table style="margin-bottom:16px;">
+    <table style="margin-bottom:6px;">
       <thead><tr><th>Tar ID</th><th>Target Name</th><th>DrugBank ID</th></tr></thead>
       <tbody>
-        ${data.matched_targets.map(t => `<tr><td>${t.tar_id}</td><td>${escapeHtml(t.target_name)}</td><td>${t.drugbank_id || '<span class="hint-msg">-</span>'}</td></tr>`).join("")}
+        ${data.matched_targets.map(t => `<tr>
+          <td>${window.srcLinks.tarId(t.tar_id)}</td>
+          <td>${window.srcLinks.uniprot(t.uniprot_accession, t.target_name)}</td>
+          <td>${window.srcLinks.drugbank(t.drugbank_id)}</td>
+        </tr>`).join("")}
       </tbody>
     </table>
+    <ul class="hint-msg" style="margin:0 0 16px; padding-left:18px; line-height:1.8;">
+      <li>Tar ID 是 TCMSP 自有的編號，點擊開啟 TCMSP 的 All targets 瀏覽表。</li>
+      <li>Target Name 連到 UniProt：已完成靶點標準化的直連該蛋白條目，尚未標準化的是名稱搜尋結果。</li>
+      <li>TCMSP 的 DrugBank ID 欄位存的不是 DrugBank 編號，只有格式符合時才提供連結。</li>
+    </ul>
 
     <h4 style="margin-bottom:6px;">候選藥材（共 ${data.herbs.length} 種，依關聯成分數排序）</h4>
     ${data.herbs.length ? `

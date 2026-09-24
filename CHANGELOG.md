@@ -1,5 +1,59 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.42.4 — 2026-09-17（暗黑基因靶點關聯視窗加上來源資料庫連結）
+
+### 需求與實際情況不一致的地方
+
+要求是「Tar ID 與 DrugBank ID 增加來源資料庫的連結」。查證後**只有一個欄位真的能這樣連**：
+
+| 欄位 | 是什麼 | 處理 |
+|---|---|---|
+| `Tar ID`（TAR04620） | **TCMSP 自有編號**，跟 Mol ID 同性質 | 連到 TCMSP 的 All targets 瀏覽表 |
+| `Target Name` | 蛋白質名稱 | **連 UniProt 條目** ← 真正有價值的那一條，原本沒有 |
+| `DrugBank ID`（h001） | **不是 DrugBank 編號** | 只有格式對才連，否則不連 |
+
+#### DrugBank 那一欄為什麼不能直接串
+
+`models.TcmspTargetUniprot` 的說明早就記過：TCMSP 的 `drugbank_id`
+「其實是流水號（3、7、16…）不是 DrugBank ID」，實際畫面上也出現 `h001`。
+真正的 DrugBank 編號是 `DB` + 5 碼（藥物）或 `BE` + 7 碼（生物實體）。
+
+**盲目串上去會得到一整欄 404。連結壞掉比沒有連結更糟**——
+使用者會以為是資料庫沒收錄，而不是我們把識別碼接錯地方。
+所以改成**驗格式再決定連不連**：未來資料若換成真的 DrugBank ID，連結會自動亮起來。
+
+### ⚠️ 同時查到：`tcmspsearch.php` 的 STATIC_TOKEN 已經失效
+
+`tcmsp_query.html` 的 `tcmspHerbUrl()` 用的是
+`tcmspsearch.php?qr=...&qsr=...&token=0d9b10a0...`。
+
+2026-09-17 實測（無 TCMSP 登入狀態的乾淨瀏覽器）：查藥材、查靶點都回
+**「Error querying database..」**。`browse.php?qc=targets` 則正常。
+
+新的連結因此一律建在 `browse.php` 上。**藥材頁那個「在 TCMSP 開啟」可能也是壞的**，
+但無法排除「有 TCMSP 登入狀態時才有效」，所以這一版沒有動它——待確認後再處理。
+
+### 改了什麼
+
+- **新增 `frontend/js/source-links.js`** — 全站唯一一份來源連結產生器：
+  `srcLinks.tarId()`／`srcLinks.uniprot(accession, name)`／`srcLinks.drugbank(value)`。
+  全部有 HTML 跳脫，空值一律回 `-`。
+- `app/target_index.py` 新增 `accepted_uniprot_by_tar()`——**只取 auto／confirmed**。
+  `pending` 是還沒審過的候選，拿它串 UniProt 連結等於把未確認的對應當成事實呈現。
+- `app/routers/dark_genes.py` 的 `/dark-genes/{id}/tcmsp-links` 回傳新增
+  `uniprot_accession`／`uniprot_gene_symbol`。
+- `frontend/js/dark-genes.js`／`dark-genes.html` — 三欄改用共用產生器，
+  並在表格下方用三行清單說明每一欄連到哪裡、為什麼有的沒有連結。
+- `frontend/js/i18n-dict.js` — en／ko 各補 3 條（724／724）。
+
+### 尚未套用的地方
+
+其他五個查詢站（`darkgene_query`／`gencc_disease_query`／`gencc_disease_list_query`／
+`ginseng_darkgene`／`disease_query`）與 `darkgene-stats.js` 也有同樣的
+Tar ID／DrugBank ID 欄位。共用模組已經備好，但**那些端點目前沒有回傳 UniProt 登錄號**，
+要一起改需要同時動六個端點，本版先不做。
+
+
 ## v1.42.3 — 2026-09-17（查詢站的分頁與表格在矮視窗被擠成 0）
 
 ### 症狀

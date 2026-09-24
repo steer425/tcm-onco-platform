@@ -99,6 +99,37 @@ Dashboard 頁面的六張卡片（主機資訊／版本資訊／專案文件／2
 - 後台「系統設定」頁面有手動觸發按鈕（`POST /system-settings/recompute-stats`），供只是透過後台介面手動編輯了少量資料、不想重新匯入整批檔案時使用
 - **之後如果又要新增一個「查詢站清單要顯示的統計數字」，一律照這個模式做**：加資料庫欄位 → 寫進 `recompute_stats.py` → 兩個匯入腳本與 `migrate_schema.py` 都要記得觸發 → 端點直接讀欄位回傳。不要為了圖方便，又寫一段「每次請求都重新掃一次全部關聯資料」的即時運算邏輯，那樣會讓查詢站的清單載入變慢（這正是這次改版要解決的問題本身）
 
+### 外部連結一律走 `frontend/js/source-links.js`，而且**連之前要先確認那是不是真的外部識別碼**（v1.42.4 起）
+
+**背景。** 畫面上長得像外部識別碼的欄位，不一定是。TCMSP 的靶點表有三欄：
+
+| 欄位 | 實際上是什麼 |
+|---|---|
+| `Tar ID`（TAR04620） | **TCMSP 自有編號**，跟 Mol ID 同性質，出了 TCMSP 沒有意義 |
+| `Target Name` | 蛋白質名稱，**標準化過的才有 UniProt 登錄號可以直連** |
+| `DrugBank ID`（`h001`、`3`、`7`…） | **不是 DrugBank 編號**（見 `models.TcmspTargetUniprot` 的說明） |
+
+**規則一：連結壞掉比沒有連結更糟。** 使用者點到 404 會以為是那個資料庫沒收錄，
+而不是我們把識別碼接錯地方——又是一種靜默失真。
+
+**規則二：外部識別碼要驗格式再決定連不連。**
+DrugBank 藥物是 `DB`+5 碼、生物實體是 `BE`+7 碼。格式不符就原樣顯示並說明，
+不要硬連。這樣未來資料換成真的識別碼時，連結會自動亮起來。
+
+**規則三：只用已採用（`auto`／`confirmed`）的映射去產生外部連結。**
+`pending` 是還沒審過的候選，拿它串 UniProt 連結，等於把未確認的對應當成事實呈現。
+用 `app/target_index.py` 的 `accepted_uniprot_by_tar()`，不要自己查一次。
+
+**規則四：⚠️ 不要在 `tcmspsearch.php?...&token=<STATIC_TOKEN>` 上面建新連結。**
+2026-09-17 實測（乾淨瀏覽器、無 TCMSP 登入）：查藥材與查靶點都回
+「Error querying database..」，那個寫死的 token 已經失效。
+`browse.php?qc=targets`／`?qc=herbs`／`?qc=diseases` 仍然正常，新連結一律用 browse。
+`tcmsp_query.html` 的「在 TCMSP 開啟」可能也是壞的，待確認是否為「需要登入狀態」。
+
+**規則五：外部網址要實際打開看過再寫進程式。**
+這一版 TCMSP 的 search、UniProt 的 entry、DrugBank 的 drugs 三個網址都逐一開過。
+**不要憑印象寫網址格式**——TCMSP 那個就是憑印象沿用舊 token 才留下壞連結。
+
 ### 查詢站的關聯圖不可以是「不肯讓步」的固定高度（v1.42.3 起）
 
 **背景。** 五個查詢站共用同一個版型：`#main`（overflow-y:auto）→ `#body`（flex:1）→

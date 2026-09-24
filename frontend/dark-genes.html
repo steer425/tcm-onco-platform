@@ -19,6 +19,11 @@
   .status-inactive { background:#fdecea; color:#c0392b; }
   #importDropZone { border: 2px dashed var(--border); border-radius: 10px; padding: 24px; text-align: center; color: var(--muted); cursor: pointer; }
   #importDropZone:hover { border-color: var(--primary); color: var(--primary); }
+  /* 來源資料庫連結（js/source-links.js）。有連結與沒連結要一眼分得出來——
+     DrugBank 那一欄大多數值不是真的 DrugBank 編號，不會有連結。 */
+  a.src-link { color: var(--primary, #1c4d78); text-decoration: none; border-bottom: 1px dotted currentColor; }
+  a.src-link:hover { text-decoration: none; border-bottom-style: solid; }
+  .src-plain { color: #777; border-bottom: 1px dotted #ccc; cursor: help; }
 </style>
 </head>
 <body data-current-page="dark-genes.html">
@@ -139,6 +144,7 @@
 <script src="js/nav.js"></script>
 <script src="js/i18n-dict.js"></script>
 <script src="js/site-lang.js"></script>
+<script src="js/source-links.js"></script>
 <script src="js/dark-genes.js"></script>
 </body>
 </html>

@@ -47,6 +47,29 @@ def _uniprot_rows(db: Session):
             .all())
 
 
+def accepted_uniprot_by_tar(db: Session, tar_ids):
+    """{tar_id: 已採用的 UniProt 映射列}。給畫面做外部連結用。
+
+    **只取 auto／confirmed**，跟這支檔案其他函式同一個判定（`ACCEPTED_STATUS`）——
+    `pending` 是還沒審過的候選，拿它去串 UniProt 連結等於把未確認的對應
+    當成已確認的事實呈現給使用者。
+
+    一個靶點可能對到多筆（Estrogen receptor → ESR1／ESR2），這裡取第一筆，
+    畫面只需要一個入口；要看完整候選請到靶點標準化頁。
+    """
+    if not tar_ids:
+        return {}
+    rows = (db.query(models.TcmspTargetUniprot)
+            .filter(models.TcmspTargetUniprot.tar_id.in_(list(tar_ids)),
+                    models.TcmspTargetUniprot.status.in_(ACCEPTED_STATUS))
+            .all())
+    best = {}
+    for r in rows:
+        if r.tar_id not in best and r.accession:
+            best[r.tar_id] = r
+    return best
+
+
 def _row_symbols(row) -> list:
     """一筆映射能代表的所有符號：主要基因符號 + 同義詞。"""
     names = [row.gene_symbol or ""]

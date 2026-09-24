@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.42.3"
-set "DEFAULT_MSG=v1.42.3 let the relationship graph give way instead of crushing the tabs and table to nothing, because on a short window they collapsed to zero height with no scrollbar that could reach them"
+set "EXPECTED_VER=1.42.4"
+set "DEFAULT_MSG=v1.42.4 link the target fields to their real source databases, and deliberately do not link the DrugBank column because TCMSP does not actually store DrugBank identifiers there"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

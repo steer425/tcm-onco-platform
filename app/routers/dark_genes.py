@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.database import get_db, get_query_db
 from app.deps import get_current_user, require_admin, write_audit_log
-from app.target_index import symbol_set, symbol_to_targets, target_to_symbols
+from app.target_index import (accepted_uniprot_by_tar, symbol_set, symbol_to_targets,
+                              target_to_symbols)
 
 router = APIRouter(prefix="/dark-genes", tags=["暗黑基因管理（癌症基因參考資料，目標三）"])
 
@@ -339,10 +340,19 @@ def get_gene_tcmsp_links(gene_id: str, current_user: models.User = Depends(get_c
         for herb_id in mol_to_herbs.get(mol_id, set()):
             herb_hit_count[herb_id] = herb_hit_count.get(herb_id, 0) + 1
 
+    uniprot_by_tar = accepted_uniprot_by_tar(db, tar_ids)
+
     return {
         "gene": {"id": gene.id, "hugo_symbol": gene.hugo_symbol, "gene_aliases": gene.gene_aliases, "gene_type": gene.gene_type},
+        # 帶出 UniProt 登錄號，畫面才能把 Target Name 連到真正的來源資料庫。
+        # Tar ID 與 DrugBank ID 都不是可以連外的識別碼（見 frontend/js/source-links.js）。
         "matched_targets": [
-            {"tar_id": t.tar_id, "target_name": t.target_name, "drugbank_id": t.drugbank_id, "kegg": t.kegg}
+            {"tar_id": t.tar_id, "target_name": t.target_name, "drugbank_id": t.drugbank_id,
+             "kegg": t.kegg,
+             "uniprot_accession": (uniprot_by_tar.get(t.tar_id).accession
+                                   if uniprot_by_tar.get(t.tar_id) else None),
+             "uniprot_gene_symbol": (uniprot_by_tar.get(t.tar_id).gene_symbol
+                                     if uniprot_by_tar.get(t.tar_id) else None)}
             for t in matched_targets
         ],
         "ingredients": [
