@@ -17,7 +17,17 @@ html,body{margin:0;padding:0;background:var(--bg);color:#eee;font-family:"Noto S
 #header h1{margin:0 0 4px;font-size:18px;font-weight:600;}
 #header p{margin:0;font-size:12px;color:var(--muted);line-height:1.6;}
 #layout{display:flex;height:calc(100vh - 116px);min-height:600px;}
-#herbPanel{width:340px;flex-shrink:0;border-right:1px solid var(--line);display:flex;flex-direction:column;}
+/* v1.42.5：藥材清單可向左收合。寬度是動畫的，所以一定要 overflow:hidden——
+   否則收合過程中裡面的搜尋框與按鈕會溢出到右邊蓋住主畫面。 */
+#herbPanel{width:340px;flex-shrink:0;border-right:1px solid var(--line);display:flex;
+  flex-direction:column;overflow:hidden;transition:width .18s ease;}
+body.herb-collapsed #herbPanel{width:0;border-right:0;}
+/* 收合把手獨立成一條常駐的窄軌，不放在面板裡面——放裡面的話收合後就跟著消失，
+   使用者再也點不開（查詢站版面規則：要活過狀態變化的元素必須是兄弟節點）。 */
+#herbRail{width:16px;flex-shrink:0;background:#1c1f26;border-right:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  color:#6b7480;font-size:13px;user-select:none;}
+#herbRail:hover{background:#242830;color:#7db8e8;}
 #herbSearch{margin:10px;padding:8px 10px;background:#1c1f26;border:1px solid #3a3d44;color:#eee;border-radius:6px;font-size:13px;}
 #herbStats{padding:0 12px 6px;font-size:11.5px;color:var(--muted);}
 #herbList{flex:1;overflow-y:auto;border-top:1px solid var(--line);}
@@ -46,7 +56,19 @@ button.primary{background:#2f5c8a;border-color:#3d70a3;}
 button.primary:hover{background:#396d9e;}
 select{background:#1c1f26;color:#eee;border:1px solid #3a3d44;border-radius:6px;padding:5px 8px;font-size:12px;}
 #body{display:flex;flex:1;min-height:0;}
-#pickerCol{width:260px;flex-shrink:0;border-right:1px solid var(--line);overflow-y:auto;}
+/* v1.42.5：成分搜尋框必須是 #pickerCol 的**兄弟**，不能放在它裡面——
+   renderPicker() 是用 innerHTML 整個換掉 #pickerCol，放裡面每次重繪就會被清空
+   （rules.md 第五之一章，同一類 bug 已經發生過三次）。 */
+#pickerWrap{width:260px;flex-shrink:0;border-right:1px solid var(--line);
+  display:flex;flex-direction:column;min-height:0;}
+#pickerBar{padding:8px 8px 6px;border-bottom:1px solid var(--line);flex-shrink:0;}
+#pickerSearch{width:100%;box-sizing:border-box;margin:0;padding:6px 8px;background:#1c1f26;
+  border:1px solid #3a3d44;color:#eee;border-radius:6px;font-size:12px;}
+#pickerCount{margin-top:5px;font-size:11px;color:var(--muted);}
+#pickerCol{flex:1;min-height:0;overflow-y:auto;}
+#pickerCol .pick-empty{padding:14px 12px;font-size:11.5px;color:var(--muted);line-height:1.7;}
+.pick-row mark{background:#3d5a2a;color:#d8f0c0;padding:0 1px;border-radius:2px;}
+.pick-row .molid{color:#8a939e;font-size:10.5px;font-family:ui-monospace,Menlo,monospace;}
 #pickerCol .pick-row{display:flex;gap:6px;padding:5px 12px;font-size:12px;cursor:pointer;}
 #pickerCol .pick-row:hover{background:#1a1d23;}
 #contentCol{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;}
@@ -213,6 +235,7 @@ body[data-page-theme="light"] .versionEntry ul{color:#3a4a42;}
     <div id="herbStats"></div>
     <div id="herbList"></div>
   </div>
+  <div id="herbRail" title="收合／展開藥材清單"><span id="herbRailIcon">‹</span></div>
   <div id="main">
     <div id="emptyState">
       ← 請從左側選擇一個藥材
@@ -872,6 +895,37 @@ function appendHerbRow(list, h){
 }
 function escapeHtml(s){ return String(s??'').replace(/[&<>'"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 
+// ---------- 藥材清單收合（v1.42.5）----------
+// 查詢站的水平空間本來就不夠：左邊藥材清單 340px + 成分勾選欄 260px 之後，
+// 關聯圖與表格只剩不到一半。選定藥材之後那份清單多半用不到，可以收起來。
+const HERB_COLLAPSE_KEY = 'tcm_herb_panel_collapsed';
+
+function setHerbCollapsed(collapsed){
+  document.body.classList.toggle('herb-collapsed', collapsed);
+  const icon = document.getElementById('herbRailIcon');
+  if(icon) icon.textContent = collapsed ? '›' : '‹';
+  const rail = document.getElementById('herbRail');
+  if(rail) rail.title = collapsed ? '展開藥材清單' : '收合藥材清單';
+  try { localStorage.setItem(HERB_COLLAPSE_KEY, collapsed ? '1' : '0'); }
+  catch(e){ /* 私密視窗會丟例外，不影響收合本身 */ }
+
+  // 關聯圖的畫布寬度跟著變了，但 vis-network 的 autoResize 只監看「視窗」大小，
+  // 不監看容器——不手動叫它重畫，圖會留在舊寬度、右邊空一塊。
+  // 等 CSS 的 .18s 轉場跑完再畫，否則量到的是轉場中間的寬度。
+  setTimeout(() => {
+    if(network){ network.redraw(); network.fit({ animation:false }); }
+  }, 220);
+}
+
+document.getElementById('herbRail').addEventListener('click', () => {
+  setHerbCollapsed(!document.body.classList.contains('herb-collapsed'));
+});
+
+// 記住上次的狀態。收合是使用者對版面的選擇，不該每次重整就跳回來。
+try {
+  if(localStorage.getItem(HERB_COLLAPSE_KEY) === '1') setHerbCollapsed(true);
+} catch(e){ /* 取不到就維持展開 */ }
+
 document.getElementById('herbSearch').addEventListener('input', e => renderHerbList(e.target.value));
 
 // ---------- Herb detail view ----------
@@ -965,7 +1019,14 @@ async function selectHerb(herbId){
       <button id="dlCsv">⭳ 下載此藥材 CSV</button>
     </div>
     <div id="body">
-      <div id="pickerCol"></div>
+      <div id="pickerWrap">
+        <div id="pickerBar">
+          <input id="pickerSearch" type="search" autocomplete="off"
+                 placeholder="搜尋成分名稱或編號…" />
+          <div id="pickerCount"></div>
+        </div>
+        <div id="pickerCol"></div>
+      </div>
       <div id="contentCol">
         <div id="network"><div class="placeholder">請按上方「▶ 顯示 Selected」查看網絡圖</div></div>
         <div id="netResizeHandle" title="拖曳調整關聯圖／表格的高度比例">⋯</div>
@@ -987,6 +1048,22 @@ async function selectHerb(herbId){
   `;
 
   applyGraphLimitDefaultsToToolbar();
+
+  // #main 每換一次藥材就被 innerHTML 整個重建，所以搜尋框的事件要在這裡重新掛，
+  // 並把先前的關鍵字填回去——pickerFilter 是模組層級變數，換藥材時刻意不清空。
+  const pickerSearchEl = document.getElementById('pickerSearch');
+  if(pickerSearchEl){
+    pickerSearchEl.value = pickerFilter;
+    pickerSearchEl.addEventListener('input', () => {
+      pickerFilter = pickerSearchEl.value;
+      renderPicker();
+    });
+    // 搜尋框裡按 Enter 不要送出任何東西，只是收掉鍵盤焦點
+    pickerSearchEl.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter'){ e.preventDefault(); pickerSearchEl.blur(); }
+      if(e.key === 'Escape'){ pickerSearchEl.value = ''; pickerFilter = ''; renderPicker(); }
+    });
+  }
 
   document.getElementById('selAll').onclick = () => { selectedMols = new Set(molsByHerb.get(herbId)); renderPicker(); markPending(); };
   document.getElementById('selNone').onclick = () => { selectedMols = new Set(); renderPicker(); markPending(); };
@@ -1056,18 +1133,67 @@ function renderKpi(){
   `;
 }
 
+// 成分搜尋關鍵字。放在 renderPicker() 外面，換藥材時要沿用同一個字串——
+// 如果每次 renderPicker() 都把它歸零，使用者一勾選成分就會看到搜尋條件被清掉。
+let pickerFilter = '';
+
+/* 一個成分是否符合搜尋條件：名稱與編號都比對，大小寫不敏感。
+ * 編號支援部分比對（打 005321 也找得到 MOL005321），因為使用者常常只記得數字那幾碼。 */
+function pickMatch(m, kw){
+  if(!kw) return true;
+  return (m.molecule_name || '').toLowerCase().includes(kw)
+      || (m.mol_id || '').toLowerCase().includes(kw);
+}
+
+// 把命中的那一段標起來。escapeHtml 一定要先做再插 <mark>，順序反了就是 XSS。
+function pickHighlight(text, kw){
+  const raw = String(text == null ? '' : text);
+  if(!kw) return escapeHtml(raw);
+  const i = raw.toLowerCase().indexOf(kw);
+  if(i < 0) return escapeHtml(raw);
+  return escapeHtml(raw.slice(0, i)) + '<mark>' + escapeHtml(raw.slice(i, i + kw.length))
+       + '</mark>' + escapeHtml(raw.slice(i + kw.length));
+}
+
+/* 上方的計數列。**勾選數一律以 selectedMols 為準，不是畫面上看得到的列數**——
+ * 搜尋只是把清單收窄，沒有改變任何勾選。不講清楚的話，使用者會以為
+ * 「搜尋之後只剩一個，那我按顯示 Selected 就是只看這一個」，然後被 190 個節點嚇到。 */
+function updatePickerCount(shown, total, kw){
+  const el = document.getElementById('pickerCount');
+  if(!el) return;
+  // 260px 寬，字要短，否則會折成三行把清單擠下去
+  el.innerHTML = kw
+    ? `顯示 ${shown}/${total}　·　已勾選 <b>${selectedMols.size}</b>（<b>不受搜尋影響</b>）`
+    : `共 ${total} 個　·　已勾選 <b>${selectedMols.size}</b> 個`;
+}
+
 function renderPicker(){
   const mols = molsByHerb.get(currentHerbId).map(id => ingredientsById.get(id)).filter(Boolean);
+  const kw = pickerFilter.trim().toLowerCase();
+  const rows = mols.filter(m => pickMatch(m, kw));
   const col = document.getElementById('pickerCol');
-  col.innerHTML = mols.map(m => `
+
+  updatePickerCount(rows.length, mols.length, kw);
+
+  if(!rows.length){
+    col.innerHTML = `<div class="pick-empty">找不到符合「${escapeHtml(pickerFilter)}」的成分。<br>
+      可以試成分名稱（例如 Frutinone A）或成分編號（例如 MOL005321，打後面數字也可以）。</div>`;
+    return;
+  }
+
+  col.innerHTML = rows.map(m => `
     <label class="pick-row">
       <input type="checkbox" data-mol="${m.mol_id}" ${selectedMols.has(m.mol_id)?'checked':''}>
-      ${escapeHtml(m.molecule_name)} <span class="small">(OB ${m.ob!=null?m.ob.toFixed(1):'-'})</span>
+      <span>${pickHighlight(m.molecule_name, kw)}
+        <span class="small">(OB ${m.ob!=null?m.ob.toFixed(1):'-'})</span>
+        <br><span class="molid">${pickHighlight(m.mol_id, kw)}</span></span>
     </label>`).join('');
   col.querySelectorAll('input').forEach(inp => {
     inp.onchange = () => {
       if(inp.checked) selectedMols.add(inp.dataset.mol); else selectedMols.delete(inp.dataset.mol);
       markPending();
+      // 只更新計數，不重繪整份清單——190 筆以上每勾一次就重繪會頓，焦點也會掉
+      updatePickerCount(rows.length, mols.length, kw);
     };
   });
 }
