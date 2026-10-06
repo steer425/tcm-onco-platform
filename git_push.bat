@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.42.5"
-set "DEFAULT_MSG=v1.42.5 let the herb list collapse and give the ingredient picker a search box, because the query station runs out of horizontal space and 190 checkboxes cannot be scanned by eye"
+set "EXPECTED_VER=1.42.8"
+set "DEFAULT_MSG=v1.42.8 pop the ingredient table out into its own full-screen window and show the six ADME columns the API was already sending, because that table is what people actually read and the main layout was squeezing it into 134px"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

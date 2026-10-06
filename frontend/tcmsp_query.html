@@ -117,8 +117,51 @@ a.term-link:hover{color:#a9d2f5;}
 .col-resizer:hover{background:rgba(125,184,232,.4);}
 #netResizeHandle{height:7px;cursor:row-resize;background:#1c1f26;border-bottom:1px solid var(--line);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#555;font-size:10px;letter-spacing:2px;}
 #netResizeHandle:hover{background:#242830;color:#7db8e8;}
-#tableWrap table{table-layout:fixed;}
-#tableWrap th{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* v1.42.6：關聯圖可隱藏。只藏關聯圖本體與它的拖曳把手，
+   #toolbar2 裡的開關按鈕留在畫面上，否則藏起來就沒有地方可以叫它回來
+   （查詢站版面規則：要活過狀態變化的元素必須是兄弟節點）。 */
+body.net-hidden #network,
+body.net-hidden #netResizeHandle{display:none;}
+body.net-hidden #tableWrap{padding-top:8px;}
+.tableHost table{table-layout:fixed;}
+/* v1.42.7：成分表最多 14 欄。欄位一多，table-layout:fixed + width:100% 會把每一欄
+   壓到只剩十幾 px，表頭連字都看不到。給一個每欄的最小寬度，寬度不夠時讓
+   #tableWrap 橫向捲動（它本來就是 overflow:auto），而不是把欄位壓爛。 */
+.tableHost table.ing-wide{width:auto;min-width:100%;}
+.tableHost table.ing-wide th,.tableHost table.ing-wide td{min-width:74px;}
+.tableHost table.ing-wide th:first-child,.tableHost table.ing-wide td:first-child{min-width:190px;}
+.tableHost table.ing-wide th:nth-child(2),.tableHost table.ing-wide td:nth-child(2){min-width:104px;}
+.predDot{color:#d08a3a;font-size:13px;line-height:1;margin-left:1px;cursor:help;}
+.ingBar{display:flex;flex-wrap:wrap;gap:8px;padding:2px 0 8px;align-items:center;
+  font-size:11.5px;color:var(--muted);}
+.fchip{border:1px solid #3d70a3;background:#22303f;color:#8fc3ea;border-radius:999px;
+  padding:1px 9px;font-size:11px;white-space:nowrap;}
+#ingFilterPanel{border:1px solid var(--line);border-radius:8px;background:#1c1f26;
+  padding:10px 12px;margin:0 0 10px;}
+.ingFilterGrid{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;
+  font-size:11.5px;color:var(--muted);}
+#ingFilterBtn.active{background:#2f5c8a;border-color:#3d70a3;}
+#ingColsPanel{border:1px solid var(--line);border-radius:8px;background:#1c1f26;
+  padding:10px 12px;margin:0 0 10px;}
+.ingColsHead{font-size:12px;color:#cbd5e1;margin-bottom:8px;}
+.ingColsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:4px 10px;}
+.ingColsGrid label{display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;
+  color:#cbd5e1;}
+.ingColsGrid label.fixed{color:var(--muted);cursor:default;}
+.ingColsFoot{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;
+  padding-top:8px;border-top:1px solid var(--line);}
+#ingColsBtn.active{background:#2f5c8a;border-color:#3d70a3;}
+.tableHost th{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* v1.42.8：資料表獨立視窗。右下角那塊空間永遠不夠——關聯圖、分頁列、篩選列
+   疊完之後表格只剩一百多 px。這個視窗把表格拉到整個畫面，是讀資料時的主要介面。
+   刻意沿用 #networkModal 的版型與操作方式（同一個站裡不要有兩套全螢幕規則）。 */
+#tableModal{display:none;position:fixed;inset:0;z-index:9998;flex-direction:column;background:#0b0d11;}
+#tableModalBar{display:flex;gap:8px;align-items:center;padding:10px 16px;
+  border-bottom:1px solid var(--line);flex-shrink:0;flex-wrap:wrap;}
+#tableModalBar b{color:#eee;font-size:14px;}
+#tableModalBar .tabs{padding:0;gap:6px;}
+#tableModalBody{flex:1;min-height:0;overflow:auto;padding:10px 16px 16px;}
+#popTableBtn{margin-left:4px;}
 #platformNav{display:flex;align-items:center;gap:16px;padding:8px 22px;background:#20303f;border-bottom:1px solid var(--line);font-size:12.5px;}
 #platformNav a{color:#8fc3ea;text-decoration:none;}
 #platformNav a:hover{text-decoration:underline;}
@@ -191,6 +234,13 @@ body[data-page-theme="light"] #networkModalLayerBar{border-color:#dfe5e0;backgro
 body[data-page-theme="light"] #networkModalBar b{color:#24312a;}
 body[data-page-theme="light"] #networkNodeDetail{border-color:#dfe5e0;background:#fafcfa;color:#24312a;}
 body[data-page-theme="light"] #networkNodeDetail table td{border-bottom-color:#e8ece8;}
+body[data-page-theme="light"] #tableModal{background:#f7faf8;}
+body[data-page-theme="light"] #tableModalBar b{color:#24312a;}
+body[data-page-theme="light"] #ingColsPanel,
+body[data-page-theme="light"] #ingFilterPanel{background:#f3f6f4;}
+body[data-page-theme="light"] .ingFilterGrid{color:#5a6b62;}
+body[data-page-theme="light"] .ingColsHead,
+body[data-page-theme="light"] .ingColsGrid label{color:#3a4a42;}
 body[data-page-theme="light"] #versionBadge{background:rgba(255,255,255,.9);color:#6b7a70;border-color:#c8d0cb;}
 body[data-page-theme="light"] .versionEntry{border-bottom-color:#dfe5e0;}
 body[data-page-theme="light"] .versionEntry h4{color:#24312a;}
@@ -249,6 +299,21 @@ body[data-page-theme="light"] .versionEntry ul{color:#3a4a42;}
     <p id="termInfoBody"></p>
     <button class="primary" onclick="closeTermInfo()">關閉</button>
   </div>
+</div>
+
+<div id="tableModal">
+  <div id="tableModalBar">
+    <b id="tableModalTitle">資料表</b>
+    <div class="tabs" id="tableModalTabs">
+      <button data-tab="ingredients">Ingredients</button>
+      <button data-tab="targets">Related Targets</button>
+      <button data-tab="diseases">Related Diseases</button>
+    </div>
+    <span style="flex:1"></span>
+    <span class="small">按 Esc 也可以關閉</span>
+    <button class="primary" id="tableCloseBtn">✕ 關閉，回主頁</button>
+  </div>
+  <div id="tableModalBody" class="tableHost"></div>
 </div>
 
 <div id="networkModal">
@@ -576,6 +641,30 @@ const TERM_INFO = {
   alogp: { title: 'ALogP（親脂性 / 脂水分配係數）', body: '衡量成分親油（脂溶性）與親水程度的指標，數值越高代表越親脂。會影響成分能否穿過細胞膜、被腸道吸收，也常用來評估是否符合藥物的一般化學特性。' },
   hdon: { title: 'Hdon — Hydrogen Bond Donors（氫鍵供體數）', body: '這個成分分子結構中能提供氫鍵的原子數目（例如 -OH、-NH）。氫鍵供體／受體數目太多的化合物，通常較不利於穿透細胞膜、口服吸收較差。' },
   hacc: { title: 'Hacc — Hydrogen Bond Acceptors（氫鍵受體數）', body: '這個成分分子結構中能接受氫鍵的原子數目（例如 O、N）。與 Hdon 一樣，數目太多通常不利於口服吸收。' },
+  tpsa: {
+    title: 'TPSA — Topological Polar Surface Area（拓撲極性表面積，Å²）',
+    body: '分子表面屬於極性原子（N、O 及其上的氫）的面積總和。「拓撲」是指不必建立 3D 構型，直接從 2D 結構用查表法加總算出來——快，而且同一個分子每次算出來都一樣。Veber 規則以 ≤ 140 Å² 作為口服吸收較好的參考；若要穿透血腦屏障則需更嚴，常見用 ≤ 90 Å²。它跟 Hdon／Hacc 講的是同一件事，但 TPSA 是連續值、解析度更高。'
+  },
+  rbn: {
+    title: 'RBN — Rotatable Bond Number（可旋轉鍵數）',
+    body: '非環、非末端的單鍵數目（兩端都不是氫，一般也不計醯胺的 C−N 鍵），用來衡量分子有多「柔軟」。Veber 規則以 ≤ 10 為參考。柔軟的分子不利於成藥有兩個原因：一是結合到靶點時必須被固定成特定構型，這個「被凍住」的熵代價會直接扣掉結合親和力；二是暴露的單鍵也比較容易被代謝酶攻擊。糖苷鍵本身就是可旋轉鍵，所以接越多糖基的成分 RBN 越高。'
+  },
+  caco2: {
+    title: 'Caco-2 — 腸道上皮滲透性（對數值）',
+    body: 'Caco-2 是一株人類結腸腺癌細胞株，養在多孔薄膜上長成單層後會自行分化出類似小腸上皮的刷狀緣與緊密連接，等於在培養皿裡做出一小片腸壁；把化合物加在上層、量多久後出現在下層，即可算出滲透係數。這是法規單位認可的體外腸道吸收預測模型。⚠️ TCMSP 存的是對數值，所以負數很常見，負值並不代表不吸收。文獻上常見以 > -0.4 視為滲透性可接受，但本平台目前沒有套用這個條件。它只管「穿不穿得過腸壁」這一關，OB 則還額外扣掉了肝臟首渡代謝——Caco-2 好但 OB 差，通常意味著成分被肝臟代謝掉了。'
+  },
+  bbb: {
+    title: 'BBB — Blood–Brain Barrier（血腦屏障穿透性，logBB）',
+    body: 'logBB = log(腦中濃度 ÷ 血中濃度)。血腦屏障由腦微血管內皮細胞的緊密連接加上外排幫浦（如 P-gp）構成，會把絕大多數分子擋在外面。常見的經驗分級是：> 0.3 容易穿透、-1.0～0.3 中等、< -1.0 難穿透。兩個方向都有意義——要研究腦部腫瘤，BBB 高是必要條件；若目標在身體其他部位，BBB 低反而是優點，代表比較不會有中樞神經副作用。此欄為模型預測值，不是實測。'
+  },
+  halflife: {
+    title: 'HL — Half-life（半衰期，小時）',
+    body: '血中濃度降到一半所需的時間，決定「要多久吃一次」。半衰期短的化合物一天要給藥好幾次才能維持有效濃度，太長則容易累積。它跟 OB 是兩件獨立的事：OB 高只說明「進得去」，HL 說明「待得住」——吸收得好但代謝太快，一樣做不成藥。此欄為模型預測值，不是實測。'
+  },
+  fasa: {
+    title: 'FASA− — 帶負電可及表面積比例（0～1）',
+    body: '分子表面可被溶劑接觸的部分裡，屬於帶負電原子的比例。表面負電比例高通常水溶性較好，但也較容易被細胞膜外側的負電排斥，同時會影響與靶點之間的靜電作用。⚠️ 這一欄在網路藥理學文獻裡幾乎沒有人拿來當篩選條件，實用價值遠低於 OB／DL／TPSA 等欄位，列出來是為了欄位完整，不建議拿它設門檻。'
+  },
   tar_id: { title: 'Tar ID（靶點編號）', body: 'TCMSP 資料庫給每個蛋白質靶點的唯一編號，格式為 TAR + 5 碼數字。' },
   target_source: {
     title: '來源（資料來源標記）',
@@ -926,6 +1015,45 @@ try {
   if(localStorage.getItem(HERB_COLLAPSE_KEY) === '1') setHerbCollapsed(true);
 } catch(e){ /* 取不到就維持展開 */ }
 
+// ---------- 關聯圖隱藏（v1.42.6）----------
+// 只看表格的時候，關聯圖佔掉的 380px 是純粹的浪費；藏起來讓表格吃滿整個高度。
+// 注意：藏起來的時候不能建立／更新 vis-network 實例——display:none 的容器量到的是
+// 0×0，vis 會把畫布也做成 0×0，之後再顯示就是一片空白（只有再 redraw 才會回來）。
+// 所以 renderNetwork() 在隱藏狀態下仍然「算」節點與邊（lastNodes/lastEdges 要留給
+// 放大檢視用），但不畫；等真的顯示出來才畫。
+const NET_HIDDEN_KEY = 'tcm_network_hidden';
+
+function isNetHidden(){ return document.body.classList.contains('net-hidden'); }
+
+function syncNetToggleBtn(){
+  const btn = document.getElementById('netToggleBtn');
+  if(!btn) return;
+  const hidden = isNetHidden();
+  btn.textContent = hidden ? '⊞ 顯示關聯圖' : '⊟ 隱藏關聯圖';
+  btn.title = hidden ? '把關聯圖叫回來' : '把關聯圖收起來，讓下面的表格用滿整個高度';
+  btn.classList.toggle('active', hidden);
+}
+
+function setNetHidden(hidden){
+  document.body.classList.toggle('net-hidden', hidden);
+  syncNetToggleBtn();
+  try { localStorage.setItem(NET_HIDDEN_KEY, hidden ? '1' : '0'); }
+  catch(e){ /* 私密視窗會丟例外，不影響隱藏本身 */ }
+
+  if(hidden){
+    // 容器要消失了，實例先收掉，免得留著一個綁在隱藏容器上的 vis-network。
+    if(network){ network.destroy(); network = null; }
+  } else {
+    // 重新顯示：容器這時候才有真正的寬高，現在畫才量得準。
+    renderNetwork();
+  }
+}
+
+// 記住上次的狀態，跟藥材清單收合一樣：這是使用者對版面的選擇。
+try {
+  if(localStorage.getItem(NET_HIDDEN_KEY) === '1') document.body.classList.add('net-hidden');
+} catch(e){ /* 取不到就維持顯示 */ }
+
 document.getElementById('herbSearch').addEventListener('input', e => renderHerbList(e.target.value));
 
 // ---------- Herb detail view ----------
@@ -978,6 +1106,9 @@ async function selectHerb(herbId){
   ingSort = {col:null, dir:1};
   ingFilters = {};
   colWidths = {};
+  // 註：ingVisibleCols（成分表要顯示哪些欄位）**刻意不在這裡重設**。
+  // 欄寬是這一張表的臨時調整，換藥材重來合理；但「我想看 BBB 這一欄」
+  // 是使用者對工具的長期偏好，換個藥材就被清掉會很煩。
   layerVisibility = { ingredients: true, targets: true, diseases: true };
 
   main.innerHTML = `
@@ -1007,6 +1138,7 @@ async function selectHerb(herbId){
         <option value="en">English（原文）</option>
         <option value="ko">한국어（原文）</option>
       </select>
+      <button id="netToggleBtn">⊟ 隱藏關聯圖</button>
       <button id="fsNet">⛶ 放大檢視關聯圖</button>
     </div>
     <div id="toolbar3" style="display:flex;gap:10px;padding:6px 20px 10px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line);">
@@ -1034,6 +1166,7 @@ async function selectHerb(herbId){
           <button data-tab="ingredients" class="active">Ingredients</button>
           <button data-tab="targets">Related Targets</button>
           <button data-tab="diseases">Related Diseases</button>
+          <button id="popTableBtn" title="把這張表拉到整個畫面">⤢ 獨立視窗</button>
           <span style="flex:1"></span>
           <span class="small">版面：</span>
           <select id="layoutPresetSelect" style="font-size:11px;"></select>
@@ -1042,7 +1175,7 @@ async function selectHerb(herbId){
           <button id="saveLayoutBtn">儲存目前版面</button>
           <button id="deleteLayoutBtn">刪除</button>
         </div>
-        <div id="tableWrap"></div>
+        <div id="tableWrap" class="tableHost"></div>
       </div>
     </div>
   `;
@@ -1086,6 +1219,13 @@ async function selectHerb(herbId){
     renderPicker(); markPending();
   };
   document.getElementById('fsNet').onclick = openNetworkFullscreen;
+  // 隱藏狀態存在 body 的 class 上（換藥材不會被重設），但按鈕本身隨 #main 重建，
+  // 所以每次都要把文字與 title 重新對齊目前狀態。
+  const netToggleBtn = document.getElementById('netToggleBtn');
+  if(netToggleBtn){
+    netToggleBtn.onclick = () => setNetHidden(!isNetHidden());
+    syncNetToggleBtn();
+  }
   document.getElementById('netLangSelect').value = netLang;
   document.getElementById('netLangSelect').onchange = (e) => {
     netLang = e.target.value;
@@ -1096,14 +1236,19 @@ async function selectHerb(herbId){
   bindLayerCheckboxes();
   syncLayerCheckboxes();
   document.getElementById('showBtn').onclick = () => renderAll();
-  document.querySelectorAll('.tabs button').forEach(btn => {
+  // ⚠️ 只綁 [data-tab]，而且只綁 #main 裡的那一組。
+  // v1.42.8 之後 .tabs 裡多了「⤢ 獨立視窗」按鈕（沒有 data-tab），
+  // 而獨立視窗自己也有一組 .tabs button——用 document.querySelectorAll('.tabs button')
+  // 會把這兩者一起綁進來：前者會讓 activeTab 變成 undefined，後者會被重複綁定。
+  document.querySelectorAll('#main .tabs button[data-tab]').forEach(btn => {
     btn.onclick = () => {
-      document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
       activeTab = btn.dataset.tab;
+      syncTabButtons();
       renderTable();
     };
   });
+  const popBtn = document.getElementById('popTableBtn');
+  if(popBtn) popBtn.onclick = openTableModal;
   document.getElementById('dlJson').onclick = downloadHerbJson;
   document.getElementById('dlCsv').onclick = downloadHerbCsv;
   document.getElementById('capTgt').onchange = renderNetwork;
@@ -1229,17 +1374,68 @@ function clearPending(){
 function renderAll(){ renderTable(); renderNetwork(); clearPending(); }
 
 // ---------- Table: sort / filter state (ingredients tab only) ----------
+// v1.42.7：TCMSP 的成分有 12 個理化／ADME 欄位，API（app/routers/tcmsp.py）本來就全部回傳了，
+// 但前端以前只用了其中 6 個，另外 6 個（TPSA／RBN／Caco-2／BBB／HL／FASA−）
+// 資料送到瀏覽器就被丟掉。這一版把它們全部接上，並補齊名詞解釋。
+//
+// `fixed` 的欄位不可隱藏（名稱與編號是識別用的，藏掉就認不出是哪一筆）。
+// `pred` 標記「這一欄是模型預測值而不是從結構算出來的」——OB／Caco-2／BBB／HL 四欄，
+// 判讀時要知道它們帶有模型誤差，表頭會加上一個標記提醒。
 const ING_COLS = [
-  {key:'molecule_name', label:'Molecule name', type:'text', info:'molecule_name'},
-  {key:'mol_id',        label:'Mol ID',        type:'text', info:'mol_id'},
+  {key:'molecule_name', label:'Molecule name', type:'text', info:'molecule_name', fixed:true},
+  {key:'mol_id',        label:'Mol ID',        type:'text', info:'mol_id',        fixed:true},
   {key:'mw',            label:'MW',            type:'num',  info:'mw'},
-  {key:'ob',            label:'OB%',           type:'num',  info:'ob'},
+  {key:'ob',            label:'OB%',           type:'num',  info:'ob',       pred:true},
   {key:'dl',            label:'DL',            type:'num',  info:'dl'},
   {key:'alogp',         label:'ALogP',         type:'num',  info:'alogp'},
   {key:'hdon',          label:'Hdon',          type:'num',  info:'hdon'},
-  {key:'hacc',          label:'Hacc',          type:'num',  info:'hacc'}
+  {key:'hacc',          label:'Hacc',          type:'num',  info:'hacc'},
+  {key:'tpsa',          label:'TPSA',          type:'num',  info:'tpsa'},
+  {key:'rbn',           label:'RBN',           type:'num',  info:'rbn'},
+  {key:'caco2',         label:'Caco-2',        type:'num',  info:'caco2',    pred:true},
+  {key:'bbb',           label:'BBB',           type:'num',  info:'bbb',      pred:true},
+  {key:'halflife',      label:'HL',            type:'num',  info:'halflife', pred:true},
+  {key:'fasa',          label:'FASA−',         type:'num',  info:'fasa'}
 ];
+
+// ---------- 成分表格的欄位顯示設定（v1.42.7）----------
+// 14 欄一次全開會把每一欄擠得很窄，所以提供勾選面板讓使用者自己收掉用不到的。
+// 預設全開：使用者是先看到欄位存在，才知道可以收；反過來預設藏起來，等於沒加。
+const ING_COLS_KEY = 'tcmsp_ing_visible_cols_v1';
+let ingVisibleCols = null;   // Set，null 代表全部顯示
+
+function visibleIngCols(){
+  if(!ingVisibleCols) return ING_COLS;
+  return ING_COLS.filter(c => c.fixed || ingVisibleCols.has(c.key));
+}
+function loadIngVisibleCols(){
+  try{
+    const raw = localStorage.getItem(ING_COLS_KEY);
+    if(!raw) return;
+    const arr = JSON.parse(raw);
+    if(Array.isArray(arr)) ingVisibleCols = new Set(arr);
+  }catch(e){ /* 私密視窗或壞資料就維持全部顯示 */ }
+}
+function saveIngVisibleCols(){
+  try{
+    if(!ingVisibleCols) localStorage.removeItem(ING_COLS_KEY);
+    else localStorage.setItem(ING_COLS_KEY, JSON.stringify([...ingVisibleCols]));
+  }catch(e){ /* 存不起來不影響這次的顯示 */ }
+}
+function setIngColVisible(key, on){
+  if(!ingVisibleCols) ingVisibleCols = new Set(ING_COLS.map(c => c.key));
+  if(on) ingVisibleCols.add(key); else ingVisibleCols.delete(key);
+  saveIngVisibleCols();
+  // ⚠️ 欄寬是**依位置**存的（colWidths[tab][index]），欄位一增減，同一個索引就
+  // 指到別的欄位去了，舊的寬度會套到錯的欄上。所以改變顯示欄位時一律清掉欄寬，
+  // 讓它重新由內容決定——重新拉一次比套到錯的欄上好。
+  if(colWidths) delete colWidths['ingredients'];
+  renderTable();
+}
+loadIngVisibleCols();
 let ingSort = {col:null, dir:1};
+let ingColsPanelOpen = false;   // 欄位勾選面板是否展開（跨 renderTable 保留）
+let ingFilterPanelOpen = false; // 篩選面板是否展開（同上）
 let ingFilters = {};
 function toggleIngSort(col){
   if(ingSort.col === col) ingSort.dir *= -1; else { ingSort.col = col; ingSort.dir = 1; }
@@ -1273,16 +1469,48 @@ function applyIngSort(rows){
 function sortArrow(col){ return ingSort.col === col ? (ingSort.dir === 1 ? ' ▲' : ' ▼') : ''; }
 
 // ---------- Table ----------
+// v1.42.8：資料表有兩個可能的容器——主畫面右下角的 #tableWrap，
+// 以及獨立視窗的 #tableModalBody。renderTable() 只認「目前該寫到哪一個」，
+// **整個渲染邏輯刻意不複製一份給視窗用**：複製出來的那一份一定會跟本尊走鐘
+// （表頭跟表身各寫一次就已經出過這種事，見 rules.md）。
+let tableModalOpen = false;
+function tableHost(){
+  return document.getElementById(tableModalOpen ? 'tableModalBody' : 'tableWrap');
+}
+
 function renderTable(){
-  const wrap = document.getElementById('tableWrap');
+  const wrap = tableHost();
+  if(!wrap) return;
   const mols = [...selectedMols];
   if(activeTab === 'ingredients'){
     let rows = mols.map(id => ingredientsById.get(id)).filter(Boolean);
     rows = applyIngFilters(rows);
     rows = applyIngSort(rows);
-    const filterBar = `<div class="ingFilterBar" style="display:flex;flex-wrap:wrap;gap:10px;padding:4px 0 10px;font-size:11.5px;color:var(--muted);align-items:center;">
-      <span>篩選（設定門檻，Enter 或點別處套用）：</span>
-      ${ING_COLS.filter(c=>c.type==='num').map(c => `
+    const cols = visibleIngCols();
+    const shown = new Set(cols.map(c => c.key));
+    // v1.42.7：篩選列改成可收合。它以前是常駐的，欄位多的時候高度會到 150px 以上，
+    // 而 #tableWrap 只有 134px——等於篩選列把表格整個吃掉（實測 1280×800 下
+    // 連一列資料都看不完整，而且這在加欄位之前就已經是這樣了）。
+    // ⚠️ 收起來的時候一定要把「目前生效中的篩選」列出來。看不見的篩選器
+    // 默默少掉一半資料，使用者會以為是資料有問題。
+    const activeF = Object.entries(ingFilters)
+      .filter(([,f]) => f && f.op && f.val !== '' && f.val != null)
+      .map(([k,f]) => {
+        const col = ING_COLS.find(c => c.key === k);
+        return `${col ? col.label : k} ${f.op === '>=' ? '≥' : f.op === '<=' ? '≤' : f.op} ${f.val}`;
+      });
+    const filterBar = `<div class="ingBar">
+      <button id="ingFilterBtn" class="${ingFilterPanelOpen?'active':''}" title="設定數值門檻">⚙ 篩選${activeF.length?`（${activeF.length}）`:''}</button>
+      <button id="ingColsBtn" class="${ingColsPanelOpen?'active':''}" title="選擇要顯示哪些欄位">▦ 欄位（${cols.length}／${ING_COLS.length}）</button>
+      ${activeF.map(t => `<span class="fchip">${escapeHtml(t)}</span>`).join('')}
+      ${activeF.length ? '<button id="ingFilterClearTop">清除</button>' : ''}
+      <span style="flex:1"></span>
+      <span class="small">顯示 ${rows.length} / ${mols.length} 筆</span>
+    </div>
+    <div id="ingFilterPanel" hidden>
+      <div class="ingColsHead">設定數值門檻　<span class="small">輸入後按 Enter 或點別處套用</span></div>
+      <div class="ingFilterGrid">
+      ${cols.filter(c=>c.type==='num').map(c => `
         <span style="display:inline-flex;gap:3px;align-items:center;">
           ${c.label}
           <select data-fcol="${c.key}" style="font-size:11px;">
@@ -1294,14 +1522,30 @@ function renderTable(){
           </select>
           <input type="number" data-fval="${c.key}" style="width:55px;font-size:11px;" value="${(ingFilters[c.key]&&ingFilters[c.key].val!=null)?ingFilters[c.key].val:''}">
         </span>`).join('')}
-      <button id="ingFilterClear">清除篩選</button>
-      <span style="flex:1"></span>
-      <span class="small">顯示 ${rows.length} / ${mols.length} 筆</span>
+      </div>
+      <div class="ingColsFoot"><button id="ingFilterClear">清除全部篩選</button></div>
+    </div>
+    <div id="ingColsPanel" hidden>
+      <div class="ingColsHead">要顯示哪些欄位　<span class="small">名稱與編號固定顯示</span></div>
+      <div class="ingColsGrid">
+        ${ING_COLS.map(c => c.fixed
+          ? `<label class="fixed"><input type="checkbox" checked disabled> ${escapeHtml(c.label)}</label>`
+          : `<label><input type="checkbox" data-colkey="${c.key}" ${shown.has(c.key)?'checked':''}> ${escapeHtml(c.label)}${c.pred?' <span class="predDot" title="模型預測值，非從結構計算">◦</span>':''}</label>`
+        ).join('')}
+      </div>
+      <div class="ingColsFoot">
+        <button id="ingColsAll">全部顯示</button>
+        <button id="ingColsBasic">只留基本六欄</button>
+        <span class="small">◦ ＝ 模型預測值（OB／Caco-2／BBB／HL），判讀時要知道它帶有模型誤差</span>
+      </div>
     </div>`;
-    wrap.innerHTML = filterBar + `<table><thead><tr>
-      ${ING_COLS.map(c => `<th class="sortable" data-col="${c.key}">${c.label} <a class="term-link" onclick="event.stopPropagation(); showTermInfo('${c.info}')">ⓘ</a>${sortArrow(c.key)}</th>`).join('')}
+    // 表頭與表身都從同一份 cols 產生。以前表身是逐欄手寫的 <td>，
+    // 加一欄就得同時改兩個地方，漏掉一邊整張表的欄位就會錯位——這類錯誤不會報錯，
+    // 只會默默把 OB 的數字顯示在 DL 欄底下。
+    wrap.innerHTML = filterBar + `<table class="ing-wide"><thead><tr>
+      ${cols.map(c => `<th class="sortable" data-col="${c.key}">${escapeHtml(c.label)}${c.pred?'<span class="predDot" title="模型預測值，非從結構計算">◦</span>':''} <a class="term-link" onclick="event.stopPropagation(); showTermInfo('${c.info}')">ⓘ</a>${sortArrow(c.key)}</th>`).join('')}
       </tr></thead><tbody>${rows.map(r => `<tr>
-        <td>${escapeHtml(r.molecule_name)}</td><td>${r.mol_id}</td><td>${fmt(r.mw)}</td><td>${fmt(r.ob)}</td><td>${fmt(r.dl)}</td><td>${fmt(r.alogp)}</td><td>${r.hdon??''}</td><td>${r.hacc??''}</td>
+        ${cols.map(c => `<td>${c.type === 'num' ? fmt(r[c.key]) : escapeHtml(r[c.key] ?? '')}</td>`).join('')}
       </tr>`).join('')}</tbody></table>`;
     wrap.querySelectorAll('th.sortable').forEach(th => {
       th.style.cursor = 'pointer';
@@ -1322,8 +1566,56 @@ function renderTable(){
         renderTable();
       };
     });
-    const clearBtn = document.getElementById('ingFilterClear');
+    // ⚠️ 這一段以下一律用 wrap.querySelector，不可以用 document.getElementById。
+    // 主畫面（#tableWrap）與獨立視窗（#tableModalBody）渲染出來的是同一組 id，
+    // document.getElementById 只會回傳 DOM 裡的第一個——視窗開著時那是主畫面
+    // 那份被蓋住的元素，事件會綁到看不見的按鈕上，點了沒有反應。
+    const clearBtn = wrap.querySelector('#ingFilterClear');
     if(clearBtn) clearBtn.onclick = () => { ingFilters = {}; renderTable(); };
+    const clearTop = wrap.querySelector('#ingFilterClearTop');
+    if(clearTop) clearTop.onclick = () => { ingFilters = {}; renderTable(); };
+
+    const fBtn = wrap.querySelector('#ingFilterBtn');
+    const fPanel = wrap.querySelector('#ingFilterPanel');
+    if(fBtn && fPanel){
+      fPanel.hidden = !ingFilterPanelOpen;
+      fBtn.onclick = () => {
+        ingFilterPanelOpen = !ingFilterPanelOpen;
+        fPanel.hidden = !ingFilterPanelOpen;
+        fBtn.classList.toggle('active', ingFilterPanelOpen);
+      };
+    }
+
+    // 欄位勾選面板（v1.42.7）。面板本身跟表格一起被 innerHTML 重建，
+    // 所以每次 renderTable() 都要重掛一次事件；開合狀態存在模組層級變數，不會被重建洗掉。
+    const colsBtn = wrap.querySelector('#ingColsBtn');
+    const colsPanel = wrap.querySelector('#ingColsPanel');
+    if(colsBtn && colsPanel){
+      colsPanel.hidden = !ingColsPanelOpen;
+      colsBtn.classList.toggle('active', ingColsPanelOpen);
+      colsBtn.onclick = () => {
+        ingColsPanelOpen = !ingColsPanelOpen;
+        colsPanel.hidden = !ingColsPanelOpen;
+        colsBtn.classList.toggle('active', ingColsPanelOpen);
+      };
+      colsPanel.querySelectorAll('[data-colkey]').forEach(cb => {
+        cb.onchange = () => setIngColVisible(cb.dataset.colkey, cb.checked);
+      });
+      const allBtn = colsPanel.querySelector('#ingColsAll');
+      if(allBtn) allBtn.onclick = () => {
+        ingVisibleCols = null; saveIngVisibleCols();
+        if(colWidths) delete colWidths['ingredients'];
+        renderTable();
+      };
+      const basicBtn = colsPanel.querySelector('#ingColsBasic');
+      if(basicBtn) basicBtn.onclick = () => {
+        // v1.42.7 之前畫面上就有的那六欄，給一個一鍵回到舊版面的出口
+        ingVisibleCols = new Set(['mw','ob','dl','alogp','hdon','hacc']);
+        saveIngVisibleCols();
+        if(colWidths) delete colWidths['ingredients'];
+        renderTable();
+      };
+    }
   } else if(activeTab === 'targets'){
     const rows = [];
     mols.forEach(mid => (targetsByMol.get(mid)||[]).forEach(r => {
@@ -1368,6 +1660,7 @@ function fmt(v){ return (v===null || v===undefined) ? '' : (typeof v==='number' 
 // ---------- Network ----------
 function renderNetwork(){
   const container = document.getElementById('network');
+  if(!container) return;   // 還沒選藥材，#main 裡根本沒有這個容器
   if(selectedMols.size === 0){
     if(network){ network.destroy(); network = null; }
     lastNodes = null; lastEdges = null; lastOptions = null;
@@ -1414,11 +1707,20 @@ function renderNetwork(){
 
     const data = {nodes, edges};
     const options = { autoResize:true, physics:{ stabilization:true, barnesHut:{gravitationalConstant:-3000,centralGravity:0.2,springLength:100,springConstant:0.03,damping:0.4} }, interaction:{hover:true,tooltipDelay:80}, edges:{smooth:{type:'continuous'}} };
+    // 先把算好的資料留下來：⛶ 放大檢視吃的是 lastNodes/lastEdges，
+    // 就算關聯圖目前是藏起來的，放大檢視也要能直接開。
+    lastNodes = nodes; lastEdges = edges; lastOptions = options;
+
+    if(isNetHidden()){
+      // 隱藏中就不要建立實例——display:none 的容器量到 0×0，畫出來的畫布也是 0×0。
+      if(network){ network.destroy(); network = null; }
+      return;
+    }
+
     if(network) network.setData(data); else network = new vis.Network(container, data, options);
     graphLegend.mount('network');
     network.once('stabilizationIterationsDone', ()=> network.fit({animation:false}));
     setTimeout(()=>{ if(network){ network.redraw(); network.fit({animation:false}); } }, 150);
-    lastNodes = nodes; lastEdges = edges; lastOptions = options;
   }catch(err){
     container.innerHTML = `<div class="placeholder">⚠️ 網絡圖繪製失敗：${err.message}</div>`;
     network = null;
@@ -1560,10 +1862,71 @@ function initNetworkResize(){
   window.addEventListener('mouseup', () => { if(dragging){ dragging = false; document.body.style.userSelect = ''; } });
 }
 
+// ---------- 資料表獨立視窗（v1.42.8）----------
+const TAB_LABEL = { ingredients:'Ingredients', targets:'Related Targets', diseases:'Related Diseases' };
+
+function syncTabButtons(){
+  // 主畫面與獨立視窗各有一組分頁按鈕，兩邊都要反映同一個 activeTab，
+  // 不然關掉視窗回到主畫面，會看到分頁標在 A、內容卻是 B。
+  document.querySelectorAll('.tabs button[data-tab]').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === activeTab);
+  });
+}
+
+function openTableModal(){
+  if(!currentHerbId){ alert('請先選擇一個藥材。'); return; }
+  const modal = document.getElementById('tableModal');
+  if(!modal) return;
+  tableModalOpen = true;
+  // 把主畫面那份清掉。留著的話文件裡會同時存在兩組一樣的 id
+  // （#ingColsBtn、#ingFilterPanel…），這是上面那條規則的根因，一併從源頭消掉。
+  const inline = document.getElementById('tableWrap');
+  if(inline) inline.innerHTML = '';
+  const herb = herbsById.get(currentHerbId);
+  document.getElementById('tableModalTitle').textContent =
+    (herb ? zhConv(herb.herb_cn_name) + '（' + (herb.herb_en_name || '') + '）· ' : '') + (TAB_LABEL[activeTab] || '');
+  modal.style.display = 'flex';
+  syncTabButtons();
+  renderTable();
+}
+
+function closeTableModal(){
+  const modal = document.getElementById('tableModal');
+  if(modal) modal.style.display = 'none';
+  tableModalOpen = false;
+  const mb = document.getElementById('tableModalBody');
+  if(mb) mb.innerHTML = '';   // 同上，換另一個方向
+  syncTabButtons();
+  // 回主畫面時一定要重畫一次：視窗開著的那段時間，#tableWrap 裡還留著開窗前的舊內容，
+  // 期間改過的排序／篩選／欄位都只寫進了視窗那一邊。
+  renderTable();
+}
+
+document.getElementById('tableCloseBtn').addEventListener('click', closeTableModal);
+document.getElementById('tableModalTabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-tab]');
+  if(!btn) return;
+  activeTab = btn.dataset.tab;
+  const herb = herbsById.get(currentHerbId);
+  document.getElementById('tableModalTitle').textContent =
+    (herb ? zhConv(herb.herb_cn_name) + '（' + (herb.herb_en_name || '') + '）· ' : '') + (TAB_LABEL[activeTab] || '');
+  syncTabButtons();
+  renderTable();
+});
+
+// Esc 關閉。網絡圖的放大視窗 z-index 比較高，兩個同時開著時先關上面那個。
+document.addEventListener('keydown', (e) => {
+  if(e.key !== 'Escape') return;
+  const netModal = document.getElementById('networkModal');
+  if(netModal && netModal.style.display === 'flex') return;
+  if(tableModalOpen) closeTableModal();
+});
+
 // ---------- Resizable table columns ----------
 let colWidths = {}; // { tabName: [w0, w1, ...] }
 function makeColumnsResizable(){
-  const table = document.querySelector('#tableWrap table');
+  const host = tableHost();
+  const table = host && host.querySelector('table');
   if(!table) return;
   const ths = table.querySelectorAll('thead th');
   const saved = colWidths[activeTab];
@@ -1606,6 +1969,9 @@ function saveCurrentLayout(name){
   presets[name] = presets[name] || {};
   presets[name].networkHeight = networkHeight;
   presets[name].cols = colWidths;
+  // v1.42.7：欄寬是依位置存的，所以顯示欄位必須跟欄寬一起存。
+  // 只存欄寬而不存顯示欄位的話，在不同欄位組合下套用這個版面，寬度會套到別的欄上。
+  presets[name].ingCols = ingVisibleCols ? [...ingVisibleCols] : null;
   saveLayoutPresets(presets);
   refreshLayoutPresetOptions();
   document.getElementById('layoutPresetSelect').value = name;
@@ -1619,6 +1985,15 @@ function applyLayoutPreset(name){
     networkHeight = p.networkHeight;
     const netEl = document.getElementById('network');
     if(netEl){ netEl.style.height = networkHeight + 'px'; if(network) network.redraw(); }
+  }
+  // 顯示欄位要先還原，再還原欄寬——順序反了的話 makeColumnsResizable() 會對著
+  // 還沒更新的表頭套寬度，等一下 renderTable() 又把它洗掉。
+  // 舊版面沒有 ingCols 這個欄位（undefined），那就不要動目前的設定；
+  // 明確存成 null 才代表「全部顯示」。
+  if(Object.prototype.hasOwnProperty.call(p, 'ingCols')){
+    ingVisibleCols = Array.isArray(p.ingCols) ? new Set(p.ingCols) : null;
+    saveIngVisibleCols();
+    renderTable();
   }
   if(p.cols){
     colWidths = JSON.parse(JSON.stringify(p.cols));
