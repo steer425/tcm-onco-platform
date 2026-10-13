@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.42.8"
-set "DEFAULT_MSG=v1.42.8 pop the ingredient table out into its own full-screen window and show the six ADME columns the API was already sending, because that table is what people actually read and the main layout was squeezing it into 134px"
+set "EXPECTED_VER=1.42.9"
+set "DEFAULT_MSG=v1.42.9 reject _qt aglycones that resolved to their parent glycoside, pick multi-hit candidates by molecular weight, and add reclassify_ingredient_queue to clean up the 81 wrong structures already in the queue"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

@@ -530,6 +530,21 @@ n = re.sub(r"_qt$", "", n, flags=re.I)   # 註解寫「quantitative 後綴」—
 而且之後 Step 6 拿 InChIKey 去對 DepMap／GDSC **不會有任何地方報錯**，
 只是對到別的化合物。
 
+**v1.42.9 已落實第 1、3、4 條**（第 2 條 v1.40.2 已做）：
+
+- `cleaned_name()` **不再剝 `_qt`**。苷元改走 `resolve_name()` 的第三層
+  `aglycone_parent`（method 欄位照實標記），結果**永不自動採用**
+- `_qt` ＋ PubChem 較重 ＋ 差值是 1~4 個糖基組合 → **直接 `rejected`**。
+  判定只有一份：`tcmsp_pubchem.glycoside_mismatch()`。不帶 `_qt` 的糖基差仍進待確認
+  （可能是 TCMSP 自己記錯分子量，方向沒有 `_qt` 那麼確定）
+- 多筆命中時逐筆比分子量，**排序在截斷之前**（舊版取 `parsed[:5]`，
+  相符的那筆排第 6 就看不到）。只有一筆相符且是原名命中 → `auto`（信心 0.9）；
+  多筆都相符（立體異構物）→ 待確認
+- 已在佇列裡的列用 `python -m app.reclassify_ingredient_queue` 重判，**不連 PubChem**、
+  預設只出報表、`--apply` 才寫入；**`confirmed`／`rejected` 一律不碰**，
+  舊 `note` 接在新判讀後面，不洗掉。差一個氫／一個水的「同一化合物」要另外加
+  `--accept-same` 才收（水合物在 PubChem 是另一個 CID，要看過報表再決定）
+
 ### 分類統計要分層，合併算會被最大的那一桶帶偏（2026-09-10）
 
 同一份資料，全庫合併算方向得到「TCMSP 較重 1252 : PubChem 較重 266，假設不成立」，
@@ -703,7 +718,7 @@ TCMSP 的成分只有英文原名，**沒有中文名稱、也沒有化學分類
 
 ### 化合物名稱清理不要動立體化學（v1.40.0）
 
-`cleaned_name()` 可以剝掉 TCMSP 的 `_qt` 後綴、方括號與括號註記，
+`cleaned_name()` 可以剝掉方括號與括號註記（v1.42.9 起**不再剝 `_qt`**，見上一節），
 但**必須保留 `beta-`、`alpha-`、`(2S)-`、`(+)-`、`(-)-` 這類前綴**。
 
 `beta-sitosterol` 與 `sitosterol` 不是同一個化合物，剝掉會解析到錯的東西，
@@ -1270,6 +1285,8 @@ python -m app.seed_gencc_translations
 - `test_target_mapping.py` 同理，開頭會自動刪掉預設的 `test_target_mapping.db`；
   它不連外網，UniProt 的 HTTP 那一層以 fixture 取代
 - `test_pathways.py` 同理（`test_pathways.db`），KEGG／Reactome 的 HTTP 那一層以 fixture 取代
+- `test_ingredient_mapping.py` 同理（`test_ingredient_mapping.db`），PubChem 的 HTTP 那一層以 fixture 取代；
+  v1.42.9 起也涵蓋 `reclassify_ingredient_queue` 的試算／寫入／重複執行
 - `git status` 看一次，確認沒有把本機檔（`.db`、`.env`、暫存檔）帶上去
 
 ### 已知環境限制：git 不能透過遠端工具跑

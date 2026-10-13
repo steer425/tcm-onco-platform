@@ -60,6 +60,29 @@ FIXTURE = {
     # 只有清理過名稱才查得到 → 一律待確認
     "Sitosterol": [_prop(666666, "CCC", "KKKKKKKKKK-LLLLLLLLLL-M",
                          "C29H50O", "414.71", "sitosterol")],
+    "luteolin": [_prop(777777, "CCCC", "MMMMMMMMMM-NNNNNNNNNN-O",
+                       "C15H10O6", "286.24", "luteolin")],
+    # ---- v1.42.9：苷元與多筆挑選 ----
+    # 人參 Step 2 驗收的真實案例：Ginsenoside-Rh4_qt（TCMSP 458.8）
+    # 以母體名查回帶一個葡萄糖的皂苷（620.9，差 162.1）
+    "Ginsenoside-Rh4": [_prop(810001, "C1R", "RH4RH4RH4R-AAAAAAAAAA-N",
+                              "C36H60O8", "620.9", "ginsenoside Rh4")],
+    # ginsenoside Rg5_qt（442.8）→ 母體 767.0，差 324.2 = 兩個己糖
+    "ginsenoside Rg5": [_prop(810002, "C2R", "RG5RG5RG5R-AAAAAAAAAA-N",
+                              "C42H70O12", "767.0", "ginsenoside Rg5")],
+    # 母體名多筆命中、全部都重出糖基 → 一樣否決
+    "multisaponin": [_prop(810003, "C3R", "MSAPMSAPMS-AAAAAAAAAA-N", "X", "620.9", "a"),
+                     _prop(810004, "C4R", "MSAPMSAPMS-BBBBBBBBBB-N", "X", "782.9", "b")],
+    # 母體名查回的分子比 TCMSP 重，但不是糖基組合 → 不能否決，只能待確認
+    "oddparent": [_prop(810005, "C5R", "ODDPODDPOD-AAAAAAAAAA-N", "X", "500.0", "odd")],
+    # 不帶 _qt 的糖基差 → 方向不確定，待確認而不是否決
+    "plainglycoside": [_prop(810006, "C6R", "PLAINPLAIN-AAAAAAAAAA-N", "X", "620.9", "p")],
+    # 多筆命中、只有一筆分子量相符 → 自動採用那一筆；而且相符的排在第 6 個，
+    # 舊版直接取前 5 筆，審核者根本看不到它
+    "kaempferol": [
+        _prop(820001 + i, f"K{i}", f"KAEMPKAEMP-{i:010d}-N", "X", mw, f"k{i}")
+        for i, mw in enumerate(["300.1", "310.2", "320.3", "330.4", "340.5", "286.24", "350.6"])
+    ],
 }
 
 SYNONYMS = {
@@ -84,8 +107,13 @@ def main():
     # ---------- 名稱處理 ----------
     print("\n【名稱正規化】")
     check("normalize 壓掉多餘空白", pc.normalize("  Quercetin  ") == "Quercetin")
-    check("cleaned_name 剝掉 TCMSP 的 _qt 後綴",
-          pc.cleaned_name("Sitosterol_qt") == "Sitosterol", pc.cleaned_name("Sitosterol_qt"))
+    check("**cleaned_name 不再剝 `_qt`**（那是苷元標記不是雜訊，改走明確路徑）",
+          pc.cleaned_name("Sitosterol_qt") == "Sitosterol_qt", pc.cleaned_name("Sitosterol_qt"))
+    check("aglycone_parent_name 只對 `_qt` 回母體名",
+          pc.aglycone_parent_name("Ginsenoside-Rh4_qt") == "Ginsenoside-Rh4"
+          and pc.aglycone_parent_name("quercetin") is None,
+          pc.aglycone_parent_name("Ginsenoside-Rh4_qt"))
+    check("`_QT` 大小寫都認得", pc.is_aglycone("alexandrin_QT"))
     check("cleaned_name 剝掉方括號註記",
           pc.cleaned_name("quercetin [supplement]") == "quercetin")
     check("cleaned_name 剝掉一般括號註記",
@@ -162,11 +190,57 @@ def main():
               r["status"] == "auto" and r["confidence"] < 1.0,
               (r["status"], r["confidence"]))
 
-        r = pc.resolve_name(None, "Sitosterol_qt", tcmsp_mw="414.71")
+        r = pc.resolve_name(None, "luteolin (natural product)", tcmsp_mw="286.25")
         check("原名查不到、清理後查得到 → 待確認（即使分子量相符）",
               r["status"] == "pending" and r["method"] == "cleaned",
               (r["status"], r["method"]))
-        check("說明是用哪個名稱查到的", "Sitosterol" in (r.get("note") or ""), r.get("note"))
+        check("說明是用哪個名稱查到的", "luteolin" in (r.get("note") or ""), r.get("note"))
+
+        print("\n【v1.42.9：苷元明確路徑】")
+        r = pc.resolve_name(None, "Sitosterol_qt", tcmsp_mw="414.71")
+        check("`_qt` 以母體名命中、分子量相符 → 待確認，method 標成 aglycone_parent",
+              r["status"] == "pending" and r["method"] == "aglycone_parent",
+              (r["status"], r["method"]))
+        check("note 寫明去掉了苷元標記", "_qt" in (r.get("note") or ""), r.get("note"))
+
+        r = pc.resolve_name(None, "Ginsenoside-Rh4_qt", tcmsp_mw="458.8")
+        check("**Ginsenoside-Rh4_qt 查回母體苷（差 162.1）→ 直接否決，不是待確認**",
+              r["status"] == "rejected", (r["status"], r.get("note")))
+        check("否決的信心分數是 0", r["confidence"] == 0.0, r["confidence"])
+        check("否決說明寫出糖基組合與下一步",
+              "己糖" in (r.get("note") or "") and "第二層查詢" in (r.get("note") or ""),
+              r.get("note"))
+
+        r = pc.resolve_name(None, "ginsenoside Rg5_qt", tcmsp_mw="442.8")
+        check("ginsenoside Rg5_qt（差 324.2＝兩個己糖）→ 否決",
+              r["status"] == "rejected" and "2×" in (r.get("note") or ""), r.get("note"))
+
+        r = pc.resolve_name(None, "multisaponin_qt", tcmsp_mw="458.8")
+        check("母體名多筆命中、每一筆都重出糖基 → 否決",
+              r["status"] == "rejected", (r["status"], r.get("note")))
+
+        r = pc.resolve_name(None, "oddparent_qt", tcmsp_mw="458.8")
+        check("母體較重但湊不出糖基 → 只能待確認，不否決",
+              r["status"] == "pending", r["status"])
+
+        r = pc.resolve_name(None, "plainglycoside", tcmsp_mw="458.8")
+        check("**不帶 `_qt` 的糖基差 → 待確認，不否決**（方向沒有 `_qt` 那麼確定）",
+              r["status"] == "pending", r["status"])
+
+        print("\n【v1.42.9：多筆命中時用分子量挑】")
+        r = pc.resolve_name(None, "kaempferol", tcmsp_mw="286.25")
+        check("7 筆裡只有 1 筆分子量相符 → 自動採用那一筆",
+              r["status"] == "auto" and r["cid"] == "820006", (r["status"], r.get("cid")))
+        check("信心分數低於單一命中（名稱本身有歧義）",
+              r["confidence"] == pc.MW_PICK_CONFIDENCE and r["confidence"] < 1.0,
+              r["confidence"])
+        check("**相符的那筆原本排第 6 個，現在排在候選第一位**（舊版截斷前 5 筆會漏掉它）",
+              r["candidates"][0]["cid"] == "820006" and len(r["candidates"]) == 5,
+              [c["cid"] for c in r["candidates"]])
+        check("每個候選都帶分子量差值", all("mw_delta" in c for c in r["candidates"]))
+        r = pc.resolve_name(None, "polyphenol", tcmsp_mw="128.17")
+        check("多筆都相符（立體異構物）→ 仍待確認", r["status"] == "pending", r["status"])
+        check("說明寫出幾筆相符", "2 筆分子量都相符" in (r.get("note") or ""), r.get("note"))
 
         r = pc.resolve_name(None, "nonexistent compound zzz", tcmsp_mw="100")
         check("查無結果 → unresolved（跟 error 分得開）",
@@ -361,6 +435,87 @@ def main():
     for a in ("tcmsp_resolve_ingredients", "tcmsp_confirm_ingredient_mapping",
               "tcmsp_reject_ingredient_mapping"):
         check(f"{a} 有寫入共用稽核表", a in actions)
+
+    # ---------- v1.42.9：既有佇列重新分類 ----------
+    print("\n【既有佇列重新分類（reclassify_ingredient_queue）】")
+    from app import reclassify_ingredient_queue as rq
+
+    def _p(cid, mw, key):
+        return {"cid": cid, "canonical_smiles": "C", "isomeric_smiles": "C",
+                "inchikey": key, "molecular_formula": "X", "molecular_weight": mw,
+                "iupac_name": "x"}
+    # ob 留空 → 不在活性母體裡，不影響上面的統計斷言
+    seed = [
+        # mol_id, 名稱, TCMSP MW, 狀態, method, cid, PubChem MW, inchikey, 候選
+        ("MOLR01", "Ginsenoside-Rh4_qt", "458.8", "pending", "cleaned",
+         "910001", "620.9", "WRONGRH4WR-AAAAAAAAAA-N", None),
+        ("MOLR02", "multisaponin_qt", "458.8", "pending", "cleaned", None, None, None,
+         [_p("910002", "620.9", "W2"), _p("910003", "782.9", "W3")]),
+        ("MOLR03", "kaempferol", "286.25", "pending", "exact", None, None, None,
+         [_p("910004", "300.1", "K4"), _p("910005", "286.24", "PICKEDKAEM-AAAAAAAAAA-N")]),
+        ("MOLR04", "arachidonate", "304.52", "pending", "exact",
+         "910006", "303.5", "ARACHIDONA-AAAAAAAAAA-N", None),
+        ("MOLR05", "mystery compound", "300.0", "pending", "exact",
+         "910007", "377.0", "MYSTERYMYS-AAAAAAAAAA-N", None),
+        # 人工已確認的苷元誤配：**任何情況都不能被改回去**
+        ("MOLR06", "alexandrin_qt", "414.79", "confirmed", "manual",
+         "910008", "576.8", "HUMANCONFI-AAAAAAAAAA-N", None),
+    ]
+    for mol_id, name, tmw, st, method, cid, pmw, key, cands in seed:
+        db.add(models.TcmspIngredient(mol_id=mol_id, molecule_name=name, mw=tmw, ob="", dl=""))
+        db.add(models.TcmspIngredientPubchem(
+            mol_id=mol_id, cid=cid, inchikey=key, molecular_weight=pmw,
+            canonical_smiles="C" if cid else None, tcmsp_mw=tmw, method=method,
+            status=st, note="舊的系統說明" if st == "pending" else "人工確認",
+            mw_delta=(str(round(abs(float(tmw) - float(pmw)), 3)) if pmw else None),
+            candidates=pc.dumps(cands or ([_p(cid, pmw, key)] if cid else []))))
+    db.commit()
+
+    def _st(mol_id):
+        r = (db.query(models.TcmspIngredientPubchem)
+             .filter(models.TcmspIngredientPubchem.mol_id == mol_id).first())
+        db.refresh(r)
+        return r
+
+    dry = rq.run(apply=False, db=db)
+    check("試算：苷元誤配 2 筆（單一命中 1、多筆全糖基 1）",
+          dry["counts"]["苷元誤配"] == 2, dry["counts"])
+    check("試算：多筆挑中 1 筆", dry["counts"]["多筆挑中"] == 1, dry["counts"])
+    check("試算：同一化合物 1 筆（差一個氫）", dry["counts"]["同一化合物"] == 1, dry["counts"])
+    check("試算：無法解釋的留給人工", dry["counts"]["人工審核"] >= 1, dry["counts"])
+    check("**試算不寫入任何資料**",
+          _st("MOLR01").status == "pending" and dry["written"]["rejected"] == 0)
+
+    applied = rq.run(apply=True, db=db)
+    r1 = _st("MOLR01")
+    check("寫入後 Ginsenoside-Rh4_qt → rejected", r1.status == "rejected", r1.status)
+    check("method 由 cleaned 改標 aglycone_parent", r1.method == "aglycone_parent", r1.method)
+    check("**舊 note 沒被洗掉**，接在新判讀後面",
+          "苷元誤配" in (r1.note or "") and "舊的系統說明" in (r1.note or ""), r1.note)
+    check("多筆全是母體苷的也否決", _st("MOLR02").status == "rejected", _st("MOLR02").status)
+    r3 = _st("MOLR03")
+    check("多筆挑中 → auto，採用分子量相符的那一筆",
+          r3.status == "auto" and r3.cid == "910005"
+          and r3.inchikey == "PICKEDKAEM-AAAAAAAAAA-N", (r3.status, r3.cid))
+    check("同一化合物在沒加 --accept-same 時不動", _st("MOLR04").status == "pending")
+    check("無法解釋的不動", _st("MOLR05").status == "pending")
+    check("**人工確認的列任何情況都不改**",
+          _st("MOLR06").status == "confirmed" and _st("MOLR06").note == "人工確認")
+
+    rq.run(apply=True, accept_same=True, db=db)
+    check("加 --accept-same 後差一個氫的才收成 auto", _st("MOLR04").status == "auto")
+    again = rq.run(apply=False, db=db)
+    check("重複執行只剩人工審核那一桶", again["counts"]["苷元誤配"] == 0
+          and again["counts"]["多筆挑中"] == 0 and again["counts"]["同一化合物"] == 0, again)
+
+    r = client.get("/tcmsp/ingredient-mapping/lookup?key=WRONGRH4WR-AAAAAAAAAA-N",
+                   headers=U).json()
+    check("**被否決的錯分子 InChIKey 反查不到**（不會再流進 Step 6）", r["total"] == 0, r)
+    r = client.get("/tcmsp/ingredient-mapping/lookup?key=PICKEDKAEM-AAAAAAAAAA-N",
+                   headers=U).json()
+    check("多筆挑中採用的那一筆反查得到", r["total"] == 1, r)
+    actions = [x.action for x in db.query(models.AuditLog).all()]
+    check("重新分類寫入共用稽核表", actions.count(rq.ACTION) == 2, actions.count(rq.ACTION))
 
     db.close()
     print("\n" + "=" * 60)

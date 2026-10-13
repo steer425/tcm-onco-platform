@@ -14,7 +14,8 @@ const STATUS_LABEL = {
   unresolved: "查無結果", rejected: "已否決", error: "連線失敗",
 };
 const METHOD_LABEL = {
-  exact: "原名精確命中", cleaned: "清理名稱後命中", cas: "以 CAS 反查", manual: "人工指定",
+  exact: "原名精確命中", cleaned: "清理名稱後命中", aglycone_parent: "苷元改查母體名",
+  cas: "以 CAS 反查", manual: "人工指定",
 };
 
 function statusPill(st) {
@@ -122,7 +123,8 @@ async function runBatch() {
     const line = r.processed === 0
       ? "這一批沒有需要處理的成分了。"
       : `本批處理 ${r.processed} 筆：自動採用 ${r.auto}、待確認 ${r.pending}` +
-        `（其中 ${r.mw_mismatch} 筆是分子量不符）、查無結果 ${r.unresolved}、` +
+        `（其中 ${r.mw_mismatch} 筆是分子量不符）、苷元誤配自動否決 ${r.rejected || 0}、` +
+        `查無結果 ${r.unresolved}、` +
         `連線失敗 ${r.error}；尚未處理 ${r.remaining} 筆。`;
     log.textContent = `${new Date().toLocaleTimeString()}  ${line}\n${log.textContent}`;
     if (r.remaining > 0) {

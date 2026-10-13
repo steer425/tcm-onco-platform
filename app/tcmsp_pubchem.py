@@ -19,7 +19,8 @@
     —— 這是本資料集最常見的一種，見 cleaned_name() 對 `_qt` 的說明
   * 立體異構物混淆（分子量相同，這種靠 MW 抓不到，只能靠人）
 
-所以分子量不符時**一律進待確認**，不自動採用。
+所以分子量不符時**一律進待確認**，不自動採用；唯一的例外是能確定錯在哪的
+`_qt` 苷元誤配，直接否決（glycoside_mismatch()）。
 
 ⚠️ 這支需要對外連到 `pubchem.ncbi.nlm.nih.gov`。Cowork 沙箱與本機 VM 都連不到，
 實際執行必須在 Render 上。測試以 fixture 取代網路層。
@@ -45,7 +46,12 @@ PROPS = ("CanonicalSMILES,IsomericSMILES,InChIKey,MolecularFormula,"
 # 結構式圖片（前端直接用 <img> 顯示）
 IMAGE_URL = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/PNG"
 
-METHOD_CONFIDENCE = {"exact": 1.0, "cleaned": 0.8, "cas": 1.0, "manual": 1.0}
+METHOD_CONFIDENCE = {"exact": 1.0, "cleaned": 0.8, "aglycone_parent": 0.5,
+                     "cas": 1.0, "manual": 1.0}
+
+# 多筆命中、但只有一筆分子量吻合時的信心分數。名稱與分子量兩條獨立證據都指向它，
+# 但名稱本身有歧義，所以不給滿分。
+MW_PICK_CONFIDENCE = 0.9
 
 # 分子量相符的容許值（道爾頓）。同一個化合物在不同資料庫之間的差異
 # 只來自同位素慣例與四捨五入，0.5 Da 已經非常寬鬆；
@@ -79,25 +85,42 @@ def normalize(name: str) -> str:
 def cleaned_name(name: str) -> str:
     """把 TCMSP 名稱裡常見的雜訊拿掉，供第二層查詢使用。
 
-    TCMSP 的成分名稱常帶括號註記、`_qt` 之類的後綴、或前面掛著編號。
+    TCMSP 的成分名稱常帶括號註記、或前面掛著編號。
     **刻意不動立體化學前綴**（(+)-、(-)-、alpha-、beta-、(2S)- 等）——
     beta-sitosterol 與 sitosterol 不是同一件事，剝掉會解析到錯的化合物，
     而那正是這整支程式最不能出的錯。
+
+    **v1.42.9 起不再剝 `_qt`。** `_qt` 不是雜訊，是 TCMSP 的苷元（aglycone）標記；
+    剝掉它是另一條有自己判定規則的路徑，見 `aglycone_parent_name()`。
+    以前在這裡靜默剝除，審核者看到的 method 是「清理名稱後命中」，
+    完全看不出查詢字串已經變成帶糖基的母體苷名稱。
     """
     n = normalize(name)
-    # ⚠️ `_qt` 是**苷元**（aglycone），不是 quantitative——舊註解寫錯了。
-    # 剝掉它之後查到的必然是**帶糖基的母體苷**，也就是 TCMSP 不要的那一個。
-    # 實測：全庫 81 筆分子量不符屬於這個成因，其中 75 筆（93%）名稱以 _qt 結尾，
-    # 方向一致（PubChem 較重 80:1）。詳見
-    # `claude/成分標準化_人參Step2驗收與苷元誤配.md`。
-    #
-    # 這裡仍然剝除，因為那是目前唯一能拿到候選的方式；但 mw_check() 會在
-    # 分子量重出糖基組合時明講「這是苷元誤配、請否決」，避免被誤按確認。
-    # **真正的解法是 CAS／InChIKey 第二層查詢**，尚未實作。
-    n = re.sub(r"_qt$", "", n, flags=re.I)
     n = re.sub(r"\s*\[[^\]]*\]\s*", " ", n)         # 方括號註記
     n = re.sub(r"\s*\((?!\+|-|[0-9]*[RSEZ])[^)]*\)\s*", " ", n)  # 括號註記，但保留立體標示
     return normalize(n)
+
+
+def is_aglycone(name: str | None) -> bool:
+    """名稱是否帶 TCMSP 的苷元標記 `_qt`。"""
+    return (name or "").strip().lower().endswith(AGLYCONE_SUFFIX)
+
+
+def aglycone_parent_name(name: str) -> str | None:
+    """`_qt` 苷元 → 去掉標記後的名稱，也就是**母體苷**的名稱。不是苷元則回 None。
+
+    ⚠️ 用這個名稱查 PubChem，查到的**幾乎必然是帶糖基的母體苷**，不是 TCMSP 要的苷元。
+    實測全庫 81 筆糖基差裡 75 筆（93%）以 `_qt` 結尾，方向 PubChem 較重 80:1
+    （見 `claude/成分標準化_人參Step2驗收與苷元誤配.md`）。
+
+    之所以還查，是因為少數 `_qt` 成分的「母體名」在 PubChem 上其實就是苷元本身
+    （分子量會相符）。所以這條路徑的結果一律交給 `resolve_name()` 依分子量判定：
+    重出糖基組合 → 否決；相符 → 待確認；其他 → 待確認。**永遠不會自動採用。**
+    """
+    if not is_aglycone(name):
+        return None
+    n = normalize(re.sub(r"_qt$", "", normalize(name), flags=re.I))
+    return cleaned_name(n) or None
 
 
 def _num(value):
@@ -160,7 +183,7 @@ def mw_check(tcmsp_mw, pubchem_mw, name: str | None = None) -> dict:
     # 提示的順序就是「這個差值最可能是什麼」的順序。
     # 糖基要排在水合物前面：162.14（一個葡萄糖）與 9 個水只差 0.035，
     # 先判水合物就會把苷元誤配講成水合物，而水合物暗示同一個化合物。
-    is_aglycone = (name or "").strip().lower().endswith(AGLYCONE_SUFFIX)
+    aglycone = is_aglycone(name)
     pubchem_heavier = b > a
     hint = ""
 
@@ -172,7 +195,7 @@ def mw_check(tcmsp_mw, pubchem_mw, name: str | None = None) -> dict:
         hydrate = _hydrate_units(delta)
         if sugar and pubchem_heavier:
             parts, total = sugar
-            if is_aglycone:
+            if aglycone:
                 hint = (f"（苷元誤配：名稱的 {AGLYCONE_SUFFIX} 表示苷元，"
                         f"但 PubChem 這一筆重出 {parts}＝{total:.2f} Da，"
                         f"查到的是帶糖基的母體苷，不是同一個分子。"
@@ -183,7 +206,7 @@ def mw_check(tcmsp_mw, pubchem_mw, name: str | None = None) -> dict:
         elif hydrate:
             hint = (f"（差值接近 {hydrate} 個水分子，"
                     f"可能是水合物與無水物的差別）")
-        elif is_aglycone:
+        elif aglycone:
             hint = (f"（名稱的 {AGLYCONE_SUFFIX} 表示苷元。"
                     f"苷元常因名稱查詢而解析到母體苷，請特別確認分子是否相同）")
         elif delta > 20:
@@ -191,6 +214,78 @@ def mw_check(tcmsp_mw, pubchem_mw, name: str | None = None) -> dict:
 
     return {"agree": False, "delta": delta,
             "reason": f"分子量不符：TCMSP {a}、PubChem {b}，相差 {delta} Da{hint}"}
+
+
+def glycoside_mismatch(name, tcmsp_mw, pubchem_mw) -> str | None:
+    """是否為「確定的苷元誤配」。是就回說明（含糖基組合），否則 None。
+
+    三個條件同時成立才算：
+      1. 名稱帶 `_qt`（TCMSP 指的是苷元）
+      2. PubChem 那一筆**較重**
+      3. 差值剛好是 1~4 個糖基的組合
+
+    這是 `resolve_name()` 與 `reclassify_ingredient_queue` 共用的唯一判定，
+    **不要在別處重寫一份**（理由同 v1.40.1 的 `_ingredient_pool()`）。
+
+    不帶 `_qt` 的糖基差**不在這裡判否決**：那可能是 TCMSP 自己記錯分子量，
+    或名稱本來就指糖苷——方向沒有 `_qt` 那麼確定，留給人看（mw_check 會給提示）。
+    """
+    if not is_aglycone(name):
+        return None
+    a, b = _num(tcmsp_mw), _num(pubchem_mw)
+    if a is None or b is None or b <= a:
+        return None
+    sugar = _sugar_combination(round(b - a, 3))
+    if not sugar:
+        return None
+    parts, total = sugar
+    return (f"苷元誤配，自動否決：名稱的 {AGLYCONE_SUFFIX} 表示苷元，"
+            f"PubChem 這一筆重出 {parts}＝{total:.2f} Da（TCMSP {a}、PubChem {b}），"
+            f"是帶糖基的母體苷，不是同一個分子。需以 CAS／InChIKey 第二層查詢重新解析")
+
+
+def same_compound_form(tcmsp_mw, pubchem_mw) -> str | None:
+    """差值是否只是「同一個化合物的不同寫法」。是就回說明，否則 None。
+
+    只認三種，而且刻意保守：
+      ≈0      0.5 Da 內，兩邊小數位慣例不同
+      ≈1 質子  酸式 vs 陰離子式（例：arachidonic acid 304.5 vs arachidonate 303.5）
+      ≈18 水   **只認一個水分子**。多個水的情況見 _hydrate_units() 的說明——
+              162.1（一個葡萄糖）距離 9 個水只差 0.035，放寬就會把苷元誤配當成水合物
+
+    供 `reclassify_ingredient_queue` 整批採用時使用；`resolve_name()` 不用它自動採用，
+    新解析的這類筆數仍進待確認，由人或重新分類腳本處理。
+    """
+    a, b = _num(tcmsp_mw), _num(pubchem_mw)
+    if a is None or b is None:
+        return None
+    d = abs(a - b)
+    if d <= MW_TOLERANCE:
+        return "分子量相符（小數位差異）"
+    if abs(d - PROTON_MASS) <= 0.2:
+        return "差一個氫（酸式 vs 陰離子式），同一化合物"
+    if abs(d - WATER_MASS) <= 0.3:
+        return "差一個水分子（水合物 vs 無水物），同一化合物"
+    return None
+
+
+def rank_by_mw(parsed: list, tcmsp_mw, name) -> tuple[list, list]:
+    """多筆候選依分子量排序。回傳 (排序後全部候選, 分子量相符的候選)。
+
+    每一筆都帶上 `mw_delta`，相符的排前面，其餘依差值由小到大。
+    **一定要在截斷前排序**——舊版直接取 `parsed[:5]`，
+    分子量相符的那一筆如果排在第 6 個，審核者根本看不到它。
+    """
+    ranked = []
+    for c in parsed:
+        chk = mw_check(tcmsp_mw, c.get("molecular_weight"), name=name)
+        ranked.append({**c, "mw_delta": chk["delta"], "_agree": chk["agree"]})
+    ranked.sort(key=lambda c: (c["_agree"] is not True,
+                               c["mw_delta"] if c["mw_delta"] is not None else 1e9))
+    agree = [c for c in ranked if c["_agree"] is True]
+    for c in ranked:
+        c.pop("_agree", None)
+    return ranked, agree
 
 
 def parse_property(entry: dict) -> dict:
@@ -258,47 +353,99 @@ def resolve_name(client: httpx.Client, name: str, tcmsp_mw=None) -> dict:
     """解析單一成分名稱。回傳一定包含 method／confidence／status。
 
     status：
-      auto        自動採用（單一命中且分子量相符）
-      pending     需要人確認（多筆命中、分子量不符、或只有清理後才查得到）
+      auto        自動採用（單一命中且分子量相符；或多筆命中但只有一筆分子量相符）
+      pending     需要人確認（分子量不符、多筆都相符、或只有清理後才查得到）
+      rejected    確定是錯的分子（`_qt` 苷元查回母體苷，見 glycoside_mismatch()）
       unresolved  查不到
       error       連線或 API 失敗，之後可重跑
+
+    查詢分三層，**由嚴到寬**：
+      exact            原名
+      cleaned          拿掉括號、方括號註記（保留立體標示）
+      aglycone_parent  只對 `_qt` 苷元：去掉標記改查母體名，結果永不自動採用
     """
     try:
-        for method, query in (("exact", normalize(name)),
-                              ("cleaned", cleaned_name(name))):
-            if not query:
-                continue
-            if method == "cleaned" and query == normalize(name):
+        attempts = [("exact", normalize(name)), ("cleaned", cleaned_name(name))]
+        parent = aglycone_parent_name(name)
+        if parent:
+            attempts.append(("aglycone_parent", parent))
+
+        tried = set()
+        for method, query in attempts:
+            if not query or query in tried:
                 continue          # 清理後沒變就不用重查一次
+            tried.add(query)
 
             results = search_by_name(client, query)
             if not results:
                 continue
 
             parsed = [parse_property(r) for r in results]
+            conf = METHOD_CONFIDENCE[method]
 
             if len(parsed) > 1:
-                return {"method": method, "confidence": METHOD_CONFIDENCE[method],
-                        "status": "pending", "candidates": parsed[:5],
-                        "tcmsp_mw": tcmsp_mw, "mw_delta": None,
-                        "note": f"名稱命中 {len(parsed)} 筆化合物，需人工判斷是哪一個"}
+                ranked, agree = rank_by_mw(parsed, tcmsp_mw, name)
+                base = {"method": method, "tcmsp_mw": tcmsp_mw,
+                        "candidates": ranked[:5]}
+                if len(agree) == 1:
+                    hit = {**agree[0], "tcmsp_mw": tcmsp_mw}
+                    pick_note = (f"名稱命中 {len(parsed)} 筆化合物，"
+                                 f"其中只有 CID {hit['cid']} 的分子量與 TCMSP 相符"
+                                 f"（差 {hit['mw_delta']} Da）")
+                    if method == "exact":
+                        return {**hit, **base, "confidence": MW_PICK_CONFIDENCE,
+                                "status": "auto", "note": pick_note + "，自動採用"}
+                    where = ("以母體名" if method == "aglycone_parent" else "以清理後的名稱")
+                    return {**hit, **base, "confidence": conf, "status": "pending",
+                            "note": f"原名查無結果，{where}「{query}」命中；{pick_note}，請確認"}
+                if not agree and method == "aglycone_parent":
+                    reasons = [glycoside_mismatch(name, tcmsp_mw, c.get("molecular_weight"))
+                               for c in ranked]
+                    if all(reasons):
+                        return {**base, "cid": None, "mw_delta": ranked[0]["mw_delta"],
+                                "confidence": 0.0, "status": "rejected",
+                                "note": f"母體名「{query}」命中 {len(parsed)} 筆，全部是"
+                                        f"帶糖基的母體苷。{reasons[0]}"}
+                if agree:
+                    note = (f"名稱命中 {len(parsed)} 筆化合物，其中 {len(agree)} 筆分子量都相符"
+                            f"（可能是立體異構物，分子量分不出來），需人工判斷是哪一個")
+                else:
+                    note = (f"名稱命中 {len(parsed)} 筆化合物，沒有一筆分子量與 TCMSP 相符，"
+                            f"需人工判斷")
+                return {**base, "confidence": conf, "status": "pending",
+                        "mw_delta": None, "note": note}
 
             hit = parsed[0]
             check = mw_check(tcmsp_mw, hit.get("molecular_weight"), name=name)
             hit["tcmsp_mw"] = tcmsp_mw
             hit["mw_delta"] = check["delta"]
 
+            if method == "aglycone_parent":
+                wrong = glycoside_mismatch(name, tcmsp_mw, hit.get("molecular_weight"))
+                if wrong:
+                    # 結構欄位照樣留著（與人工否決一致），rejected 不在 ACCEPTED_STATUS，
+                    # 反查與覆蓋率都不會用到它；留著是讓人看得到「當初查到了什麼」
+                    return {**hit, "method": method, "confidence": 0.0,
+                            "status": "rejected", "candidates": [hit], "note": wrong}
+                verdict = ("分子量相符，可能母體名在 PubChem 上就是苷元本身"
+                           if check["agree"] else check["reason"])
+                return {**hit, "method": method,
+                        "confidence": round(conf * (1 if check["agree"] else 0.4), 2),
+                        "status": "pending", "candidates": [hit],
+                        "note": f"原名查無結果，去掉苷元標記 {AGLYCONE_SUFFIX} 以母體名"
+                                f"「{query}」命中；{verdict}。請確認是不是苷元，不是母體苷"}
+
             if check["agree"] is False:
                 # 名稱對上但分子量不符——這是最危險的情況，絕不自動採用
                 return {**hit, "method": method,
-                        "confidence": round(METHOD_CONFIDENCE[method] * 0.4, 2),
+                        "confidence": round(conf * 0.4, 2),
                         "status": "pending", "candidates": [hit],
                         "note": check["reason"]}
 
             if method == "cleaned":
                 # 清理過名稱才查得到，就算分子量相符也請人看一眼
                 return {**hit, "method": method,
-                        "confidence": METHOD_CONFIDENCE[method], "status": "pending",
+                        "confidence": conf, "status": "pending",
                         "candidates": [hit],
                         "note": f"原名查無結果，以清理後的「{query}」命中" +
                                 ("；分子量相符" if check["agree"] else "；" + check["reason"])}
@@ -307,12 +454,14 @@ def resolve_name(client: httpx.Client, name: str, tcmsp_mw=None) -> dict:
                 return {**hit, "method": method, "confidence": 0.7, "status": "auto",
                         "candidates": [], "note": check["reason"]}
 
-            return {**hit, "method": method, "confidence": METHOD_CONFIDENCE[method],
+            return {**hit, "method": method, "confidence": conf,
                     "status": "auto", "candidates": [], "note": None}
 
         return {"method": "exact", "confidence": 0.0, "status": "unresolved",
                 "candidates": [], "tcmsp_mw": tcmsp_mw,
-                "note": "以原名與清理後的名稱查詢，PubChem 都查無此化合物"}
+                "note": ("以原名、清理後的名稱與母體名查詢，PubChem 都查無此化合物"
+                         if parent else
+                         "以原名與清理後的名稱查詢，PubChem 都查無此化合物")}
 
     except Exception as exc:  # noqa: BLE001
         logger.error("PubChem 解析失敗（%s）：%s", name, exc)

@@ -264,7 +264,7 @@ def resolve_batch(payload: ResolveIn,
     remaining_before = len(rows)
     items = rows[:payload.limit]
     if not items:
-        return {"processed": 0, "auto": 0, "pending": 0, "unresolved": 0,
+        return {"processed": 0, "auto": 0, "pending": 0, "rejected": 0, "unresolved": 0,
                 "error": 0, "mw_mismatch": 0, "remaining": 0}
 
     if payload.retry_errors:
@@ -278,7 +278,7 @@ def resolve_batch(payload: ResolveIn,
 
     results = pc.resolve_many([(i.mol_id, i.molecule_name, i.mw) for i in items])
 
-    tally = {"auto": 0, "pending": 0, "unresolved": 0, "error": 0}
+    tally = {"auto": 0, "pending": 0, "rejected": 0, "unresolved": 0, "error": 0}
     mw_mismatch = 0
     for item in items:
         r = results.get(item.mol_id) or {}

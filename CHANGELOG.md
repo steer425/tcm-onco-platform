@@ -1,5 +1,81 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.42.9 — 2026-10-14（苷元誤配直接否決、多筆命中用分子量挑選）
+
+### 為什麼
+
+9/10 人參 Step 2 驗收查出：待確認佇列 272 筆裡有 **81 筆是糖基差**，其中 75 筆名稱以 `_qt` 結尾。
+`_qt` 是 TCMSP 的苷元標記，`cleaned_name()` 把它當雜訊剝掉，於是查回**帶糖基的母體苷**。
+這 81 筆都帶著錯分子的 CID／SMILES／InChIKey，照「看起來像就按確認」清佇列，
+錯的結構會進資料庫，Step 6 拿 InChIKey 對 DepMap 時**不會有任何地方報錯**。
+
+v1.40.2 補了提示；這一版把剩下三條規則（`rules.md`「名稱裡的後綴可能是化學意義」）做完。
+
+### 改了什麼
+
+**1. `_qt` 改成明確路徑**（`app/tcmsp_pubchem.py`）
+
+- `cleaned_name()` 不再剝 `_qt`
+- `resolve_name()` 新增第三層 `aglycone_parent`：只對 `_qt` 成分，去掉標記改查母體名。
+  method 欄位照實記錄，後台顯示「苷元改查母體名」——以前顯示「清理名稱後命中」，看不出查詢字串已經換了分子
+- 這一層**永遠不自動採用**
+
+**2. 苷元誤配直接否決**
+
+`_qt`、PubChem 較重、差值剛好是 1~4 個糖基組合，三者同時成立 → `rejected`，信心 0，
+note 寫出糖基組合與下一步（CAS／InChIKey 第二層查詢）。判定只有一份：`glycoside_mismatch()`。
+
+不帶 `_qt` 的糖基差**不否決**，仍進待確認——那可能是 TCMSP 自己記錯分子量，方向沒有 `_qt` 那麼確定。
+
+**3. 多筆命中時用分子量挑**
+
+逐筆比對 TCMSP 分子量，**先排序再截斷**（舊版直接取前 5 筆，相符的排第 6 就看不到）。
+
+| 情況 | 結果 |
+|---|---|
+| 只有一筆相符、原名命中 | `auto`，信心 0.9 |
+| 只有一筆相符、清理後或母體名命中 | 待確認（相符的排第一） |
+| 多筆都相符（立體異構物） | 待確認 |
+| 母體名命中多筆、全部重出糖基 | `rejected` |
+
+**4. 既有佇列重新分類：`python -m app.reclassify_ingredient_queue`**（新增）
+
+上面三條只影響之後新解析的成分。這支用資料庫已存的欄位套同一套判定重判 pending 列，**不連 PubChem**。
+
+| 桶 | `--apply` 後 |
+|---|---|
+| 苷元誤配 | → `rejected`；method 由 `cleaned` 改標 `aglycone_parent` |
+| 多筆挑中 | → `auto`，採用分子量相符的候選（CAS 未取得，重新解析才會補） |
+| 同一化合物（差一個氫或一個水） | 預設不動，加 `--accept-same` 才 → `auto` |
+| 人工審核 | 不動 |
+
+- 預設只出報表，`--apply` 才寫入，寫入時記一筆共用稽核（`tcmsp_reclassify_ingredient_queue`）
+- **`confirmed`／`rejected` 一律不碰**；舊 `note` 接在新判讀後面，不洗掉
+- 可重複執行
+
+**5. 小調整**：批次解析回傳多一個 `rejected` 計數，後台批次訊息顯示「苷元誤配自動否決 N」。
+
+### 驗證
+
+`python -m tests.test_ingredient_mapping` 全過（82 → 117 項），新增 35 項斷言：用人參驗收的真實案例
+（Ginsenoside-Rh4_qt 458.8 → 620.9、ginsenoside Rg5_qt 442.8 → 767.0）、
+不帶 `_qt` 的糖基差不否決、母體較重但湊不出糖基不否決、相符的候選排第 6 也挑得到，
+以及重新分類的試算不寫入、人工確認不被改、重複執行收斂、被否決的錯分子 InChIKey 反查不到。
+其餘四支回歸（news_e2e、target_mapping、pathways、herb_ingredients）與 `test_zh_match.js` 全過。
+
+⚠️ 真正打 PubChem 的那一層仍是 fixture（沙箱連不到 PubChem），**沒有端對端驗證過**。
+
+### 部署注意事項
+
+- **沒有動資料表**，不需要 `migrate_schema`
+- 上版後對正式資料庫**先跑報表、看過再寫入**：
+
+```powershell
+$env:DATABASE_URL="（Neon 連線字串）"
+python -m app.reclassify_ingredient_queue --out reports\requeue.md
+python -m app.reclassify_ingredient_queue --apply
+```
+
 ## v1.42.8 — 2026-10-06（資料表可拉成獨立視窗）
 
 ### 為什麼
