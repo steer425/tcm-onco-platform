@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.42.9"
-set "DEFAULT_MSG=v1.42.9 reject _qt aglycones that resolved to their parent glycoside, pick multi-hit candidates by molecular weight, and add reclassify_ingredient_queue to clean up the 81 wrong structures already in the queue"
+set "EXPECTED_VER=1.42.10"
+set "DEFAULT_MSG=v1.42.10 stop treating a one-water difference as the same compound, because the first production run showed Isotanshinone II resolving to a lighter dehydration product"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

@@ -136,6 +136,9 @@ def main():
     r = pc.mw_check("302.25", "320.26")
     check("差 18 Da 判為不符，並提示可能是水合物",
           r["agree"] is False and "水合物" in r["reason"], r["reason"])
+    r = pc.mw_check("294.37", "276.3")
+    check("PubChem 少一個水 → 提示是脫水產物、不是同一化合物",
+          r["agree"] is False and "脫水" in r["reason"], r["reason"])
     r = pc.mw_check("302.25", "440.50")
     check("差 138 Da 判為不符，並提示可能是鹽類或同名異物",
           r["agree"] is False and ("鹽類" in r["reason"] or "同名異物" in r["reason"]),
@@ -457,6 +460,12 @@ def main():
          "910006", "303.5", "ARACHIDONA-AAAAAAAAAA-N", None),
         ("MOLR05", "mystery compound", "300.0", "pending", "exact",
          "910007", "377.0", "MYSTERYMYS-AAAAAAAAAA-N", None),
+        # 正式資料庫的真實案例：PubChem 少一個水 → 脫水產物，不是同一化合物（v1.42.10）
+        ("MOLR07", "Isotanshinone II", "294.37", "pending", "exact",
+         "910009", "276.3", "ISOTANSHIN-AAAAAAAAAA-N", None),
+        # PubChem 多一個水 → 也不整批收，留給人看
+        ("MOLR08", "glyceryl linolenate", "352.57", "pending", "exact",
+         "910010", "370.5", "GLYLINOLEN-AAAAAAAAAA-N", None),
         # 人工已確認的苷元誤配：**任何情況都不能被改回去**
         ("MOLR06", "alexandrin_qt", "414.79", "confirmed", "manual",
          "910008", "576.8", "HUMANCONFI-AAAAAAAAAA-N", None),
@@ -482,6 +491,9 @@ def main():
           dry["counts"]["苷元誤配"] == 2, dry["counts"])
     check("試算：多筆挑中 1 筆", dry["counts"]["多筆挑中"] == 1, dry["counts"])
     check("試算：同一化合物 1 筆（差一個氫）", dry["counts"]["同一化合物"] == 1, dry["counts"])
+    check("**差一個水分子不算同一化合物**（Isotanshinone II 294.37 vs 276.3 是脫水產物）",
+          rq.classify_row(_st("MOLR07"), "Isotanshinone II")["bucket"] == "人工審核"
+          and rq.classify_row(_st("MOLR08"), "glyceryl linolenate")["bucket"] == "人工審核")
     check("試算：無法解釋的留給人工", dry["counts"]["人工審核"] >= 1, dry["counts"])
     check("**試算不寫入任何資料**",
           _st("MOLR01").status == "pending" and dry["written"]["rejected"] == 0)
@@ -504,6 +516,8 @@ def main():
 
     rq.run(apply=True, accept_same=True, db=db)
     check("加 --accept-same 後差一個氫的才收成 auto", _st("MOLR04").status == "auto")
+    check("加 --accept-same 也不會收差一個水的",
+          _st("MOLR07").status == "pending" and _st("MOLR08").status == "pending")
     again = rq.run(apply=False, db=db)
     check("重複執行只剩人工審核那一桶", again["counts"]["苷元誤配"] == 0
           and again["counts"]["多筆挑中"] == 0 and again["counts"]["同一化合物"] == 0, again)

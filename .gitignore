@@ -25,3 +25,7 @@ reports/
 
 # tests/test_zh_match.js 的選配依賴（npm i opencc-js），不進版控
 node_modules/
+
+# 測試腳本自己建的 SQLite（v1.42.10）。v1.42.9 push 時 test_ingredient_mapping.db 被 `git add .` 帶上去了
+test*.db
+*.db-journal

@@ -1,5 +1,62 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.42.10 — 2026-10-14（差一個水分子不再算同一化合物）
+
+### 為什麼
+
+v1.42.9 上版後對正式資料庫跑 `python -m app.reclassify_ingredient_queue --apply`：
+
+| 桶 | 筆數 | 寫入 |
+|---|---|---|
+| 苷元誤配 | **80** | → rejected（9/10 盤點預估 81，吻合） |
+| 多筆挑中 | 3 | → auto |
+| 同一化合物 | 11 | 未動（沒加 `--accept-same`） |
+| 人工審核 | 270 | 未動 |
+| `_qt` 改標 aglycone_parent | 133 | |
+
+人參那 3 筆 `_qt`（Rh4、alexandrin、Rg5）都在 80 筆裡。
+
+「同一化合物」11 筆中 8 筆差一個氫，**3 筆差一個水分子，這 3 筆不能整批收**：
+
+- **Isotanshinone II**：TCMSP 294.37（C19H18O3），PubChem 276.3——PubChem 比較**輕**。
+  那不是水合物，是少一個水的脫水產物，共價結構不同，是另一個化合物
+- glyceryl linolenate（352.57 → 370.5）、glucobrassicin（430.48 → 448.5）：PubChem 較重，
+  但天然物差 18 常是羥基化，不一定是結晶水
+
+如果照 v1.42.9 的說法加 `--accept-same`，Isotanshinone II 的錯結構就會被收成 auto。
+
+### 改了什麼
+
+- `same_compound_form()` 只認「≈0」與「差一個氫」，**不再認差一個水分子**
+- `mw_check()` 的水分子提示分方向：PubChem 較重 → 「可能是水合物，但也常是羥基化，請確認分子式」；
+  PubChem 較輕 → 「通常是脫水產物，不是同一個化合物」
+- `reclassify_ingredient_queue` 說明與 `--accept-same` 說明同步更新；修掉 `datetime.utcnow()` 的 DeprecationWarning
+- `.gitignore` 補上 `test*.db`、`*.db-journal`：v1.42.9 push 時 `test_ingredient_mapping.db`（測試腳本自己建的庫）
+  被 `git add .` 帶進 repo。已追蹤的檔案 `.gitignore` 擋不住，要另外 `git rm --cached`（見部署注意事項）
+
+### 驗證
+
+`python -m tests.test_ingredient_mapping` 117 → 120 項全過。新增以 Isotanshinone II 與 glyceryl linolenate
+真實數值做的斷言：兩筆都歸「人工審核」，加 `--accept-same` 也不會收。
+
+### 部署注意事項
+
+- 沒有動資料表，不需要 `migrate_schema`
+- push 前先把誤上傳的測試庫移出版控（只移出 git，本機檔案保留）：
+
+```powershell
+cd D:\tcm_backend
+git rm --cached test_ingredient_mapping.db
+```
+
+- 這一版之後再跑一次報表，「同一化合物」應該從 11 變成 **8**（只剩差一個氫的），確認後再加 `--accept-same`：
+
+```powershell
+$env:DATABASE_URL="（Neon 連線字串）"
+python -m app.reclassify_ingredient_queue
+python -m app.reclassify_ingredient_queue --apply --accept-same
+```
+
 ## v1.42.9 — 2026-10-14（苷元誤配直接否決、多筆命中用分子量挑選）
 
 ### 為什麼
@@ -46,7 +103,7 @@ note 寫出糖基組合與下一步（CAS／InChIKey 第二層查詢）。判定
 |---|---|
 | 苷元誤配 | → `rejected`；method 由 `cleaned` 改標 `aglycone_parent` |
 | 多筆挑中 | → `auto`，採用分子量相符的候選（CAS 未取得，重新解析才會補） |
-| 同一化合物（差一個氫或一個水） | 預設不動，加 `--accept-same` 才 → `auto` |
+| 同一化合物（差一個氫或一個水；v1.42.10 起只認差一個氫） | 預設不動，加 `--accept-same` 才 → `auto` |
 | 人工審核 | 不動 |
 
 - 預設只出報表，`--apply` 才寫入，寫入時記一筆共用稽核（`tcmsp_reclassify_ingredient_queue`）

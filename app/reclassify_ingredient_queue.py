@@ -22,11 +22,12 @@ v1.42.9 改了 `tcmsp_pubchem.resolve_name()` 的三條規則：
 |---|---|---|
 | 苷元誤配 | 名稱帶 `_qt`、PubChem 較重、差值是 1~4 個糖基組合 | `rejected` |
 | 多筆挑中 | 原名命中多筆、只有一筆分子量相符 | `auto`（採用那一筆） |
-| 同一化合物 | 原名命中、差一個氫或一個水分子 | 只有加 `--accept-same` 才改 `auto` |
+| 同一化合物 | 原名命中、差一個氫（酸式 vs 陰離子式） | 只有加 `--accept-same` 才改 `auto` |
 | 人工審核 | 其他 | 不動 |
 
-「同一化合物」預設不動，是因為水合物在 PubChem 是**另一個 CID**：
-化學上是同一個分子，但結構欄位會是水合物的那一筆。要不要整批收，請看過報表再決定。
+「同一化合物」預設不動，要不要整批收請看過報表再決定。
+v1.42.10 起**差一個水分子不再算同一化合物**（見 `tcmsp_pubchem.same_compound_form()`）：
+正式資料庫跑出來的 Isotanshinone II 是 PubChem 少一個水的脫水產物，不是水合物。
 
 ## 不會碰的東西
 
@@ -49,7 +50,7 @@ import io
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app import models, tcmsp_pubchem as pc
 from app.database import SessionLocal
@@ -77,7 +78,7 @@ def _check_db_target():
 
 def _merge_note(new: str, old: str | None) -> str:
     """新判讀放前面，舊 note 接在後面——不洗掉任何人寫過的東西。"""
-    stamp = datetime.utcnow().strftime("%Y-%m-%d")
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     text = f"[{stamp} 重新分類] {new}"
     if old and old.strip():
         text += f"｜原記錄：{old.strip()}"
@@ -244,7 +245,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="成分標準化待確認佇列的重新分類（不連 PubChem）")
     ap.add_argument("--apply", action="store_true", help="實際寫入（預設只看報表）")
     ap.add_argument("--accept-same", action="store_true",
-                    help="連「差一個氫／一個水分子」的同一化合物一起改成 auto")
+                    help="連「差一個氫」（酸式 vs 陰離子式）的同一化合物一起改成 auto")
     ap.add_argument("--out", default=None, help="另存成 markdown 檔")
     args = ap.parse_args(argv)
     _fix_console()

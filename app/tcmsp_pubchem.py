@@ -203,9 +203,12 @@ def mw_check(tcmsp_mw, pubchem_mw, name: str | None = None) -> dict:
             else:
                 hint = (f"（差值等於 {parts}＝{total:.2f} Da 且 PubChem 較重，"
                         f"很可能查到的是糖苷而非苷元，請先確認是不是同一個分子）")
+        elif hydrate and pubchem_heavier:
+            hint = (f"（差值接近 {hydrate} 個水分子且 PubChem 較重，可能是水合物，"
+                    f"但天然物差 18 也常是羥基化——請確認分子式）")
         elif hydrate:
-            hint = (f"（差值接近 {hydrate} 個水分子，"
-                    f"可能是水合物與無水物的差別）")
+            hint = (f"（PubChem 少了 {hydrate} 個水分子，這通常是脫水產物，"
+                    f"**不是同一個化合物**，請確認分子式）")
         elif aglycone:
             hint = (f"（名稱的 {AGLYCONE_SUFFIX} 表示苷元。"
                     f"苷元常因名稱查詢而解析到母體苷，請特別確認分子是否相同）")
@@ -247,14 +250,18 @@ def glycoside_mismatch(name, tcmsp_mw, pubchem_mw) -> str | None:
 def same_compound_form(tcmsp_mw, pubchem_mw) -> str | None:
     """差值是否只是「同一個化合物的不同寫法」。是就回說明，否則 None。
 
-    只認三種，而且刻意保守：
+    只認兩種，而且刻意保守：
       ≈0      0.5 Da 內，兩邊小數位慣例不同
       ≈1 質子  酸式 vs 陰離子式（例：arachidonic acid 304.5 vs arachidonate 303.5）
-      ≈18 水   **只認一個水分子**。多個水的情況見 _hydrate_units() 的說明——
-              162.1（一個葡萄糖）距離 9 個水只差 0.035，放寬就會把苷元誤配當成水合物
 
-    供 `reclassify_ingredient_queue` 整批採用時使用；`resolve_name()` 不用它自動採用，
-    新解析的這類筆數仍進待確認，由人或重新分類腳本處理。
+    **v1.42.10 起不再認「差一個水分子」。** v1.42.9 把它當成水合物 vs 無水物，
+    正式資料庫跑出來的 3 筆裡至少 1 筆是**不同的化合物**：
+    Isotanshinone II（TCMSP 294.37，C19H18O3）查回 276.3——PubChem 比較**輕**，
+    那不是水合物，是少了一個水的脫水產物，共價結構不一樣。
+    天然物裡差 18 多半是羥基化／脫水這類真正的結構差異，不是結晶水。
+    差一個水的一律留給人看。
+
+    供 `reclassify_ingredient_queue` 整批採用時使用；`resolve_name()` 不用它自動採用。
     """
     a, b = _num(tcmsp_mw), _num(pubchem_mw)
     if a is None or b is None:
@@ -264,8 +271,6 @@ def same_compound_form(tcmsp_mw, pubchem_mw) -> str | None:
         return "分子量相符（小數位差異）"
     if abs(d - PROTON_MASS) <= 0.2:
         return "差一個氫（酸式 vs 陰離子式），同一化合物"
-    if abs(d - WATER_MASS) <= 0.3:
-        return "差一個水分子（水合物 vs 無水物），同一化合物"
     return None
 
 
