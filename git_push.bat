@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.46.0"
-set "DEFAULT_MSG=v1.46.0 mark which TCMSP diseases are tumours (by ICD-10, then ICD-9, then disease name, with admin override that recompute never touches) and show the class as a badge, filter and header line on the disease, herb and admin pages"
+set "EXPECTED_VER=1.46.1"
+set "DEFAULT_MSG=v1.46.1 add set_disease_tumor_class to fix five disease tumour classes that the TCMSP source data gets wrong, checking each disease name before writing"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

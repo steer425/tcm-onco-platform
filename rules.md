@@ -1353,6 +1353,7 @@ pre-flight 因此以舊版號去比對四個檔案、四項全 FAIL——**擋�
 | `python -m app.migrate_schema` | **對既有資料表新增/修改欄位時**。只是新增全新資料表則不用——`create_all()` 會自動建。但「全新」是相對**正式資料庫**而言：本機或測試庫若已經建過該表的舊版，仍要跑一次才會補上新欄位（v1.34.0 的 `news_articles.is_embargoed`／`embargo_until` 就是這個情況） |
 | `python -m app.seed_gencc_translations` | **改了 GenCC 疾病三語系翻譯時**（v1.32.6 起）。只補空值、不覆蓋既有翻譯，可重複執行 |
 | `python -m app.import_tcmsp_data` / `import_dark_genes` / `import_gencc_diseases` | 匯入或更新對應的來源資料時 |
+| `python -m app.set_disease_tumor_class` | **要批次手動指定疾病腫瘤分類時**（v1.46.1）。清單寫在檔案裡的 `CORRECTIONS`，每筆核對病名，對不上整批不寫；預設只顯示，`--apply` 才寫入 |
 | `python -m app.classify_tumor_diseases` | **想先看疾病腫瘤分類會怎麼分、哪些要人工確認時**（v1.46.0）。預設只顯示不寫入，`--csv 檔名` 另存全清單；寫入不用靠它——`migrate_schema`、匯入、後台「重算統計」都會一併判定 |
 
 在本機對正式資料庫跑這些腳本前要先指定連線字串：
