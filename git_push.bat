@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.43.0"
-set "DEFAULT_MSG=v1.43.0 put Step 6 on screen: tumour cell line dependency page backed by one shared depmap_analysis module, and add the tables query stations read to the read-only cache"
+set "EXPECTED_VER=1.44.0"
+set "DEFAULT_MSG=v1.44.0 let every user see their own profile, login history and account changes, and change their own password from personal settings"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

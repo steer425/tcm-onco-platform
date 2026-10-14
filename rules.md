@@ -566,6 +566,20 @@ F1-8 腫瘤細胞頁與報表腳本 `inspect_depmap` 共用 `select_herb_targets
    但在規格 C 分層完成前**不可當證據等級呈現**
 5. 不寫「有效」「抑制」——依賴 ≠ 化合物會殺死那株細胞（方向性、敲除 ≠ 抑制、只有腫瘤株）
 
+### 本人資料端點只看得到本人（`/me/*`，v1.44.0）
+
+`app/routers/me.py` 的端點**一律只用 `get_current_user` 取出的那個人，不接受任何 user_id 參數**。
+要查別人請走管理者的 `/login-logs`、`/audit-logs`。
+
+- 異動紀錄＝「自己做的事」＋「別人對自己帳號做的事」（`target_type='user' AND target_id=本人`）。
+  後者是重點：帳號被重設密碼或被改角色，本人要看得到。所以 `users.update_user` 的稽核說明
+  要寫出改了哪些欄位（重設密碼／調整角色／狀態），**絕不寫密碼內容**
+- 變更密碼：驗證目前密碼；至少 8 字元、英文＋數字、不含帳號、擋常見密碼（含種子預設值 0000）、
+  不超過 72 位元組（bcrypt 會靜默截斷超過的部分）。目前密碼輸錯回 **400 不是 401**——
+  `api.js` 收到 401 會清掉登入狀態並跳回首頁
+- `/me/password` 列在唯讀模式豁免清單：密碼外洩時要能立刻換
+- JWT 不可撤銷的既有限制照實告知使用者：其他裝置的工作階段要等到期（最長 8 小時）才失效
+
 ### 測試絕不能跑在正式資料庫上（v1.43.0，實際發生過）
 
 測試開頭的 `os.environ.setdefault("DATABASE_URL", ...)` **不會覆蓋已存在的值**。
@@ -1181,7 +1195,7 @@ git check-ignore -v <路徑>    # 會指出是 .gitignore 第幾行擋掉的
 | `security.html` | F0-7 | 資安規劃（施工中，列出規劃項目） |
 | `reports.html` | F0-8 | 報表設計（施工中，列出規劃項目） |
 | `system-settings.html` | F0-16 | 系統設定（配色主題切換） |
-| `personal-settings.html` | F0-18 | 個人化設定（全站語系／查詢站配色） |
+| `personal-settings.html` | F0-18 | 個人化設定（個人資訊、變更密碼、本人登入紀錄、本人異動紀錄、全站語系／查詢站配色） |
 | `announcements.html` | F0-17 | 公告管理 |
 | `patients.html` | F3-1 | 客戶資料管理（病患基本資料／就診紀錄，其餘基因體資料層待擴充） |
 | `dark-genes.html` | F3-2 | 暗黑基因管理（癌症基因參考資料，可匯入 TSV／CRUD） |
@@ -1317,7 +1331,7 @@ python -m app.seed_gencc_translations
 
 - 四種語系全測（見第五之二章「上版前的強制檢查規則」）
 - `python -m tests.test_news_e2e`、`python -m tests.test_target_mapping`、
-  `python -m tests.test_pathways`、`python -m tests.test_ingredient_mapping` 與 `python -m tests.test_depmap_page` 全過（**不是** `python -m pytest tests/ -q`——`test_news_e2e.py`
+  `python -m tests.test_pathways`、`python -m tests.test_ingredient_mapping`、`python -m tests.test_depmap_page` 與 `python -m tests.test_me` 全過（**不是** `python -m pytest tests/ -q`——`test_news_e2e.py`
   是手寫的端對端驗證腳本，函式名稱不是 pytest 慣例的 `test_*`，`pytest` 指令會直接回報
   「collected 0 items」、結束碼 5，**看起來像失敗，但其實根本沒有跑到任何一項驗證**，
   這是這次開發中實際發現的認知陷阱，不是理論疑慮）

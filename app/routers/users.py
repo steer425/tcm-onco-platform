@@ -55,7 +55,12 @@ def update_user(user_id: str, payload: schemas.UserUpdate, db: Session = Depends
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="找不到帳號")
+    # 記下這次改了哪些欄位：本人會在「個人化設定 → 異動紀錄」看到這一筆（v1.44.0），
+    # 只寫「更新帳號」的話，被重設密碼或被改角色的人看不出發生了什麼。**密碼內容絕不寫入。**
+    changed = []
     if payload.status is not None:
+        if user.status != payload.status:
+            changed.append(f"狀態 → {payload.status.value if hasattr(payload.status, 'value') else payload.status}")
         user.status = payload.status
     if payload.suspend_reason is not None:
         user.suspend_reason = payload.suspend_reason
@@ -63,13 +68,16 @@ def update_user(user_id: str, payload: schemas.UserUpdate, db: Session = Depends
         user.notes = payload.notes
     if payload.password:
         user.password_hash = hash_password(payload.password)
+        changed.append("重設密碼")
     if payload.role_ids is not None:
+        changed.append("調整角色")
         db.query(models.UserRole).filter(models.UserRole.user_id == user.id).delete()
         for rid in payload.role_ids:
             db.add(models.UserRole(user_id=user.id, role_id=rid))
     db.commit()
     db.refresh(user)
-    write_audit_log(db, admin, "update_user", "user", user.id, f"更新帳號 {user.account}")
+    write_audit_log(db, admin, "update_user", "user", user.id,
+                    f"更新帳號 {user.account}" + (f"（{'、'.join(changed)}）" if changed else ""))
     return _to_out(user)
 
 

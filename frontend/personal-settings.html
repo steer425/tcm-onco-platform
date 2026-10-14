@@ -17,6 +17,20 @@
   .theme-preview span { display: block; padding-top: 22px; font-size: 11px; }
   .theme-preview.dark span { color: #8a8f98; }
   .theme-preview.light span { color: #6b7a70; }
+  /* ---- 個人資訊（v1.44.0） ---- */
+  .profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px 20px; }
+  .profile-grid .k { font-size: 12px; color: var(--muted); }
+  .profile-grid .v { font-size: 14px; margin-top: 2px; word-break: break-all; }
+  .pw-form { max-width: 420px; }
+  .pw-form button { margin-top: 16px; }
+  .ok-msg { color: var(--primary); font-size: 13px; margin-top: 10px; }
+  .log-wrap { overflow-x: auto; }
+  .log-wrap td.ua { max-width: 360px; font-size: 12px; color: var(--muted); word-break: break-all; }
+  .log-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .log-bar label { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
+  .log-bar input[type=checkbox] { width: auto; }
+  .tag.other { background: #fdf3e2; color: #8a5a12; }
+  .tag.pw { background: #eaf1fb; color: #1f4f7a; }
 </style>
 </head>
 <body data-current-page="personal-settings.html">
@@ -29,6 +43,48 @@
     <div class="topbar">
       <h2 style="margin:0;">個人化設定</h2>
       <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">個人資訊</h3>
+      <div class="profile-grid" id="profileGrid">載入中...</div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">密碼設定</h3>
+      <p class="hint-msg" style="margin-top:0;">
+        新密碼至少 8 個字元，需同時包含英文字母與數字，不可包含帳號名稱，也不可使用 0000、12345678 這類常見密碼。
+      </p>
+      <form class="pw-form" id="pwForm" autocomplete="off">
+        <label for="pwCurrent">目前密碼</label>
+        <input id="pwCurrent" type="password" autocomplete="current-password" required />
+        <label for="pwNew">新密碼</label>
+        <input id="pwNew" type="password" autocomplete="new-password" required />
+        <label for="pwConfirm">再輸入一次新密碼</label>
+        <input id="pwConfirm" type="password" autocomplete="new-password" required />
+        <button type="submit" id="pwSubmit">變更密碼</button>
+        <div id="pwMsg"></div>
+      </form>
+      <p class="hint-msg" id="pwOauthHint" style="display:none;"></p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">登入紀錄</h3>
+      <div class="log-bar"><span class="hint-msg" style="margin:0;" id="loginTotal"></span></div>
+      <div class="log-wrap"><table id="loginTable"></table></div>
+      <button class="secondary" id="loginMore" style="display:none; margin-top:10px;">顯示更多</button>
+      <p class="hint-msg">看到不認得的登入時間或 IP，請立即變更密碼並通知管理者。</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">異動紀錄</h3>
+      <div class="log-bar">
+        <label><input type="checkbox" id="auditIncludeLogin" /> 包含登入／登出</label>
+        <span class="hint-msg" style="margin:0;" id="auditTotal"></span>
+      </div>
+      <div class="log-wrap"><table id="auditTable"></table></div>
+      <button class="secondary" id="auditMore" style="display:none; margin-top:10px;">顯示更多</button>
+      <p class="hint-msg">包含你自己做的操作，以及<b>別人對你的帳號所做的變更</b>（例如管理者調整角色或重設密碼，會標示「他人操作」）。</p>
     </div>
 
     <div class="card">
