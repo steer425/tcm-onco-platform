@@ -128,7 +128,32 @@ body {
   border-radius: 12px;
   padding: 36px 32px;
   width: 340px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
   box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+}
+
+/* ---- 登入頁背景圖（v1.46.2，js/login-bg.js 依視窗尺寸繪製） ---- */
+body.login-page { background: #0d261c; }
+#loginBg { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
+#loginBg svg { display: block; width: 100%; height: 100%; }
+body.login-page .login-wrap { position: relative; z-index: 1; background: transparent; box-sizing: border-box; }
+body.login-page .login-card { box-shadow: 0 18px 48px rgba(0,0,0,.38); }
+/* 寬螢幕：圖在左、登入卡在右 */
+body.login-wide .login-wrap { justify-content: flex-end; padding: 24px max(32px, 4vw) 24px 24px; }
+/* 直式／手機：圖在上方帶狀區，登入卡從帶狀區下緣開始，頁面可往下捲 */
+body.login-portrait .login-wrap { align-items: flex-start; padding: calc(var(--login-art-band, 260px) + 4px) 16px 28px; }
+.lbg-flow { animation: lbgFlow 2.6s linear infinite; }
+@keyframes lbgFlow { to { stroke-dashoffset: -24; } }
+.lbg-pulse { transform-box: fill-box; transform-origin: center; animation: lbgPulse 3.2s ease-out infinite; }
+@keyframes lbgPulse { 0% { transform: scale(1); opacity: .85; } 100% { transform: scale(1.55); opacity: 0; } }
+.lbg-scan { animation: lbgScan 6s ease-in-out infinite alternate; }
+@keyframes lbgScan { from { transform: translateY(-160px); } to { transform: translateY(260px); } }
+.lbg-node { animation: lbgBlink 2.8s ease-in-out infinite; }
+.lbg-node:nth-child(3n) { animation-delay: -1.2s; }
+@keyframes lbgBlink { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) {
+  .lbg-flow, .lbg-pulse, .lbg-scan, .lbg-node { animation: none; }
 }
 
 .login-card h2 {
@@ -174,6 +199,17 @@ button.secondary {
 button.danger { background: var(--danger); }
 
 .error-msg { color: var(--danger); font-size: 13px; margin-top: 10px; }
+/* 有內容時變成明顯的警示框（v1.46.2：帳密錯誤原本只有一行小紅字，又會一閃而過） */
+.error-msg:not(:empty) {
+  background: #fdecec; border: 1px solid #f3b4b4; border-left: 4px solid var(--danger);
+  border-radius: 6px; padding: 9px 12px; font-weight: 600; line-height: 1.5;
+}
+.error-shake { animation: errorShake .38s ease-in-out; }
+@keyframes errorShake {
+  0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); }
+}
+@media (prefers-reduced-motion: reduce) { .error-shake { animation: none; } }
 .hint-msg { color: var(--muted); font-size: 12px; margin-top: 14px; }
 
 table {

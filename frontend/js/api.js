@@ -33,8 +33,17 @@ async function api(path, options = {}) {
   const token = getToken();
   if (token) headers["Authorization"] = "Bearer " + token;
 
-  const res = await fetch(API_BASE + path, { ...options, headers });
-  if (res.status === 401) {
+  let res;
+  try {
+    res = await fetch(API_BASE + path, { ...options, headers });
+  } catch (netErr) {
+    // 網路斷線、伺服器沒回應（Render 喚醒失敗時常見）：給看得懂的訊息，不要丟出瀏覽器的 "Failed to fetch"
+    throw new Error("無法連線到伺服器，請稍後再試");
+  }
+  // 401 只有在「帶著登入憑證卻被拒」時才代表登入過期，這時才清掉並導回登入頁。
+  // 登入本身帳密錯誤也是 401——如果照樣導回登入頁，頁面會立刻重新載入，
+  // 錯誤訊息一閃而過、使用者根本看不到（v1.46.2 實際回報）。
+  if (res.status === 401 && token && !path.startsWith("/auth/login")) {
     clearSession();
     window.location.href = "index.html";
     throw new Error("未登入或登入已過期");

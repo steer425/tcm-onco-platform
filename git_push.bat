@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.46.1"
-set "DEFAULT_MSG=v1.46.1 add set_disease_tumor_class to fix five disease tumour classes that the TCMSP source data gets wrong, checking each disease name before writing"
+set "EXPECTED_VER=1.46.2"
+set "DEFAULT_MSG=v1.46.2 keep the wrong-password message on screen instead of reloading the login page, and add a responsive login background showing herbs, AI, DNA testing and the seven integrated databases"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

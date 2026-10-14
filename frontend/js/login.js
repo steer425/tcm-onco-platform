@@ -41,6 +41,8 @@ function applyLoginLanguage(lang) {
 initLoginOpenCC();
 const langSelect = document.getElementById("langSelect");
 const savedLoginLang = localStorage.getItem(LOGIN_LANG_STORAGE_KEY) || "en"; // 預設英文
+// 頁面載入之後才寫進畫面的文字（錯誤訊息、背景圖縮放後重畫的標籤）用這支轉換成目前語系
+window.loginT = (text) => convertLoginText(text, savedLoginLang);
 langSelect.value = savedLoginLang;
 applyLoginLanguage(savedLoginLang);
 langSelect.addEventListener("change", (e) => {
@@ -81,8 +83,26 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
     window.location.href = "dashboard.html";
   } catch (err) {
     stopWaiting();
-    errorMsg.textContent = err.message;
+    showLoginError(err.message);
+    // 帳密錯誤時把密碼選起來，直接重打即可
+    const pw = document.getElementById("password");
+    if (pw) { pw.focus(); pw.select(); }
   }
+});
+
+// 錯誤訊息：登入頁的語系轉換只在載入時跑一次，之後才寫進去的文字要自己轉，否則英文介面會冒出中文。
+// 訊息會一直留著，直到使用者重新輸入帳號或密碼（不會自己消失）。
+function showLoginError(msg) {
+  const el = document.getElementById("errorMsg");
+  if (!el) return;
+  el.textContent = window.loginT ? window.loginT(msg) : msg;
+  el.classList.remove("error-shake");
+  void el.offsetWidth; // 重新觸發動畫：連續輸錯時也看得出「又錯了一次」
+  el.classList.add("error-shake");
+}
+["account", "password"].forEach((id) => {
+  const input = document.getElementById(id);
+  if (input) input.addEventListener("input", () => { document.getElementById("errorMsg").textContent = ""; });
 });
 
 document.getElementById("applyBtn").addEventListener("click", () => {
@@ -162,5 +182,5 @@ document.getElementById("facebookLoginBtn").addEventListener("click", () => {
     token_exchange_failed: "與第三方服務交換登入憑證失敗，請重新嘗試。",
     missing_profile: "無法取得帳號資訊，請確認已授權必要的權限。",
   };
-  document.getElementById("errorMsg").textContent = messages[err] || ("第三方登入失敗：" + err);
+  showLoginError(messages[err] || ("第三方登入失敗：" + err));
 })();
