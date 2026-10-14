@@ -334,6 +334,11 @@ class TcmspDisease(Base):
     # 預先計算好的統計數字：這個疾病連結到幾個不重複的 TCMSP 靶點，
     # 由 app/recompute_stats.py 統一重算，查詢站列表不用現場運算
     target_count = Column(Integer, default=0, nullable=False)
+    # 腫瘤分類（v1.46.0）：判定規則只有一份，見 app/disease_tumor.py。
+    # tumor_class：malignant／in_situ／benign／uncertain／unspecified，None＝非腫瘤
+    # tumor_basis：icd10／icd9／name＝自動判定；manual＝管理者指定，自動分類永遠不覆蓋
+    tumor_class = Column(String, nullable=True, index=True)
+    tumor_basis = Column(String, nullable=True)
 
 
 class TcmspHerbIngredient(Base):

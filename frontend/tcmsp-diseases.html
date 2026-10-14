@@ -12,6 +12,9 @@
   .status-pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:600; }
   .status-has { background:#e8f3ec; color:#1f4f37; }
   .status-missing { background:#fdf3e0; color:#8a5a00; }
+  .tumor-cell select { width: 150px; margin: 0; font-size: 12.5px; }
+  .tumor-auto { font-size: 11.5px; color: #6b7a70; margin-top: 3px; }
+  .tumor-review { font-size: 11.5px; color: #8a5a00; margin-top: 3px; max-width: 260px; }
 </style>
 </head>
 <body data-current-page="tcmsp-diseases.html">
@@ -31,16 +34,28 @@
         對應「TCMSP 疾病關聯查詢站」左側清單的中文名稱來源。系統已預先帶入 116 筆常見疾病的中文翻譯，
         其餘可在此逐步補充/修正；修正過的內容之後重新執行 TCMSP 資料匯入腳本也不會被洗掉。
       </p>
+      <p class="hint-msg">
+        「腫瘤分類」預設是自動判定：先看 ICD-10，沒有就看 ICD-9，兩者都沒有才看病名。
+        判定錯了可以在這裡手動指定，手動指定的之後重算統計、重新匯入都不會被改回去；選「自動判定」即可交回系統。
+        篩選「需要確認」會列出 ICD 與病名說法不一致的項目。
+      </p>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px;">
         <input id="searchInput" placeholder="搜尋疾病名稱（中/英文）或 Dis ID" style="max-width:260px;" />
-        <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#6b7a70;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#6b7a70; white-space:nowrap;">
           <input type="checkbox" id="missingOnlyFilter" /> 只顯示尚無中文名稱
         </label>
+        <select id="tumorFilter" style="max-width:170px; margin:0;">
+          <option value="">腫瘤分類：全部</option>
+          <option value="tumor">只看腫瘤</option>
+          <option value="non_tumor">只看非腫瘤</option>
+          <option value="review">需要確認</option>
+          <option value="manual">手動指定過的</option>
+        </select>
         <span class="hint-msg" id="countHint" style="margin-left:auto;"></span>
       </div>
       <table>
         <thead>
-          <tr><th>Dis ID</th><th>英文名稱</th><th>中文名稱</th><th>狀態</th><th>備注</th><th style="width:100px;">操作</th></tr>
+          <tr><th>Dis ID</th><th>英文名稱</th><th>中文名稱</th><th>狀態</th><th>ICD9／ICD10</th><th>腫瘤分類</th><th>備注</th><th style="width:100px;">操作</th></tr>
         </thead>
         <tbody id="tableBody"></tbody>
       </table>
@@ -52,6 +67,7 @@
 <script src="js/nav.js"></script>
 <script src="js/i18n-dict.js"></script>
 <script src="js/site-lang.js"></script>
+<script src="js/tumor-class.js"></script>
 <script src="js/tcmsp-diseases.js"></script>
 </body>
 </html>

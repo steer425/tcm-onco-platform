@@ -566,6 +566,33 @@ F1-8 腫瘤細胞頁與報表腳本 `inspect_depmap` 共用 `select_herb_targets
    但在規格 C 分層完成前**不可當證據等級呈現**
 5. 不寫「有效」「抑制」——依賴 ≠ 化合物會殺死那株細胞（方向性、敲除 ≠ 抑制、只有腫瘤株）
 
+### 疾病的腫瘤分類只有一份判定：`app/disease_tumor.py`（v1.46.0）
+
+TCMSP 的疾病沒有「是不是腫瘤」的欄位，腫瘤是混在 837 種疾病裡的子集合。平台在 `tcmsp_diseases` 加了
+`tumor_class`（malignant／in_situ／benign／uncertain／unspecified，None＝非腫瘤）與 `tumor_basis`
+（icd10／icd9／name＝自動；manual＝管理者指定）。
+
+- **依據的優先順序是 ICD-10 → ICD-9 → 病名**。病名不可靠：「Cancer pain」是疼痛（G89.3）、
+  「Benign prostatic hyperplasia」是增生不是贅生（N40）、「Polycythemia vera」病名沒有 tumor 卻是 D45。
+  ICD 與病名說法不一致時依 ICD，但列進「需要確認」（後台篩選、`classify_tumor_diseases` 都看得到）
+- **病名比對用完整字詞清單，不要用 `-oma` 字尾**：glaucoma、hematoma、granuloma、trachoma 都不是腫瘤；
+  中文「動脈瘤」也不是
+- **`tumor_basis == "manual"` 的自動分類永遠不碰**。判定掛在 `recompute_all_stats()` 最後一步，
+  所以匯入、`migrate_schema`、後台「重算統計」都會重判——只有手動指定的會被跳過，測試裡有這條回歸斷言
+- 後台 PUT `/tcmsp/diseases/{id}` **沒帶 `tumor_class` 就不動分類**：存中文名稱不能順手把分類變成手動指定。
+  前端只有下拉真的改過才送
+- 前台顯示一律用 `frontend/js/tumor-class.js`，代碼與中文名稱要跟後端 `TUMOR_CLASS_LABELS` 一致（測試會比對）。
+  篩選選項**不把筆數寫進選項文字**：en／ko 是整段查字典，「惡性腫瘤（212）」永遠翻不過去
+- 列表上只標腫瘤、不標「非腫瘤」（大多數是非腫瘤，每列都標只是雜訊）；**詳情頁兩種都要明寫**，
+  否則看不出是「非腫瘤」還是「漏標」
+- **「靶點連到某個腫瘤」只代表靶點與該疾病相關，不代表藥材對它有效**——對外文件與畫面說明都不能寫成療效
+
+### 新增「可為空」欄位時，先跑 migrate 再 push（v1.46.0）
+
+模型一加欄位，新版程式 `SELECT` 就會帶到它；如果先 push、Render 部署完才跑 `migrate_schema`，
+中間那段時間所有讀這張表的頁面都會 500。**可為空、沒有預設值的欄位**對舊版程式完全無害（舊程式不會讀它），
+所以順序反過來：本機測試 → 對正式庫跑 `migrate_schema` → 再 push。
+
 ### 查詢站版面工具只有一份：`frontend/js/qs-ui.js`（v1.45.0）
 
 左側清單收合、勾選欄搜尋、關聯圖隱藏、表格篩選／欄位／排序／獨立視窗，新查詢站一律呼叫 `QSUI.*`，
@@ -1326,6 +1353,7 @@ pre-flight 因此以舊版號去比對四個檔案、四項全 FAIL——**擋�
 | `python -m app.migrate_schema` | **對既有資料表新增/修改欄位時**。只是新增全新資料表則不用——`create_all()` 會自動建。但「全新」是相對**正式資料庫**而言：本機或測試庫若已經建過該表的舊版，仍要跑一次才會補上新欄位（v1.34.0 的 `news_articles.is_embargoed`／`embargo_until` 就是這個情況） |
 | `python -m app.seed_gencc_translations` | **改了 GenCC 疾病三語系翻譯時**（v1.32.6 起）。只補空值、不覆蓋既有翻譯，可重複執行 |
 | `python -m app.import_tcmsp_data` / `import_dark_genes` / `import_gencc_diseases` | 匯入或更新對應的來源資料時 |
+| `python -m app.classify_tumor_diseases` | **想先看疾病腫瘤分類會怎麼分、哪些要人工確認時**（v1.46.0）。預設只顯示不寫入，`--csv 檔名` 另存全清單；寫入不用靠它——`migrate_schema`、匯入、後台「重算統計」都會一併判定 |
 
 在本機對正式資料庫跑這些腳本前要先指定連線字串：
 

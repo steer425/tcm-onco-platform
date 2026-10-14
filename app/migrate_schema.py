@@ -49,6 +49,10 @@ ALTER_STATEMENTS = [
     # 不需要在這裡加 ALTER——只有「既有資料表新增欄位」才需要。
     # v1.39.0 的 pathways / target_pathways 同理，也是全新資料表。
     # v1.40.0 的 tcmsp_ingredient_pubchem 同理。
+    # v1.46.0：疾病的腫瘤分類（值由下面步驟 4 的 recompute_all_stats 一併判定寫入）
+    "ALTER TABLE tcmsp_diseases ADD COLUMN tumor_class VARCHAR",
+    "ALTER TABLE tcmsp_diseases ADD COLUMN tumor_basis VARCHAR",
+    "CREATE INDEX IF NOT EXISTS ix_tcmsp_diseases_tumor_class ON tcmsp_diseases (tumor_class)",
 ]
 
 

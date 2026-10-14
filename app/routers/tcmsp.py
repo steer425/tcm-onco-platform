@@ -25,6 +25,15 @@ def _invalidate_full_data_cache():
     _full_data_cache["expires_at"] = 0
 
 
+def _disease_out(d):
+    """前台各查詢站共用的疾病欄位。tumor_class／tumor_basis 見 app/disease_tumor.py（v1.46.0）。"""
+    return {
+        "dis_id": d.dis_id, "disease_id": d.disease_id, "disease_name": d.disease_name,
+        "disease_cn_name": d.disease_cn_name, "icd9": d.icd9, "icd10": d.icd10,
+        "tumor_class": d.tumor_class, "tumor_basis": d.tumor_basis,
+    }
+
+
 def _val(v):
     """資料庫欄位皆以字串儲存，這裡嘗試轉回數值型別供前端使用（轉換失敗則維持字串/None）"""
     if v is None or v == "":
@@ -96,10 +105,7 @@ def public_get_herb_detail(herb_id: int, current_user: models.User = Depends(get
             for t in targets
         ],
         "diseases": [
-            {
-                "dis_id": d.dis_id, "disease_id": d.disease_id, "disease_name": d.disease_name,
-                "disease_cn_name": d.disease_cn_name, "icd9": d.icd9, "icd10": d.icd10,
-            }
+            _disease_out(d)
             for d in diseases
         ],
         "herb_ingredient": [{"herb_id": r.herb_id, "mol_id": r.mol_id} for r in herb_ingredient_rows],
@@ -242,10 +248,7 @@ def get_full_data(current_user: models.User = Depends(get_current_user), db: Ses
             for t in targets
         ],
         "diseases": [
-            {
-                "dis_id": d.dis_id, "disease_id": d.disease_id, "disease_name": d.disease_name,
-                "disease_cn_name": d.disease_cn_name, "icd9": d.icd9, "icd10": d.icd10,
-            }
+            _disease_out(d)
             for d in diseases
         ],
         "herb_ingredient": [
@@ -333,11 +336,7 @@ def admin_delete_herb(herb_id: int, db: Session = Depends(get_db), admin: models
 def public_list_diseases(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_query_db)):
     diseases = db.query(models.TcmspDisease).all()
     return [
-        {
-            "dis_id": d.dis_id, "disease_id": d.disease_id, "disease_name": d.disease_name,
-            "disease_cn_name": d.disease_cn_name, "icd9": d.icd9, "icd10": d.icd10,
-            "target_count": d.target_count,
-        }
+        {**_disease_out(d), "target_count": d.target_count}
         for d in diseases
     ]
 
@@ -362,10 +361,7 @@ def public_get_disease_detail(dis_id: str, current_user: models.User = Depends(g
     herbs = db.query(models.TcmspHerb).filter(models.TcmspHerb.id.in_(herb_ids), models.TcmspHerb.status == "active").all() if herb_ids else []
 
     return {
-        "diseases": [{
-            "dis_id": disease.dis_id, "disease_id": disease.disease_id, "disease_name": disease.disease_name,
-            "disease_cn_name": disease.disease_cn_name, "icd9": disease.icd9, "icd10": disease.icd10,
-        }],
+        "diseases": [_disease_out(disease)],
         "targets": [
             {"tar_id": t.tar_id, "target_id": t.target_id, "drugbank_id": t.drugbank_id, "target_name": t.target_name, "kegg": t.kegg, "source": t.source}
             for t in targets
@@ -398,6 +394,7 @@ def public_get_disease_detail(dis_id: str, current_user: models.User = Depends(g
 
 @router.get("/diseases", summary="（後台）查詢疾病列表（可搜尋、可篩選尚無中文名稱的項目）")
 def admin_list_diseases(keyword: Optional[str] = None, missing_cn_only: Optional[bool] = None,
+                         tumor: Optional[str] = None,
                          db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
     q = db.query(models.TcmspDisease)
     if keyword:
@@ -410,17 +407,31 @@ def admin_list_diseases(keyword: Optional[str] = None, missing_cn_only: Optional
         q = q.filter(
             (models.TcmspDisease.disease_cn_name.is_(None)) | (models.TcmspDisease.disease_cn_name == "")
         )
+    # tumor：tumor＝只看腫瘤、non_tumor＝只看非腫瘤、manual＝只看管理者手動指定過的、
+    # review＝自動判定與病名不一致（需要人工看一眼）。review 要逐筆跑判定，放在 SQL 篩選之後
+    if tumor == "tumor":
+        q = q.filter(models.TcmspDisease.tumor_class.isnot(None))
+    elif tumor == "non_tumor":
+        q = q.filter(models.TcmspDisease.tumor_class.is_(None))
+    elif tumor == "manual":
+        q = q.filter(models.TcmspDisease.tumor_basis == "manual")
     diseases = q.order_by(models.TcmspDisease.disease_id).all()
-    return [
-        {
-            "dis_id": d.dis_id, "disease_id": d.disease_id, "disease_name": d.disease_name,
-            "disease_cn_name": d.disease_cn_name, "icd9": d.icd9, "icd10": d.icd10, "notes": d.notes,
-        }
-        for d in diseases
-    ]
+    from app.disease_tumor import classify_disease
+    out = []
+    for d in diseases:
+        auto = classify_disease(d.disease_name, d.disease_cn_name, d.icd9, d.icd10)
+        if tumor == "review" and not auto["conflict"]:
+            continue
+        out.append({
+            **_disease_out(d), "notes": d.notes,
+            # 自動判定的結果與需要確認的原因：手動指定過的也照樣算出來，讓管理者看得到「如果交回自動會是什麼」
+            "tumor_auto_class": auto["tumor_class"], "tumor_auto_basis": auto["tumor_basis"],
+            "tumor_review_note": auto["conflict"],
+        })
+    return out
 
 
-@router.put("/diseases/{dis_id}", summary="（後台）編輯疾病中文名稱／備注")
+@router.put("/diseases/{dis_id}", summary="（後台）編輯疾病中文名稱／備注／腫瘤分類")
 def admin_update_disease(dis_id: str, payload: dict, db: Session = Depends(get_db),
                           admin: models.User = Depends(require_admin)):
     disease = db.query(models.TcmspDisease).filter(models.TcmspDisease.dis_id == dis_id).first()
@@ -430,11 +441,38 @@ def admin_update_disease(dis_id: str, payload: dict, db: Session = Depends(get_d
         disease.disease_cn_name = payload["disease_cn_name"] or None
     if "notes" in payload:
         disease.notes = payload["notes"]
+
+    # 腫瘤分類（v1.46.0）：值是分類代碼＝手動指定；"none"＝手動指定為非腫瘤；"auto"＝交回自動判定。
+    # 沒帶這個欄位就不動——中文名稱的儲存按鈕不能順手把分類改掉
+    from app.disease_tumor import TUMOR_CLASS_LABELS, VALID_CLASSES, classify_disease
+    tumor_note = ""
+    if "tumor_class" in payload:
+        want = (payload["tumor_class"] or "").strip()
+        before = (disease.tumor_class, disease.tumor_basis)
+        if want == "auto":
+            r = classify_disease(disease.disease_name, disease.disease_cn_name, disease.icd9, disease.icd10)
+            disease.tumor_class, disease.tumor_basis = r["tumor_class"], r["tumor_basis"]
+        elif want in ("none", ""):
+            disease.tumor_class, disease.tumor_basis = None, "manual"
+        elif want in VALID_CLASSES:
+            disease.tumor_class, disease.tumor_basis = want, "manual"
+        else:
+            raise HTTPException(status_code=400, detail=f"不認得的腫瘤分類：{want}")
+        if (disease.tumor_class, disease.tumor_basis) != before:
+            lbl = lambda c: TUMOR_CLASS_LABELS.get(c, "非腫瘤") if c else "非腫瘤"
+            how = "交回自動判定" if want == "auto" else "手動指定"
+            tumor_note = f"腫瘤分類 {lbl(before[0])} → {lbl(disease.tumor_class)}（{how}）"
     db.commit()
     _invalidate_full_data_cache()
+    parts = []
+    if "disease_cn_name" in payload:
+        parts.append(f"中文名稱 → {disease.disease_cn_name}")
+    if tumor_note:
+        parts.append(tumor_note)
     write_audit_log(db, admin, "update_tcmsp_disease", "tcmsp_disease", dis_id,
-                     f"編輯疾病中文名稱 {disease.disease_name} → {disease.disease_cn_name}")
+                     f"編輯疾病 {disease.disease_name}：" + ("；".join(parts) or "備注"))
     return {
         "dis_id": disease.dis_id, "disease_name": disease.disease_name,
         "disease_cn_name": disease.disease_cn_name, "notes": disease.notes,
+        "tumor_class": disease.tumor_class, "tumor_basis": disease.tumor_basis,
     }

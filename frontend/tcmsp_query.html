@@ -373,6 +373,7 @@ if (!localStorage.getItem("tcm_token")) {
 </script>
 <script src="js/api.js"></script>
 <script src="js/graph-legend.js"></script>
+<script src="js/tumor-class.js"></script>
 <script>
 let DATA = { herbs: [], ingredients: [], targets: [], diseases: [], herb_ingredient: [], ingredient_target: [], target_disease: [] };
 let herbsById, ingredientsById, targetsById, diseasesById;
@@ -676,6 +677,7 @@ const TERM_INFO = {
   dis_id: { title: 'Dis ID（疾病編號）', body: 'TCMSP 資料庫給每個疾病的唯一編號，格式為 DIS + 5 碼數字，可用 https://www.tcmsp-e.com/browse.php?qc=diseases 依編號查詢。' },
   icd9: { title: 'ICD9', body: '國際疾病分類第九版（ICD-9）代碼，是一套國際通用的疾病編碼標準，可用來對照其他醫療資料庫。' },
   icd10: { title: 'ICD10', body: '國際疾病分類第十版（ICD-10）代碼，是 ICD-9 的後續版本，目前較廣泛使用的國際疾病編碼標準。' },
+  tumor_class: { title: '腫瘤分類', body: 'TCMSP 原始資料沒有這個欄位，是平台依 ICD-10（沒有時用 ICD-9，兩者都沒有時用病名）判定的：C00–C97 惡性腫瘤、D00–D09 原位癌、D10–D36 良性腫瘤、D37–D48 性質未明。空白代表非腫瘤。腫瘤是疾病的一個子集合；這個藥材的靶點連到某個腫瘤，只代表「靶點與這個疾病相關」，不代表藥材對這個腫瘤有效。' },
   via_target: { title: 'Via target（透過哪個靶點連結）', body: '這個疾病是透過哪一個蛋白質靶點跟目前勾選的成分產生關聯（成分 → 靶點 → 疾病 的中間靶點）。' },
   disease_name: { title: 'Disease name（疾病名稱）', body: 'TCMSP 資料庫裡這個疾病的英文名稱（原始資料沒有中文欄位，網絡圖裡的中文名稱是額外整理的常見疾病翻譯，涵蓋常見／高頻出現的疾病，較罕見或高度專業的疾病名稱仍維持英文原名）。' },
   disease_zh: {
@@ -922,6 +924,7 @@ function openDiseaseInfoModal(disId){
         <tr><td class="small" style="padding:4px 8px 4px 0;">Dis ID</td><td>${escapeHtml(d.dis_id||'')}</td></tr>
         <tr><td class="small" style="padding:4px 8px 4px 0;">ICD9</td><td>${escapeHtml(d.icd9||'-')}</td></tr>
         <tr><td class="small" style="padding:4px 8px 4px 0;">ICD10</td><td>${escapeHtml(d.icd10||'-')}</td></tr>
+        <tr><td class="small" style="padding:4px 8px 4px 0;">腫瘤分類</td><td>${d.tumor_class ? TumorClass.badge(d) + ' <span class="small">（<span>' + escapeHtml(TumorClass.basis(d.tumor_basis)) + '</span>）</span>' : '非腫瘤'}</td></tr>
       </table>
       ${d.disease_id!=null ? `<p class="small" style="margin-top:10px;"><a class="term-link" href="https://www.tcmsp-e.com/disease.php?qd=${encodeURIComponent(d.disease_id)}" target="_blank" rel="noopener">查看 TCMSP 原始資料來源 ↗</a></p>` : ''}`;
   }
@@ -1644,12 +1647,12 @@ function renderTable(){
     wrap.innerHTML = `<table><thead><tr>
       <th><a class="term-link" onclick="showTermInfo('disease_name')">Disease name</a></th>
       <th><a class="term-link" onclick="showTermInfo('disease_zh')">中文名稱</a></th>
-      <th><a class="term-link" onclick="showTermInfo('dis_id')">Dis ID</a></th><th><a class="term-link" onclick="showTermInfo('icd9')">ICD9</a></th><th><a class="term-link" onclick="showTermInfo('icd10')">ICD10</a></th><th><a class="term-link" onclick="showTermInfo('via_target')">Via target</a></th>
+      <th><a class="term-link" onclick="showTermInfo('dis_id')">Dis ID</a></th><th><a class="term-link" onclick="showTermInfo('icd9')">ICD9</a></th><th><a class="term-link" onclick="showTermInfo('icd10')">ICD10</a></th><th><a class="term-link" onclick="showTermInfo('tumor_class')">腫瘤分類</a></th><th><a class="term-link" onclick="showTermInfo('via_target')">Via target</a></th>
       <th><a class="term-link" onclick="showTermInfo('disease_info_modal')">疾病資訊</a></th>
       </tr></thead><tbody>${uniqRows.map(x => { const zh = zhOnly('disease', x.d.dis_id); return `<tr>
         <td>${escapeHtml(x.d.disease_name)}</td>
         <td>${zh ? escapeHtml(zh) : '<span class="na">-</span>'}</td>
-        <td>${x.d.dis_id}</td><td>${x.d.icd9||''}</td><td>${x.d.icd10||''}</td><td>${escapeHtml(x.t.target_name||'')}</td>
+        <td>${x.d.dis_id}</td><td>${x.d.icd9||''}</td><td>${x.d.icd10||''}</td><td>${x.d.tumor_class ? TumorClass.badge(x.d, { small: true }) : ''}</td><td>${escapeHtml(x.t.target_name||'')}</td>
         <td><a class="term-link" onclick="openDiseaseInfoModal('${x.d.dis_id}')">查看疾病資訊</a></td>
       </tr>`; }).join('')}</tbody></table>`;
   }
@@ -1799,7 +1802,7 @@ function showNodeDetail(nodeId){
     const d = diseasesById.get(nodeId.slice(2));
     if(d) html = nodeDetailTable('疾病 Disease', [
       ['Disease name', d.disease_name], ['中文名稱', zhOnly('disease', d.dis_id) || null], ['Dis ID', d.dis_id],
-      ['ICD9', d.icd9], ['ICD10', d.icd10]
+      ['ICD9', d.icd9], ['ICD10', d.icd10], ['腫瘤分類', TumorClass.label(d.tumor_class)]
     ]);
   }
   const panelEl = document.getElementById('networkNodeDetail');
@@ -2131,7 +2134,7 @@ function herbFullPayload(){
   const diseaseRows = [];
   tarSet.forEach(tid => (diseasesByTar.get(tid)||[]).forEach(did => {
     const d = diseasesById.get(did);
-    diseaseRows.push({ tar_id: tid, target_name: (targetsById.get(tid)||{}).target_name, dis_id: did, disease_name: d?d.disease_name:'' });
+    diseaseRows.push({ tar_id: tid, target_name: (targetsById.get(tid)||{}).target_name, dis_id: did, disease_name: d?d.disease_name:'', tumor_class: d?(d.tumor_class||''):'' });
   }));
   return { herb, ingredients, ingredient_target: targetRows, target_disease: diseaseRows };
 }

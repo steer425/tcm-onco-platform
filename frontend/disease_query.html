@@ -24,6 +24,7 @@ body[data-page-theme="light"] #header{border-color:#dfe5e0;}
 body[data-page-theme="light"] #header p{color:#6b7a70;}
 body[data-page-theme="light"] #disPanel{border-color:#dfe5e0;}
 body[data-page-theme="light"] #disSearch,
+body[data-page-theme="light"] #tumorFilter,
 body[data-page-theme="light"] input,
 body[data-page-theme="light"] select{background:#fff;border-color:#c8d0cb;color:#24312a;}
 body[data-page-theme="light"] #disStats,
@@ -66,6 +67,9 @@ body[data-page-theme="light"] #networkNodeDetail table td{border-bottom-color:#e
 #disPanel{width:320px;flex-shrink:0;border-right:1px solid var(--line);display:flex;flex-direction:column;}
 #disSearch{margin:10px;padding:8px 10px;background:#1c1f26;border:1px solid #3a3d44;color:#eee;border-radius:6px;font-size:13px;}
 #disStats{padding:0 12px 6px;font-size:11.5px;color:var(--muted);}
+#tumorFilterRow{display:flex;align-items:center;gap:6px;padding:6px 10px 6px;font-size:12px;color:var(--muted);}
+#tumorFilter{flex:1;margin:0;padding:5px 8px;background:#1c1f26;border:1px solid #3a3d44;color:#eee;border-radius:6px;font-size:12.5px;}
+#disHeader .tumor-line{margin-top:4px;font-size:12.5px;}
 #disList{flex:1;overflow-y:auto;border-top:1px solid var(--line);}
 .disRow{padding:8px 12px;border-bottom:1px solid #1e2128;cursor:pointer;font-size:12.5px;}
 .disRow:hover{background:#1a1d23;}
@@ -150,6 +154,10 @@ tr:hover td{background:#171a20;}
     </div>
     <div style="padding:6px 12px 0;">
       <button id="loadAllBtn" class="primary" style="width:100%;">⬇ 載入全部 564 種疾病資料（目前僅載入預設疾病）</button>
+    </div>
+    <div id="tumorFilterRow">
+      <label for="tumorFilter">腫瘤分類</label>
+      <select id="tumorFilter" title="依 ICD-10／ICD-9 代碼判定，沒有代碼的依病名判定"></select>
     </div>
     <div id="disStats" class="small"></div>
     <div id="disList"></div>
@@ -239,6 +247,7 @@ if (!localStorage.getItem("tcm_token")) { window.location.href = "index.html"; }
 </script>
 <script src="js/api.js"></script>
 <script src="js/qs-ui.js"></script>
+<script src="js/tumor-class.js"></script>
 <script src="js/graph-legend.js"></script>
 <script>
 let DATA = { herbs: [], ingredients: [], targets: [], diseases: [], herb_ingredient: [], ingredient_target: [], target_disease: [] };
@@ -413,14 +422,19 @@ async function bootstrapData() {
 
 function renderDiseaseStats() {
   const loadedNote = allDataLoaded ? '（已載入全部）' : `（已載入 ${loadedDisIds.size} 個疾病的完整資料，其餘點擊時自動載入）`;
-  document.getElementById("disStats").textContent = `共 ${DATA.diseases.length} 種疾病 ${loadedNote}`;
+  const tc = TumorClass.counts(DATA.diseases);
+  document.getElementById("disStats").textContent = `共 ${DATA.diseases.length} 種疾病，其中腫瘤 ${tc.tumor} 種 ${loadedNote}`;
+  const sel = document.getElementById("tumorFilter");
+  sel.innerHTML = TumorClass.filterOptionsHtml(DATA.diseases, sel.value);
 }
 
 function renderDiseaseList(filter) {
   const listEl = document.getElementById("disList");
   const kw = window.zhNorm(filter);
+  const tumorFilter = document.getElementById("tumorFilter").value;
 
-  if (!kw && defaultDisId && !allDataLoaded) {
+  // 腫瘤篩選跟搜尋一樣，選了就列出完整清單（清單本身一開始就整份載入了，只有關聯資料是點了才載）
+  if (!kw && !tumorFilter && defaultDisId && !allDataLoaded) {
     listEl.innerHTML = '<div style="padding:8px 12px; color:var(--muted); font-size:11px;">僅顯示預設疾病，輸入上方搜尋框可找其他疾病，或按「載入全部」看完整清單</div>';
     const d = diseasesById.get(defaultDisId);
     if (d) listEl.innerHTML += buildDiseaseRowHtml(d);
@@ -435,7 +449,9 @@ function renderDiseaseList(filter) {
       String(d.dis_id).toLowerCase().includes(kw)
     );
   }
-  listEl.innerHTML = list.map(d => buildDiseaseRowHtml(d)).join("");
+  if (tumorFilter) list = list.filter(d => TumorClass.matches(d, tumorFilter));
+  listEl.innerHTML = list.length ? list.map(d => buildDiseaseRowHtml(d)).join("")
+    : '<div style="padding:16px 12px;color:var(--muted);font-size:12px;">沒有符合條件的疾病。</div>';
   bindDiseaseRowClicks(listEl);
 }
 
@@ -445,7 +461,7 @@ function buildDiseaseRowHtml(d) {
   const cnt = d.target_count || 0;
   const cnName = d.disease_cn_name ? escapeHtml(zhConv(d.disease_cn_name)) : '';
   return `<div class="disRow" data-id="${d.dis_id}">
-    <div class="name">${cnName ? cnName + ' ' : ''}${escapeHtml(d.disease_name || "(未命名)")} ${cnt ? `<span class="badge">${cnt} 個靶點</span>` : ""}</div>
+    <div class="name">${cnName ? cnName + ' ' : ''}${escapeHtml(d.disease_name || "(未命名)")}${TumorClass.badge(d, { small: true })} ${cnt ? `<span class="badge">${cnt} 個靶點</span>` : ""}</div>
     <div class="meta">${d.icd9 ? "ICD9: " + d.icd9 : ""} ${d.icd10 ? " ICD10: " + d.icd10 : ""}</div>
   </div>`;
 }
@@ -457,6 +473,7 @@ function bindDiseaseRowClicks(listEl) {
 }
 
 document.getElementById("disSearch").addEventListener("input", (e) => renderDiseaseList(e.target.value));
+document.getElementById("tumorFilter").addEventListener("change", () => renderDiseaseList(document.getElementById("disSearch").value));
 
 function escapeHtml(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -514,6 +531,7 @@ async function selectDisease(disId) {
   document.getElementById("disHeader").innerHTML = `
     <h2>${currentDisease.disease_cn_name ? escapeHtml(zhConv(currentDisease.disease_cn_name)) + '　' : ''}${escapeHtml(currentDisease.disease_name || "(未命名)")}</h2>
     <div class="meta">${currentDisease.icd9 ? "ICD9: " + currentDisease.icd9 : ""} ${currentDisease.icd10 ? "　ICD10: " + currentDisease.icd10 : ""} ${!currentDisease.icd9 && !currentDisease.icd10 ? "（無 ICD 編碼資料）" : ""}</div>
+    <div class="tumor-line">${TumorClass.describe(currentDisease)}</div>
   `;
 
   renderPicker();
@@ -744,7 +762,7 @@ function showNodeDetail(nodeId, nodesDataSet) {
   if (!node) { panel.style.display = "none"; return; }
   let rows = [];
   if (nodeId.startsWith("dis-")) {
-    rows = [["中文名稱", zhConv(currentDisease.disease_cn_name) || "-"], ["英文名稱", currentDisease.disease_name], ["Dis ID", currentDisease.dis_id], ["ICD9", currentDisease.icd9 || "-"], ["ICD10", currentDisease.icd10 || "-"]];
+    rows = [["中文名稱", zhConv(currentDisease.disease_cn_name) || "-"], ["英文名稱", currentDisease.disease_name], ["Dis ID", currentDisease.dis_id], ["ICD9", currentDisease.icd9 || "-"], ["ICD10", currentDisease.icd10 || "-"], ["腫瘤分類", TumorClass.label(currentDisease.tumor_class)]];
   } else if (nodeId.startsWith("tgt-")) {
     const t = targetsById.get(nodeId.slice(4));
     rows = [["Target name", t.target_name], ["Tar ID", t.tar_id], ["DrugBank ID", t.drugbank_id || "-"], ["KEGG", t.kegg || "-"]];

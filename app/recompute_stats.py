@@ -1,7 +1,7 @@
 """
 重新計算並寫入資料庫的統計欄位，取代原本「每次查詢站列表載入時即時運算」的做法。
 
-涵蓋六個地方：
+涵蓋六個地方（另加第七項：疾病的腫瘤分類，見 app/disease_tumor.py）：
     1. 疾病關聯查詢站：TcmspDisease.target_count（這個疾病連結到幾個不重複的 TCMSP 靶點）
     2. 藥材關聯查詢站：TcmspHerb.target_count（這個藥材連結到幾個不重複的 TCMSP 靶點）
     3. 暗黑基因關聯查詢站：DarkGene.has_tcmsp_target（這個基因是否比對到任何 TCMSP 靶點）
@@ -42,7 +42,7 @@ def _gene_symbols_for_match(gene: models.DarkGene):
 
 def recompute_herb_target_counts(db: Session):
     """藥材 -> 成分 -> 靶點，統計每個藥材連結到幾個不重複的靶點。"""
-    print("步驟 1/6：重算藥材的靶點統計（TcmspHerb.target_count）...")
+    print("步驟 1/7：重算藥材的靶點統計（TcmspHerb.target_count）...")
     herb_ingredient_rows = db.query(models.TcmspHerbIngredient).all()
     ingredient_target_rows = db.query(models.TcmspIngredientTarget).all()
 
@@ -63,7 +63,7 @@ def recompute_herb_target_counts(db: Session):
 
 def recompute_disease_target_counts(db: Session):
     """疾病 -> 靶點，統計每個疾病連結到幾個不重複的靶點（直接關聯，不用經過成分）。"""
-    print("步驟 2/6：重算疾病的靶點統計（TcmspDisease.target_count）...")
+    print("步驟 2/7：重算疾病的靶點統計（TcmspDisease.target_count）...")
     target_disease_rows = db.query(models.TcmspTargetDisease).all()
     disease_to_targets = {}
     for r in target_disease_rows:
@@ -78,7 +78,7 @@ def recompute_disease_target_counts(db: Session):
 
 def recompute_dark_gene_has_target(db: Session):
     """暗黑基因是否比對到任何 TCMSP 靶點（基因符號/別名 vs 靶點名稱的單詞比對）。"""
-    print("步驟 3/6：重算暗黑基因的中藥靶點比對結果（DarkGene.has_tcmsp_target）...")
+    print("步驟 3/7：重算暗黑基因的中藥靶點比對結果（DarkGene.has_tcmsp_target）...")
     sym_to_tar, mapped_count = symbol_to_targets(db)
     print(f"  （已標準化靶點 {mapped_count} 個，其餘退回名稱字詞比對）")
     genes = db.query(models.DarkGene).all()
@@ -95,7 +95,7 @@ def recompute_dark_gene_has_target(db: Session):
 
 def recompute_herb_dark_gene_counts(db: Session):
     """藥材 -> 成分 -> 靶點 -> 暗黑基因，統計每個藥材連結到幾個不重複的暗黑基因。"""
-    print("步驟 4/6：重算藥材的暗黑基因關聯統計（TcmspHerb.dark_gene_count）...")
+    print("步驟 4/7：重算藥材的暗黑基因關聯統計（TcmspHerb.dark_gene_count）...")
     genes = db.query(models.DarkGene).filter(models.DarkGene.status == "active").all()
     # 跟步驟 3 用同一份索引，否則兩個統計會出現「這個基因有比對到靶點，
     # 但沒有任何藥材連得到它」這種自相矛盾的結果
@@ -137,7 +137,7 @@ def recompute_gencc_disease_has_target(db: Session):
     跟暗黑基因用同一套比對演算法，差別是 GenCC 沒有別名欄位，只用 gene_symbol 單一欄位比對，
     資料量遠大於暗黑基因（可能 1.5~2 萬筆），這裡的迴圈本身仍是 O(n) 的 set 查找，不會太慢，
     但要注意如果之後資料量再往上一個量級，可能需要考慮批次處理或非同步背景任務。"""
-    print("步驟 5/6：重算 GenCC 可編碼蛋白區疾病的中藥靶點比對結果（GenccDisease.has_tcmsp_target）...")
+    print("步驟 5/7：重算 GenCC 可編碼蛋白區疾病的中藥靶點比對結果（GenccDisease.has_tcmsp_target）...")
     # 跟步驟 3/4 用同一份索引（app/target_index.py），否則暗黑基因說「AR 有比對到靶點」、
     # GenCC 卻說沒有，同一個符號在兩個頁面得到相反答案
     sym_to_tar, mapped_count = symbol_to_targets(db)
@@ -156,7 +156,7 @@ def recompute_gencc_disease_has_target(db: Session):
 
 def recompute_herb_gencc_disease_counts(db: Session):
     """藥材 -> 成分 -> 靶點 -> GenCC 疾病（透過 gene_symbol），統計每個藥材連結到幾個不重複的可編碼蛋白區疾病。"""
-    print("步驟 6/6：重算藥材的 GenCC 可編碼蛋白區疾病關聯統計（TcmspHerb.gencc_disease_count）...")
+    print("步驟 6/7：重算藥材的 GenCC 可編碼蛋白區疾病關聯統計（TcmspHerb.gencc_disease_count）...")
     diseases = db.query(models.GenccDisease).filter(models.GenccDisease.status == "active").all()
     sym_to_tar, _ = symbol_to_targets(db)
 
@@ -198,6 +198,18 @@ def recompute_all_stats(db: Session):
     recompute_herb_dark_gene_counts(db)
     recompute_gencc_disease_has_target(db)
     recompute_herb_gencc_disease_counts(db)
+    recompute_disease_tumor_class(db)
+
+
+def recompute_disease_tumor_class(db: Session):
+    """疾病的腫瘤分類（v1.46.0）。不是統計數字，但同樣是「由原始欄位推導、可隨時重算」的欄位，
+    放在這裡才會跟著匯入、migrate_schema、後台「重算統計」一起更新。
+    管理者手動指定（tumor_basis == "manual"）的不會被覆蓋。"""
+    from app.disease_tumor import apply_tumor_classification
+    print("步驟 7/7：重新判定疾病的腫瘤分類（TcmspDisease.tumor_class）...")
+    r = apply_tumor_classification(db)
+    print(f"  共 {r['total']} 種疾病，其中腫瘤 {r['tumor_total']} 種；本次變動 {len(r['changed'])} 筆，"
+          f"需要人工看一眼 {len(r['conflicts'])} 筆（python -m app.classify_tumor_diseases 看清單）")
 
 
 if __name__ == "__main__":
