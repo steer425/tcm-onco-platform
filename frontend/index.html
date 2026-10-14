@@ -50,7 +50,8 @@
       第三方登入服務啟動中，請稍候（免費方案伺服器閒置後需要喚醒，最長約 1 分鐘）...
     </div>
     <div id="errorMsg" class="error-msg"></div>
-    <p class="hint-msg">測試帳號：admin / 0000（僅供本機測試，正式環境請務必更改密碼）</p>
+    <div id="wakeHint" class="hint-msg" style="display:none;">伺服器喚醒中，請稍候（最長約 1 分鐘）…</div>
+    <p class="hint-msg">第一次登入可能需要等候約 1 分鐘：平台後端架在 Render 免費方案上，閒置約 15 分鐘後會自動休眠，下一次連線時要先把伺服器喚醒，之後就會恢復正常速度。</p>
   </div>
 </div>
 

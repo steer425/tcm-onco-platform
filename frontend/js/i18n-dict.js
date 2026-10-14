@@ -828,6 +828,21 @@ window.I18N_DICT = {
     "從未變更": "Never Changed",
     "未綁定": "Not Linked",
     "啟用中": "Active",
+    // ---- 登入頁（v1.45.0） ----
+    "第一次登入可能需要等候約 1 分鐘：平台後端架在 Render 免費方案上，閒置約 15 分鐘後會自動休眠，下一次連線時要先把伺服器喚醒，之後就會恢復正常速度。": "The first sign-in may take up to about 1 minute: the backend runs on Render's free plan, which sleeps after about 15 minutes of inactivity and has to wake up on the next request. After that it runs at normal speed.",
+    "伺服器喚醒中，請稍候（最長約 1 分鐘）…": "Waking up the server, please wait (up to about 1 minute)…",
+    // ---- 查詢站共用版面工具 qs-ui.js（v1.45.0） ----
+    "⚙ 篩選": "⚙ Filter",
+    "▦ 欄位": "▦ Columns",
+    "⤢ 獨立視窗": "⤢ Pop Out",
+    "⤡ 回主頁": "⤡ Back",
+    "⊟ 隱藏關聯圖": "⊟ Hide Graph",
+    "⊞ 顯示關聯圖": "⊞ Show Graph",
+    "全部顯示": "Show All",
+    "清除": "Clear",
+    "按 Esc 也可以關閉": "Press Esc to close",
+    "沒有符合的項目。": "No matching items.",
+    "資料表": "Data Table",
   },
   ko: {
     // ---- 導覽選單 ----
@@ -1648,5 +1663,20 @@ window.I18N_DICT = {
     "從未變更": "변경한 적 없음",
     "未綁定": "연동 안 됨",
     "啟用中": "활성",
+    // ---- 登入頁（v1.45.0） ----
+    "第一次登入可能需要等候約 1 分鐘：平台後端架在 Render 免費方案上，閒置約 15 分鐘後會自動休眠，下一次連線時要先把伺服器喚醒，之後就會恢復正常速度。": "첫 로그인은 약 1분 정도 걸릴 수 있습니다. 플랫폼 백엔드는 Render 무료 요금제에서 운영되며, 약 15분간 사용이 없으면 자동으로 절전 상태가 되어 다음 접속 시 서버를 먼저 깨워야 합니다. 이후에는 정상 속도로 돌아옵니다.",
+    "伺服器喚醒中，請稍候（最長約 1 分鐘）…": "서버를 깨우는 중입니다. 잠시 기다려 주세요 (최대 약 1분)…",
+    // ---- 查詢站共用版面工具 qs-ui.js（v1.45.0） ----
+    "⚙ 篩選": "⚙ 필터",
+    "▦ 欄位": "▦ 열",
+    "⤢ 獨立視窗": "⤢ 새 창으로",
+    "⤡ 回主頁": "⤡ 돌아가기",
+    "⊟ 隱藏關聯圖": "⊟ 그래프 숨기기",
+    "⊞ 顯示關聯圖": "⊞ 그래프 표시",
+    "全部顯示": "모두 표시",
+    "清除": "지우기",
+    "按 Esc 也可以關閉": "Esc 키로도 닫을 수 있습니다",
+    "沒有符合的項目。": "일치하는 항목이 없습니다.",
+    "資料表": "데이터 표",
   },
 };

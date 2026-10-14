@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ccircle cx=%2750%27 cy=%2750%27 r=%2745%27 fill=%27%232f5c8a%27/%3E%3Ctext x=%2750%27 y=%2768%27 font-size=%2760%27 text-anchor=%27middle%27 fill=%27white%27%3E%E8%97%A5%3C/text%3E%3C/svg%3E" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>人參與暗黑基因關聯</title>
+<title>藥材與暗黑基因關聯</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/standalone/umd/vis-network.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
 <script src="js/zh-match.js"></script>
@@ -133,7 +133,7 @@ body[data-page-theme="light"] #networkNodeDetail{border-color:#dfe5e0;background
   <a href="#" id="platformLogout">登出</a>
 </div>
 <div id="header">
-  <h1>人參與暗黑基因關聯</h1>
+  <h1>藥材與暗黑基因關聯</h1>
   <p>左側預設選人參（Panax Ginseng，也可搜尋其他藥材），右側顯示這個藥材的成分連結到哪些 TCMSP 靶點、這些靶點又比對到哪些暗黑基因（Herb → Ingredients → Targets → Dark Genes），呈現「這個藥材的成分可能作用在哪些癌症基因上」。</p>
 </div>
 <div id="layout">
@@ -215,6 +215,7 @@ body[data-page-theme="light"] #networkNodeDetail{border-color:#dfe5e0;background
 if (!localStorage.getItem("tcm_token")) { window.location.href = "index.html"; }
 </script>
 <script src="js/api.js"></script>
+<script src="js/qs-ui.js"></script>
 <script src="js/graph-legend.js"></script>
 <script>
 let uiLang = localStorage.getItem('tcm_ui_lang') || 'tw';
@@ -269,6 +270,22 @@ let activeTab = "ingredients";
 let network = null, modalNetwork = null;
 let modalOpen = false;
 let layerVisibility = { ingredients: true, targets: true, genes: true };
+
+// ---------- 版面調整（v1.45.0，與藥材關聯查詢站同一套，見 js/qs-ui.js）----------
+QSUI.collapsiblePanel({
+  panel: "herbPanel", key: "tcm_gd_panel_collapsed", label: "藥材清單",
+  onToggle: () => { if (network) { network.redraw(); network.fit({ animation: false }); } },
+});
+const qsNet = QSUI.networkToggle({
+  network: "network", extra: ["netResizeHandle"], after: "fsNet", key: "tcm_gd_network_hidden",
+  onHide: () => { if (network) { network.destroy(); network = null; } },
+  onShow: () => { if (currentHerb && currentDetail) renderNetwork("network", false); },
+});
+const TAB_LABEL_GD = { ingredients: "Related Ingredients", targets: "Related Targets", genes: "Matched Dark Genes" };
+const qsTable = QSUI.tableTools({
+  wrap: "tableWrap", tabsBar: "#bodyWrap .tabs", key: "tcm_gd_table", getTab: () => activeTab,
+  title: () => (currentHerb ? zhConv(currentHerb.herb_cn_name) + "・" : "") + (TAB_LABEL_GD[activeTab] || ""),
+});
 
 // 讓瀏覽器有機會重繪畫面，再繼續執行下一段耗時的同步運算，避免看起來卡住不動
 function yieldToUI(){
@@ -407,9 +424,8 @@ function renderTable(){
   const wrap = document.getElementById("tableWrap");
   if (!currentDetail) { wrap.innerHTML = ""; return; }
   if (activeTab === "ingredients") {
-    wrap.innerHTML = `<table><thead><tr><th>Mol ID</th><th>Molecule Name</th><th>OB%</th><th>DL</th></tr></thead><tbody>
-      ${currentRelated.ingredients.map(i => `<tr><td>${i.mol_id}</td><td>${escapeHtml(i.molecule_name)}</td><td>${i.ob ?? '<span class="na">-</span>'}</td><td>${i.dl ?? '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="4" class="small">無資料（可能已被顯示層級篩掉）</td></tr>'}
-    </tbody></table>`;
+    // v1.45.0：與藥材查詢站同一組 14 欄 ADME
+    wrap.innerHTML = QSUI.ingredientTable(currentRelated.ingredients, "無資料（可能已被顯示層級篩掉）");
   } else if (activeTab === "targets") {
     wrap.innerHTML = `<table><thead><tr><th>Tar ID</th><th>Target Name</th><th>DrugBank ID</th><th>比對到的暗黑基因</th></tr></thead><tbody>
       ${currentRelated.targets.map(t => `<tr><td>${t.tar_id}</td><td>${escapeHtml(t.target_name)}</td><td>${t.drugbank_id || '<span class="na">-</span>'}</td><td>${(t.matched_genes||[]).map(g => escapeHtml(g.hugo_symbol)).join('、') || '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="4" class="small">無資料（可能已被顯示層級篩掉）</td></tr>'}
@@ -423,6 +439,7 @@ function renderTable(){
     </tbody></table>`;
   }
   makeColumnsResizable();
+  if (qsTable) qsTable.afterRender();
 }
 
 function buildGraphData(){
@@ -482,6 +499,9 @@ function buildGraphData(){
 
 function renderNetwork(containerId, isModal){
   const container = document.getElementById(containerId || "network");
+  // 舊實例先收掉；隱藏中不建立實例（v1.45.0，0×0 畫布之後顯示會是一片空白）
+  if (!isModal && network) { network.destroy(); network = null; }
+  if (!isModal && qsNet && qsNet.isHidden()) return;
   if (!currentDetail || !currentDetail.ingredients.length) {
     container.innerHTML = '<div class="placeholder">此藥材目前沒有可顯示的關聯資料</div>';
     return;

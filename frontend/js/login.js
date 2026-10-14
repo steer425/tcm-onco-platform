@@ -54,6 +54,17 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   const password = document.getElementById("password").value;
   const errorMsg = document.getElementById("errorMsg");
   errorMsg.textContent = "";
+  // 超過 4 秒還沒回應，多半是 Render 免費方案的伺服器正在從休眠中喚醒（最長約 1 分鐘）。
+  // 告訴使用者在等什麼，免得以為當掉而一直重按。
+  const wakeHint = document.getElementById("wakeHint");
+  const submitBtn = e.submitter || document.querySelector('#loginForm button[type="submit"]');
+  if (submitBtn) submitBtn.disabled = true;
+  const wakeTimer = setTimeout(() => { if (wakeHint) wakeHint.style.display = "block"; }, 4000);
+  const stopWaiting = () => {
+    clearTimeout(wakeTimer);
+    if (wakeHint) wakeHint.style.display = "none";
+    if (submitBtn) submitBtn.disabled = false;
+  };
   try {
     const data = await api("/auth/login", {
       method: "POST",
@@ -69,6 +80,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
     } catch (prefErr) { /* 存語系偏好失敗不影響登入本身 */ }
     window.location.href = "dashboard.html";
   } catch (err) {
+    stopWaiting();
     errorMsg.textContent = err.message;
   }
 });

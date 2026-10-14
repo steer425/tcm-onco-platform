@@ -98,6 +98,10 @@ body {
   margin-bottom: 24px;
 }
 
+/* v1.45.0：右上角的使用者名稱＋登出按鈕（由 nav.js 的 addTopbarLogout() 建立） */
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.topbar-logout { padding: 5px 12px; font-size: 13px; }
+
 .topbar .user-info {
   font-size: 14px;
   color: var(--muted);

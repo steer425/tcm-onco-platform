@@ -238,6 +238,7 @@ tr:hover td{background:#171a20;}
 if (!localStorage.getItem("tcm_token")) { window.location.href = "index.html"; }
 </script>
 <script src="js/api.js"></script>
+<script src="js/qs-ui.js"></script>
 <script src="js/graph-legend.js"></script>
 <script>
 let DATA = { herbs: [], ingredients: [], targets: [], diseases: [], herb_ingredient: [], ingredient_target: [], target_disease: [] };
@@ -461,6 +462,27 @@ function escapeHtml(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// ---------- 版面調整（v1.45.0，與藥材關聯查詢站同一套，見 js/qs-ui.js）----------
+// 左側疾病清單可收合、靶點勾選欄可搜尋、關聯圖可隱藏、表格可篩選／選欄位／排序／獨立視窗
+QSUI.collapsiblePanel({
+  panel: "disPanel", key: "tcm_dis_panel_collapsed", label: "疾病清單",
+  onToggle: () => { if (mainNetwork) { mainNetwork.redraw(); mainNetwork.fit({ animation: false }); } },
+});
+const qsPicker = QSUI.pickerSearch({
+  col: "pickerCol", placeholder: "搜尋靶點名稱或 Tar ID…",
+  selectedCount: () => selectedTargetIds.size,
+});
+const qsNet = QSUI.networkToggle({
+  network: "network", extra: ["netResizeHandle"], after: "fullscreenBtn", key: "tcm_dis_network_hidden",
+  onHide: () => { if (mainNetwork) { mainNetwork.destroy(); mainNetwork = null; } },
+  onShow: () => { if (currentDisease) renderNetwork("network", false); },
+});
+const TAB_LABEL_DIS = { targets: "Related Targets", ingredients: "Related Ingredients", herbs: "Related Herbs" };
+const qsTable = QSUI.tableTools({
+  wrap: "tableWrap", tabsBar: "#contentCol .tabs", key: "tcm_dis_table", getTab: () => activeTab,
+  title: () => (currentDisease ? (zhConv(currentDisease.disease_cn_name) || currentDisease.disease_name) + "・" : "") + (TAB_LABEL_DIS[activeTab] || ""),
+});
+
 async function selectDisease(disId) {
   currentDisease = diseasesById.get(disId);
   if (!currentDisease) return;
@@ -505,7 +527,7 @@ function renderPicker() {
     const t = targetsById.get(tid);
     if (!t) return "";
     const ingCount = (ingredientsByTarget.get(tid) || new Set()).size;
-    return `<label class="pick-row">
+    return `<label class="pick-row" data-search="${escapeHtml(tid)}">
       <input type="checkbox" data-tid="${tid}" ${selectedTargetIds.has(tid) ? "checked" : ""}>
       <span style="flex:1;">${escapeHtml(t.target_name)}</span>
       <span class="small">${ingCount} 個成分</span>
@@ -516,8 +538,10 @@ function renderPicker() {
       if (cb.checked) selectedTargetIds.add(cb.dataset.tid);
       else selectedTargetIds.delete(cb.dataset.tid);
       document.getElementById("selCount").textContent = appliedTargetIds.size;
+      if (qsPicker) qsPicker.apply();
     });
   });
+  if (qsPicker) qsPicker.apply();
 }
 
 document.getElementById("selAllBtn").addEventListener("click", () => {
@@ -608,9 +632,11 @@ function recomputeAndRender() {
 }
 
 // ---------- Tabs / Table ----------
-document.querySelectorAll(".tabs button").forEach(btn => {
+// 只綁 data-tab 的按鈕：分頁列裡還有「套用／儲存版面」與 v1.45.0 的篩選／欄位／獨立視窗按鈕，
+// 舊寫法會把它們也當分頁，點了 activeTab 就變成 undefined。
+document.querySelectorAll(".tabs button[data-tab]").forEach(btn => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tabs button[data-tab]").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     activeTab = btn.dataset.tab;
     renderTable();
@@ -624,15 +650,15 @@ function renderTable() {
       ${currentRelated.targets.map(t => `<tr><td>${t.tar_id}</td><td>${escapeHtml(t.target_name)}</td><td>${t.drugbank_id || '<span class="na">-</span>'}</td><td>${t.kegg || '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="4" class="small">無資料（可能已被顯示層級或挑選器篩掉）</td></tr>'}
     </tbody></table>`;
   } else if (activeTab === "ingredients") {
-    wrap.innerHTML = `<table><thead><tr><th>Mol ID</th><th>Molecule Name</th><th>MW</th><th>OB%</th><th>DL</th><th>ALogP</th></tr></thead><tbody>
-      ${currentRelated.ingredients.map(i => `<tr><td>${i.mol_id}</td><td>${escapeHtml(i.molecule_name)}</td><td>${i.mw ?? '<span class="na">-</span>'}</td><td>${i.ob ?? '<span class="na">-</span>'}</td><td>${i.dl ?? '<span class="na">-</span>'}</td><td>${i.alogp ?? '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="6" class="small">無資料（可能已被顯示層級或挑選器篩掉）</td></tr>'}
-    </tbody></table>`;
+    // v1.45.0：與藥材查詢站同一組 14 欄 ADME（前 6 欄順序不變，舊的欄寬版面照樣對得上）
+    wrap.innerHTML = QSUI.ingredientTable(currentRelated.ingredients, "無資料（可能已被顯示層級或挑選器篩掉）");
   } else {
     wrap.innerHTML = `<table><thead><tr><th>Herb ID</th><th>中文名稱</th><th>拼音</th><th>English Name</th><th>分類</th></tr></thead><tbody>
       ${currentRelated.herbs.map(h => `<tr><td>${h.herb_id}</td><td>${escapeHtml(zhConv(h.herb_cn_name))}</td><td>${escapeHtml(h.herb_pinyin)}</td><td>${escapeHtml(h.herb_en_name)}</td><td>${escapeHtml(zhConv(h.child_cn_name)) || '<span class="na">-</span>'}</td></tr>`).join("") || '<tr><td colspan="5" class="small">無資料（可能已被顯示層級或挑選器篩掉）</td></tr>'}
     </tbody></table>`;
   }
   makeColumnsResizable();
+  if (qsTable) qsTable.afterRender();
 }
 
 // ---------- Network graph ----------
@@ -689,6 +715,10 @@ function buildGraphData() {
 
 function renderNetwork(containerId, isModal) {
   const container = document.getElementById(containerId);
+  // 舊實例一定要先收掉，否則會畫進已經脫離 DOM 的節點（rules.md 第五之一章）
+  if (!isModal && mainNetwork) { mainNetwork.destroy(); mainNetwork = null; }
+  // v1.45.0：關聯圖隱藏中不建立實例（display:none 量到 0×0，之後顯示會是一片空白）
+  if (!isModal && qsNet && qsNet.isHidden()) return;
   if (!currentDisease || appliedTargetIds.size === 0 || !layerVisibility.targets) {
     container.innerHTML = '<div class="placeholder">目前沒有可顯示的靶點關聯資料（請檢查挑選器與顯示層級設定）</div>';
     return;

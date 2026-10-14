@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.44.0"
-set "DEFAULT_MSG=v1.44.0 let every user see their own profile, login history and account changes, and change their own password from personal settings"
+set "EXPECTED_VER=1.45.0"
+set "DEFAULT_MSG=v1.45.0 add a top-right logout, drop the default admin password from the login page, and bring the herb query station layout tools to the disease, herb-dark-gene and active-ingredient pages"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

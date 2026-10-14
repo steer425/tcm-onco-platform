@@ -293,6 +293,14 @@ $('detailClose').addEventListener('click', closeModal);
 $('detailModal').addEventListener('click', (e) => { if (e.target.id === 'detailModal') closeModal(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
+/* 右上角登出（這一頁沒有掛 nav.js，自己綁；v1.45.0） */
+$('platformLogout').addEventListener('click', async (e) => {
+  e.preventDefault();
+  try { await api(`/auth/logout?login_log_id=${getLoginLogId()}`, { method: 'POST' }); } catch (err) { /* 失敗也照樣清掉本機登入狀態 */ }
+  clearSession();
+  window.location.href = 'index.html';
+});
+
 /* 查詢站類頁面沒有掛 nav.js，語系要自己呼叫（見 rules.md 第五之二章） */
 const langSel = $('uiLangSelect');
 langSel.addEventListener('change', () => {

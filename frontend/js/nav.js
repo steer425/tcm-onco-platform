@@ -77,18 +77,42 @@ function escapeHtmlNav(s) {
   return (s || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// 登出只有一份實作：側邊選單底部的「登出」與右上角的「登出」按鈕都呼叫它。
+async function doLogout(e) {
+  if (e) e.preventDefault();
+  try { await api(`/auth/logout?login_log_id=${getLoginLogId()}`, { method: "POST" }); } catch (err) {}
+  clearSession();
+  window.location.href = "index.html";
+}
+
 function bindLogout() {
   const link = document.getElementById("logoutLink");
   if (!link) return;
-  link.addEventListener("click", async (e) => {
-    e.preventDefault();
-    try { await api(`/auth/logout?login_log_id=${getLoginLogId()}`, { method: "POST" }); } catch (err) {}
-    clearSession();
-    window.location.href = "index.html";
-  });
+  link.addEventListener("click", doLogout);
+}
+
+// v1.45.0：右上角（使用者名稱旁）也放一個登出按鈕。側邊選單的登出在最底下，
+// 後台功能一多就要捲很久才看得到。
+// ⚠️ 按鈕不能放進 #userInfo 裡——各頁面是用 textContent 寫入使用者名稱，
+// 放裡面會被整個蓋掉。所以把 #userInfo 包進一個新容器，按鈕當它的兄弟。
+function addTopbarLogout() {
+  const info = document.getElementById("userInfo");
+  if (!info || document.getElementById("topbarLogout")) return;
+  const wrap = document.createElement("div");
+  wrap.className = "topbar-right";
+  info.parentNode.insertBefore(wrap, info);
+  wrap.appendChild(info);
+  const btn = document.createElement("button");
+  btn.id = "topbarLogout";
+  btn.type = "button";
+  btn.className = "secondary topbar-logout";
+  btn.textContent = "登出";
+  btn.addEventListener("click", doLogout);
+  wrap.appendChild(btn);
 }
 
 requireLogin();
+addTopbarLogout();
 renderNav();
 
 // 呼叫全站語系套用函式（定義在 site-lang.js）。

@@ -431,8 +431,13 @@ def get_herb_dark_gene_links(herb_id: int, current_user: models.User = Depends(g
             "herb_id": herb.id, "herb_cn_name": herb.herb_cn_name, "herb_pinyin": herb.herb_pinyin,
             "herb_en_name": herb.herb_en_name,
         },
+        # v1.45.0：補齊 12 個理化／ADME 欄位，讓「藥材與暗黑基因關聯」的成分表跟藥材查詢站一致
+        # （欄位與 /tcmsp/herbs/public/... 相同；值照 TCMSP 原字串回傳，與既有 ob／dl 一致）
         "ingredients": [
-            {"mol_id": i.mol_id, "molecule_name": i.molecule_name, "ob": i.ob, "dl": i.dl}
+            {"mol_id": i.mol_id, "molecule_name": i.molecule_name,
+             "mw": i.mw, "ob": i.ob, "dl": i.dl, "alogp": i.alogp, "hdon": i.hdon, "hacc": i.hacc,
+             "tpsa": i.tpsa, "rbn": i.rbn, "caco2": i.caco2, "bbb": i.bbb,
+             "halflife": i.halflife, "fasa": i.fasa}
             for i in ingredients
         ],
         "targets": [

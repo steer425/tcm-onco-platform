@@ -232,7 +232,25 @@ function renderTable() {
       <th>標準化狀態</th><th>PubChem CID${help('cid')}</th>
       <th>SMILES</th><th>CAS${help('cas')}</th><th>InChIKey${help('inchikey')}</th><th>分子量差</th>
     </tr></thead><tbody>${body}</tbody>`;
+  if (qsTable) qsTable.afterRender();
 }
+
+/* ---------------------------------------------------------------- 版面調整（v1.45.0）
+ * 與藥材關聯查詢站同一套（js/qs-ui.js）：左側藥材清單可收合；表格可篩選、選欄位、
+ * 點表頭排序、拉成獨立視窗。這一頁沒有關聯圖與勾選欄，所以沒有那兩項。 */
+QSUI.collapsiblePanel({ panel: 'herbPanel', key: 'tcm_hi_panel_collapsed', label: '藥材清單' });
+const qsTable = QSUI.tableTools({
+  wrap: 'tableWrap', tabsBar: '#toolbar', key: 'tcm_hi_table', getTab: () => 'ingredients',
+  title: () => (currentData ? (currentData.herb.herb_cn_name || currentData.herb.herb_en_name) + '・活性成分' : '活性成分'),
+});
+
+/* 右上角登出（這一頁沒有掛 nav.js，自己綁） */
+document.getElementById('platformLogout').addEventListener('click', async (e) => {
+  e.preventDefault();
+  try { await api(`/auth/logout?login_log_id=${getLoginLogId()}`, { method: 'POST' }); } catch (err) { /* 失敗也照樣清掉本機登入狀態 */ }
+  clearSession();
+  window.location.href = 'index.html';
+});
 
 /* ---------------------------------------------------------------- 事件 */
 
