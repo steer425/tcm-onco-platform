@@ -550,6 +550,42 @@ n = re.sub(r"_qt$", "", n, flags=re.I)   # 註解寫「quantitative 後綴」—
 - 正式資料庫第一次執行結果（2026-10-14）：pending 364 → 苷元誤配 80 否決、多筆挑中 3、
   同一化合物 11（其中 3 筆差水，v1.42.10 改歸人工）、人工審核 270
 
+### Step 6 的判定只有一份：`app/depmap_analysis.py`（v1.43.0）
+
+F1-8 腫瘤細胞頁與報表腳本 `inspect_depmap` 共用 `select_herb_targets()`。v1.41.1～v1.41.3
+在排序規則上錯過三次，定案的規則（泛必需先排除 → **選擇性當門檻** → **效應量當排序**）
+只能存在一個地方。上線前已用同一份 fixture 比對重構前後的腳本輸出，逐字相同。
+
+畫面規則：
+
+1. **不提供 lineage 富集**。人參的三個「顯著」lineage 經對照基因集檢定落在隨機範圍內；
+   只放 q 值不放對照就是選擇性呈現。要看請跑報表腳本，它會連對照一起印
+2. 顯示 DepMap 資料的地方都要附 `ATTRIBUTION`（來源、釋出版本、CC BY 4.0）——授權義務
+3. 被選擇性門檻刷掉的要列出來並寫原因（規格 A），泛必需另列
+4. 「打到它的成分」只列**活性成分**；邊上的 TCMSP `validated`／`svm`／`rf` 照實帶出，
+   但在規格 C 分層完成前**不可當證據等級呈現**
+5. 不寫「有效」「抑制」——依賴 ≠ 化合物會殺死那株細胞（方向性、敲除 ≠ 抑制、只有腫瘤株）
+
+### 測試絕不能跑在正式資料庫上（v1.43.0，實際發生過）
+
+測試開頭的 `os.environ.setdefault("DATABASE_URL", ...)` **不會覆蓋已存在的值**。
+同一個 PowerShell 視窗只要先為了維運腳本設過 `$env:DATABASE_URL`（Neon），接著跑測試就會連上正式庫。
+v1.43.0 上版前就這樣跑了一次 `test_depmap_page`：寫入因唯一鍵衝突整筆回滾，但 seed 與登入紀錄已經寫進去。
+
+規則：
+
+1. 每支測試開頭必須檢查 `DATABASE_URL` 是 `sqlite` 開頭，否則直接結束——**新測試照抄那一段**
+2. 交付說明裡「跑測試」與「設 `$env:DATABASE_URL` 跑維運腳本」要分開寫，測試一律寫在前面；
+   需要時明講「開新視窗」或 `Remove-Item Env:DATABASE_URL`
+
+### 查詢站要用到的資料表都要進 `CACHED_TABLES`（v1.43.0）
+
+走 `get_query_db` 的端點在唯讀模式下讀本機快取，**快取只建 `CACHED_TABLES` 裡的表**。
+漏一張就是 `no such table` 的 500，而且只在唯讀模式開啟時才會發生——平常完全測不出來。
+F1-7 從 v1.42.0 起就用到 `system_settings`（OB／DL 門檻）、`tcmsp_target_uniprot`、
+`tcmsp_ingredient_pubchem`，都沒在清單裡；v1.43.0 連同 DepMap 四張表一起補上。
+`tests/test_depmap_page.py` 會用只含 `CACHED_TABLES` 的資料庫跑一次端點，新查詢站請照做。
+
 ### 分類統計要分層，合併算會被最大的那一桶帶偏（2026-09-10）
 
 同一份資料，全庫合併算方向得到「TCMSP 較重 1252 : PubChem 較重 266，假設不成立」，
@@ -1160,6 +1196,8 @@ git check-ignore -v <路徑>    # 會指出是 .gitignore 第幾行擋掉的
 | `target-mapping.html` | F1-4 | 靶點標準化（UniProt）：覆蓋率、分批解析、人工審核、以基因符號反查靶點 |
 | `pathways.html` | F1-5 | 通路富集分析（KEGG／Reactome）：覆蓋率、分來源同步、藥材富集結果（p／q 值） |
 | `ingredient-mapping.html` | F1-6 | 成分標準化（PubChem）：覆蓋率、分批解析、人工審核（含結構圖與分子量對照）、以 InChIKey／CAS／CID 反查 |
+| `herb-ingredients.html` | F1-7 | 藥材活性成分與結構標準化查詢站（預設人參）：OB／DL 篩選後逐一列出 PubChem 標準化狀態 |
+| `tumor-cells.html` | F1-8 | 腫瘤細胞株依賴查詢站（DepMap，預設人參）：選擇性依賴靶點、被門檻刷掉的與原因、基因 → 細胞株、細胞株 → 靶點 → 成分反查 |
 
 > 有些功能代碼共用同一個頁面（例如 F0-10/F0-12 都指向 `logs.html`），這是刻意設計：避免導覽選單出現好幾個連到同一頁的重複連結。共用頁面的功能代碼會把 `show_frontend`/`show_backend` 都設為 `false`，只有「主要代表」該頁面的那個功能代碼會顯示在導覽選單裡，其餘的僅在權限矩陣表格裡顯示頁面路徑供對照。
 
@@ -1279,7 +1317,7 @@ python -m app.seed_gencc_translations
 
 - 四種語系全測（見第五之二章「上版前的強制檢查規則」）
 - `python -m tests.test_news_e2e`、`python -m tests.test_target_mapping`、
-  `python -m tests.test_pathways` 與 `python -m tests.test_ingredient_mapping` 全過（**不是** `python -m pytest tests/ -q`——`test_news_e2e.py`
+  `python -m tests.test_pathways`、`python -m tests.test_ingredient_mapping` 與 `python -m tests.test_depmap_page` 全過（**不是** `python -m pytest tests/ -q`——`test_news_e2e.py`
   是手寫的端對端驗證腳本，函式名稱不是 pytest 慣例的 `test_*`，`pytest` 指令會直接回報
   「collected 0 items」、結束碼 5，**看起來像失敗，但其實根本沒有跑到任何一項驗證**，
   這是這次開發中實際發現的認知陷阱，不是理論疑慮）
@@ -1292,6 +1330,8 @@ python -m app.seed_gencc_translations
 - `test_pathways.py` 同理（`test_pathways.db`），KEGG／Reactome 的 HTTP 那一層以 fixture 取代
 - `test_ingredient_mapping.py` 同理（`test_ingredient_mapping.db`），PubChem 的 HTTP 那一層以 fixture 取代；
   v1.42.9 起也涵蓋 `reclassify_ingredient_queue` 的試算／寫入／重複執行
+- `test_depmap_page.py` 同理（`test_depmap_page.db`），DepMap 資料以 fixture 直接寫入；
+  也會跑一次 `inspect_depmap` 確認腳本與 API 排序相同，並用只含 `CACHED_TABLES` 的資料庫驗唯讀模式
 - `git status` 看一次，確認沒有把本機檔（`.db`、`.env`、暫存檔）帶上去
 
 ### 已知環境限制：git 不能透過遠端工具跑

@@ -36,6 +36,19 @@ CACHED_TABLES = [
     "tcmsp_target_disease",
     "dark_genes",
     "gencc_diseases",
+    # v1.43.0：查詢站實際會讀到、但先前漏掉的參考資料表。少了它們，唯讀模式下
+    # F1-7／F1-8 走 get_query_db 會直接 500（no such table）：
+    #   system_settings          OB／DL 門檻（pathways.adme_thresholds）；只有主題與門檻這類設定，無帳號資料
+    #   tcmsp_target_uniprot     靶點 → 基因符號（target_index）
+    #   tcmsp_ingredient_pubchem 成分標準化結果（F1-7）
+    #   depmap_*                 Step 6 細胞株依賴（F1-8）
+    "system_settings",
+    "tcmsp_target_uniprot",
+    "tcmsp_ingredient_pubchem",
+    "depmap_models",
+    "depmap_gene_dependency",
+    "depmap_gene_summary",
+    "depmap_import_runs",
     # 新聞模組：每日重點新聞屬於「每天更新一次、供大量前台讀取」的參考資料，適合快取。
     # 刻意不快取 user_news_bookmarks（使用者個人收藏，綁 users 外鍵）與 news_settings
     # （管理設定，讀取量小），維持「不快取帳號/使用者相關資料」的既有原則。

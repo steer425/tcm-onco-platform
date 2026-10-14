@@ -154,6 +154,12 @@ FEATURE_CONFIG = [
      "nav_label": "藥材活性成分", "page_url": "herb-ingredients.html",
      "show_frontend": True, "show_backend": True, "sort_order": 76},
 
+    # 目標一 Step 6：分析鏈路第五站「腫瘤細胞」。判定與報表腳本 inspect_depmap 共用
+    # app/depmap_analysis.py。刻意不呈現 lineage 富集（已被對照基因集檢定推翻）。
+    {"code": "F1-8", "module": "目標一/二", "name": "腫瘤細胞株依賴查詢站（DepMap，預設人參）",
+     "nav_label": "腫瘤細胞株依賴", "page_url": "tumor-cells.html",
+     "show_frontend": True, "show_backend": True, "sort_order": 77},
+
     # ---- 其餘目標零基礎建設項目：現在都有對應頁面可查看/設定 ----
     {"code": "F0-1", "module": "目標零", "name": "前後台架構規劃",
      "nav_label": "系統架構規劃", "page_url": "architecture.html",

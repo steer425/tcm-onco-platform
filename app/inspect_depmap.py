@@ -41,7 +41,6 @@ from app import models, pathways
 # 同一個統計寫兩份就會分岔，而且分岔的那天不會有人發現。
 from app.pathways import hypergeom_sf, benjamini_hochberg
 from app.database import SessionLocal
-from app.target_index import standardized_target_symbols
 
 # 非泛必需基因的選擇性分級（依賴株數佔母體的比例）。
 #
@@ -60,36 +59,10 @@ SELECTIVE_BANDS = [
     ("近泛必需", 0.60, 1.01),
 ]
 
-# 「強依賴」的慣例界線。門檻 -0.5 只是「有依賴」，-1.0 才是明確的強依賴
-# （DepMap 的 Chronos 分數以 -1 對齊泛必需基因的中位數）。
-STRONG_EFFECT = -1.0
-
-# 方向性警示用的受體類別（**啟發式、非完整清單**）。
-#
-# CRISPR 依賴分數量的是「移除這個基因，細胞會不會死」。要把它轉成治療假說，
-# 前提是那個化合物**抑制**該靶點——但 TCMSP 的成分–靶點關係沒有方向性，
-# 只記錄關聯，不分抑制、活化或單純結合。
-#
-# 核受體與配體門控受體的天然配體**通常是活化劑**。人參皂苷結合 AHR
-# 很可能是活化它而不是抑制它，那麼「AHR 是依賴基因」加上「皂苷結合 AHR」
-# 推不出「皂苷會殺死那株細胞」——方向反了效果可能相反。
-#
-# 這份清單只用來**提醒**，不用來下結論。沒被標記不代表方向就沒問題。
-RECEPTOR_PREFIXES = (
-    "NR1", "NR2", "NR3", "NR4", "NR5", "NR6",      # 核受體命名系統
-    "RXR", "RAR", "PPAR", "THR", "ESR",
-    "ADRA", "ADRB", "CHRM", "CHRN", "HTR", "DRD",  # GPCR 與配體門控離子通道
-    "OPR", "ADORA", "GABR", "GRIN", "GRM", "CNR",
-)
-RECEPTOR_EXACT = {
-    "AR", "PGR", "VDR", "AHR", "ESR1", "ESR2", "NR3C1", "NR3C2",
-    "PPARG", "PPARA", "PPARD", "RXRA", "RXRB", "RXRG",
-}
-
-
-def is_receptor(sym: str) -> bool:
-    s = (sym or "").upper()
-    return s in RECEPTOR_EXACT or s.startswith(RECEPTOR_PREFIXES)
+# 強依賴界線、受體清單、選擇性判定一律來自 app/depmap_analysis.py——
+# F1-8 腫瘤細胞頁也呼叫同一份（v1.43.0）。腳本與畫面各寫一份，前 15 名遲早會分岔。
+from app.depmap_analysis import (STRONG_EFFECT, is_receptor,  # noqa: E402,F401
+                                 select_herb_targets)
 
 
 def _fix_console():
@@ -238,24 +211,9 @@ def main():
         if herb is None:
             out(f"\n（找不到 herb_id={args.herb}）")
         else:
-            ob_min, dl_min = pathways.adme_thresholds(db)
-            meta = pathways.active_ingredients(db, herb.id, ob_min, dl_min)
-            mol_ids = meta["passed"]
-            tar_ids = {r.tar_id for r in
-                       db.query(models.TcmspIngredientTarget)
-                       .filter(models.TcmspIngredientTarget.mol_id.in_(mol_ids)).all()} \
-                if mol_ids else set()
-
-            # 靶點 → 基因符號，只用已標準化的第一層
-            t2s = standardized_target_symbols(db)
-            syms = set()
-            for t in tar_ids:
-                syms.update(t2s.get(t, set()))
-
-            sum_by_sym = {s.gene_symbol: s for s in summaries}
-            hit = [sum_by_sym[s] for s in syms if s in sum_by_sym]
-            hit_sel = [s for s in hit if not s.is_common_essential and s.n_dependent > 0]
-            hit_ess = [s for s in hit if s.is_common_essential]
+            sel = select_herb_targets(db, herb.id, release, args.max_ratio)
+            meta, tar_ids, syms = sel["meta"], sel["tar_ids"], sel["symbols"]
+            hit, hit_sel, hit_ess = sel["hit"], sel["selective"], sel["essential"]
 
             out()
             out(f"## 四、{herb.herb_cn_name or herb.herb_en_name}"
@@ -274,30 +232,13 @@ def main():
                 # （1,143 基因 × 1,208 株，本來就有格子會靠隨機波動越線）。
                 # 所以另外數「強依賴」株數，並在同分時用效應量排序。
                 # 對應 rules.md 的「兩種排序都要看」。
-                deps = (db.query(D).filter(D.release == release,
-                                           D.gene_symbol.in_([s.gene_symbol for s in hit_sel]))
-                        .all())
-                strong = {}
-                for d in deps:
-                    v = _num(d.gene_effect)
-                    if v is not None and v <= STRONG_EFFECT:
-                        strong[d.gene_symbol] = strong.get(d.gene_symbol, 0) + 1
+                # 排序規則（選擇性當門檻、效應量當排序）的理由見 depmap_analysis 模組說明。
+                # v1.41.2 用「強依賴株數」排序，PSMG1（54.1%）排第一——那是廣度不是選擇性。
+                strong, gated, dropped = sel["strong"], sel["gated"], sel["dropped"]
+                rows = gated
 
                 def ratio(x):
                     return x.n_dependent / x.n_lines_total if x.n_lines_total else 9
-
-                # 選擇性是**門檻**，效應量才是**排序**。
-                #
-                # v1.41.2 用「強依賴株數」排序，結果 PSMG1（653／1208＝54.1%）
-                # 排第一——在一半細胞株都依賴的基因當然累積最多強依賴株數，
-                # 但那是廣度不是選擇性，已經接近泛必需只是沒進 DepMap 名單。
-                # 規格 B 要的正是「排序主軸從命中數翻轉為選擇性」，
-                # 用另一種命中數排序等於繞回原點。
-                gated = [x for x in hit_sel if ratio(x) <= args.max_ratio]
-                dropped = [x for x in hit_sel if ratio(x) > args.max_ratio]
-                rows = sorted(gated,
-                              key=lambda x: (_num(x.min_effect)
-                                             if _num(x.min_effect) is not None else 0))
 
                 n_strong_genes = sum(1 for s in gated if strong.get(s.gene_symbol))
                 out(f"### 選擇性門檻內、依效應量排序的前 "

@@ -14,6 +14,14 @@ from fractions import Fraction
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_pathways.db")
 
+# ⛔ 測試會寫入、刪除資料，**絕不能跑在正式資料庫上**（v1.43.0 實際發生過）。
+# 同一個 PowerShell 視窗先前若為了跑維運腳本設過 $env:DATABASE_URL（Neon），
+# 上面的 setdefault 不會覆蓋它，測試就直接連上正式庫。所以非 SQLite 一律拒絕執行。
+if not os.environ["DATABASE_URL"].startswith("sqlite"):
+    import sys as _sys
+    _sys.exit("⛔ DATABASE_URL 指向非 SQLite 的資料庫（很可能是正式環境），測試拒絕執行。\n"
+              "   請先清掉：Remove-Item Env:DATABASE_URL　或開一個新的 PowerShell 視窗再跑。")
+
 if (os.environ["DATABASE_URL"] == "sqlite:///./test_pathways.db"
         and os.path.exists("test_pathways.db")):
     os.remove("test_pathways.db")

@@ -1,5 +1,85 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.43.0 — 2026-10-14（F1-8 腫瘤細胞株依賴查詢站：分析鏈路第五站上畫面）
+
+### 為什麼
+
+Step 6（DepMap 細胞株依賴）的資料層與分析在 v1.41.0–v1.41.6 就驗收了，但**只有報表腳本，沒有畫面**——
+分析鏈路「中藥 → 成分 → 靶點 → 疾病 → **腫瘤細胞** → 研究報告」的第五站在網站上還是空的。
+規格 B 要求可以從細胞株反查選擇性依賴靶點、再回連 TCMSP 成分，腳本做不到這種來回查。
+
+### 改了什麼
+
+**1. 判定收斂成一份：`app/depmap_analysis.py`**（新增）
+
+`select_herb_targets()` 是腳本與 API 唯一共用的判定：活性成分 → 已標準化靶點符號 → 排除泛必需 →
+**選擇性當門檻（預設 ≤ 20%）→ 效應量當排序**。`inspect_depmap` 改呼叫它，重構前後用同一份 fixture
+跑報表**逐字相同**（含 lineage 對照那一節）。受體清單、強依賴界線也搬到這裡。
+
+另有 `symbol_sources()`：每個靶點是哪幾個**活性成分**打到的——BCL2 那份文件列的第一個缺口
+「哪個成分打 BCL2」，現在畫面上直接看得到。
+
+**2. API：`app/routers/depmap.py`**（新增，全部唯讀、走 `get_query_db`）
+
+| 端點 | 用途 |
+|---|---|
+| `GET /depmap/meta` | 資料版本、門檻、篩選母體、授權標註 |
+| `GET /depmap/herbs/{herb_id}/selective?max_ratio=` | 漏斗各層數字、選擇性靶點、被刷掉的與原因、泛必需排除名單 |
+| `GET /depmap/genes/{symbol}/lines` | 依賴這個基因的細胞株，由強到弱 |
+| `GET /depmap/lines/search?q=` | 以名稱／癌別搜尋細胞株 |
+| `GET /depmap/lines/{depmap_id}?herb_id=` | 這株細胞依賴、且本藥材打得到的靶點（規格 B 反查） |
+
+**刻意不提供 lineage 富集**：人參的三個「顯著」lineage 經對照基因集檢定落在隨機範圍內。
+
+**3. 前台頁面 `tumor-cells.html`（F1-8，預設人參）**
+
+- 漏斗：活性成分 → 靶點 → 已標準化基因 → DepMap 有資料 → 非泛必需且有依賴 → 通過門檻
+- 三個分頁：選擇性靶點／被門檻刷掉（附原因）／泛必需（已排除）
+- 門檻可切 5%／10%／20%；強依賴株數為 0 的列以灰色「—」標示為雜訊
+- 點基因 → 依賴它的細胞株；點細胞株 → 它依賴的本藥材靶點與打到的成分；都附 DepMap 連結
+- 受體類標靶標「⚠️ 受體」（方向性警示，啟發式）
+- 頁尾：不是療效、方向性、敲除 ≠ 抑制、只有腫瘤株、不提供 lineage 富集的理由、DepMap 24Q2 CC BY 4.0 標註
+- F1-7 頁導覽列加連結；i18n en／ko 各補 31 條（755／755）
+
+**4. 修正唯讀模式的潛在 500**（`app/local_cache.py`）
+
+唯讀模式下 `get_query_db` 讀本機快取，而快取只建 `CACHED_TABLES` 裡的表。F1-7 從 v1.42.0 起就讀
+`system_settings`（OB／DL 門檻）、`tcmsp_target_uniprot`、`tcmsp_ingredient_pubchem`，三張都沒在清單裡——
+**開唯讀模式那一刻 F1-7 就會 500，平常測不出來**。這版連同 DepMap 四張表一起補上。
+
+### 驗證
+
+- 新增 `tests/test_depmap_page.py` 46 項：排序（BCL2 → AHR → NOISE1）、PSMG1 54.1% 被刷掉並寫原因、
+  CDK1 泛必需排除、只列活性成分、受體警示、門檻切換、基因／細胞株下鑽、權限、F1-8 進導覽、
+  **腳本與 API 排序相同**、**只含 CACHED_TABLES 的資料庫也跑得動**
+- 既有回歸（news_e2e、target_mapping、pathways、herb_ingredients、ingredient_mapping）與 `test_zh_match.js` 全過
+- Chromium 實際渲染頁面：主表、兩個下鑽視窗、門檻切換、英文介面、手機寬度，無 JS 錯誤
+  （外部 CDN 在沙箱被擋，OpenCC 繁簡轉換未載入是環境限制）
+
+⚠️ 頁面是用 fixture 驗的，**還沒對正式資料庫看過**。上線後請打開人參確認前幾名是 BCL2，
+數字應與 `reports/depmap.md`（10/06 那份）一致。
+
+**5. ⛔ 六支測試一律拒絕在非 SQLite 資料庫上執行**
+
+上版前在本機跑 `python -m tests.test_depmap_page`，同一個 PowerShell 視窗剛為了 `reclassify_ingredient_queue`
+設過 `$env:DATABASE_URL`（Neon）。測試開頭用的是 `os.environ.setdefault(...)`，**不會覆蓋已存在的值**，
+於是直接連上正式資料庫：啟動時的 `seed_default_data()` 寫入了 F1-8 功能項目（與部署時本來就會做的相同），
+登入留下兩筆 admin 登入紀錄；測試資料的寫入撞上唯一鍵、整筆交易回滾，**沒有任何測試資料寫進正式庫**。
+
+六支測試開頭都加了檢查：`DATABASE_URL` 不是 `sqlite` 開頭就直接結束並說明怎麼清掉。
+六支測試都是同一種寫法，所以不只這一支有風險。
+
+### 部署注意事項
+
+- 新增功能項目 F1-8：Render 重啟時 `seed_default_data()` 會建立；保險起見跑一次遷移
+- 沒有新增或修改資料表欄位
+- 若曾開過唯讀模式，關掉再開一次才會用新的 `CACHED_TABLES` 重建快取
+
+```powershell
+$env:DATABASE_URL="（Neon 連線字串）"
+python -m app.migrate_schema
+```
+
 ## v1.42.10 — 2026-10-14（差一個水分子不再算同一化合物）
 
 ### 為什麼
