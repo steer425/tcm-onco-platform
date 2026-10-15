@@ -95,7 +95,7 @@
     const gene = document.createElement("div"); gene.className = "l3d-gene"; row.appendChild(gene);
     top.append(tag, row);
     const cap = document.createElement("div"); cap.className = "l3d-caption";
-    const hint = document.createElement("div"); hint.className = "l3d-hint"; hint.textContent = t("點選熔爐開啟登入・點選秘笈或藥田查看介紹");
+    const hint = document.createElement("div"); hint.className = "l3d-hint"; hint.textContent = t("點選熔爐開啟／收起登入・點選秘笈或藥田查看介紹");
     cap.appendChild(hint);
     const strong = document.createElement("strong"); strong.textContent = t("研究流程示意動畫");
     const rest = document.createElement("span"); rest.textContent = t("非療效宣稱・科研輔助工具，不作為醫療診斷或治療建議");
@@ -148,11 +148,19 @@
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
   function onPick(p) {
-    if (p.type === "furnace") openLogin();
+    if (p.type === "furnace") { if (loginOpen) closeLogin(); else openLogin(); }
     else if (p.type === "db") showInfo(DB_INFO[p.i], "db");
     else if (p.type === "herbs") showInfo(HERB_INFO, "herbs");
   }
-  // 登入框：3D 模式下先藏起來，點熔爐（或「開啟登入」鈕）才出現
+  // 登入框：3D 模式下先藏起來，點熔爐（或「開啟登入」鈕）才出現；打開後再點熔爐收起來
+  function closeLogin() {
+    if (!loginOpen) return;
+    loginOpen = false;
+    const card = document.querySelector(".login-card");
+    if (card && card.contains(document.activeElement)) document.activeElement.blur();
+    document.body.classList.remove("login-open");
+    if (scene) scene.setLoginOpen(false);
+  }
   function openLogin() {
     if (loginOpen) return;
     loginOpen = true;
@@ -191,8 +199,6 @@
 
   function apply() {
     const on = capable && fits();
-    // 第三方登入失敗轉回來時帶著錯誤訊息，登入框要直接打開，訊息才看得到
-    if (/[?&]google_error=/.test(location.search)) loginOpen = true;
     document.body.classList.toggle("login-open", loginOpen);
     if (on && !scene && !loading && !failed) { load(); return; }
     document.body.classList.toggle("login-3d", !!(on && scene));
@@ -200,6 +206,8 @@
   }
 
   if (!capable) return;
+  // 第三方登入失敗轉回來時帶著錯誤訊息，登入框要直接打開，訊息才看得到（只在進頁時判斷一次，之後可以點熔爐收起）
+  if (/[?&]google_error=/.test(location.search)) loginOpen = true;
   let timer = null;
   window.addEventListener("resize", () => { clearTimeout(timer); timer = setTimeout(apply, 150); });
   // 等登入框與平面背景先畫好，再開始抓 3D

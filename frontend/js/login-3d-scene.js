@@ -197,76 +197,89 @@ window.startLogin3D = function (canvas, hud) {
   furnHalo.rotation.x = Math.PI / 2; furnHalo.position.set(FURN_X, FURN_Y + 0.15, 0); scene.add(furnHalo);
 
   // 七本武林秘笈（線裝書，藍白相間、半透明），排成北斗七星，整座星斗繞著熔爐轉。熔煉時依序點亮，點選可看介紹
-  // 北斗七星：天樞、天璇、天璣、天權（斗身），玉衡、開陽、搖光（斗柄）。
-  // 熔爐放在斗身（斗口）裡，整座星斗像真實夜空的北斗繞北極星一樣，繞著熔爐轉；
-  // 斗身比真實比例放大，才圍得住熔爐。星斗所在平面向後傾，轉到前方時靠近鏡頭、後方時退遠
-  const DIPPER = [[-2.3, 1.6], [-2.1, -1.8], [2.1, -2.1], [2.2, 1.3], [4.0, 1.9], [5.7, 2.6], [7.5, 1.6]];
+  // 北斗七星：天樞、天璇、天璣、天權（斗身），玉衡、開陽、搖光（斗柄）。座標是常見星圖的相對位置（真實比例，v1.46.5 定案）。
+  // 整座星斗懸在熔爐上方，沿水平圓軌道緩慢繞熔爐公轉；星斗始終正面朝向畫面，形狀與書上的字都不會被轉歪
+  const DIPPER = [[0, 0], [0.06, -0.62], [0.86, -0.8], [0.9, -0.27], [1.5, -0.12], [2.08, 0.05], [2.72, -0.3]];
   const DIPPER_LINKS = [[0, 1], [1, 2], [2, 3], [3, 0], [3, 4], [4, 5], [5, 6]];
   const MANUALS = ["本草藥理真經", "萬化分子譜", "蛋白靶點錄", "經脈通路圖", "生化反應訣", "腫瘤基因秘錄", "細胞依存心法"];
   const STAR_NAMES = ["天樞", "天璇", "天璣", "天權", "玉衡", "開陽", "搖光"];
+  const BOOK_W = 2.0, BOOK_H = 2.5;
   function coverTexture(i) {
-    const W = 320, H = 450, c = document.createElement("canvas"); c.width = W; c.height = H;
+    // 封面底色半透明（看得到後面的星空），字一律不透明、加深色描邊，確保清楚
+    const W = 512, H = 666, c = document.createElement("canvas"); c.width = W; c.height = H;
     const x = c.getContext("2d");
-    const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#2257b0"); g.addColorStop(1, "#173f86");
+    const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, "rgba(46,104,206,.42)"); g.addColorStop(1, "rgba(22,62,140,.5)");
     x.fillStyle = g; x.fillRect(0, 0, W, H);
-    // 青花紋：白色雲紋與回紋邊框（藍白相間）
-    x.strokeStyle = "rgba(255,255,255,.18)"; x.lineWidth = 3;
-    for (let k = 0; k < 7; k++) {
-      const cy = 60 + k * 58, cx = 120 + (k % 2) * 90;
-      x.beginPath(); x.arc(cx, cy, 22, Math.PI, 0); x.arc(cx + 34, cy, 12, Math.PI, 0); x.stroke();
+    // 青花紋：白色雲紋（淡）與雙線邊框（藍白相間）
+    x.strokeStyle = "rgba(255,255,255,.16)"; x.lineWidth = 4;
+    for (let k = 0; k < 6; k++) {
+      const cy = 150 + k * 70, cx = 110 + (k % 2) * 70;
+      x.beginPath(); x.arc(cx, cy, 30, Math.PI, 0); x.arc(cx + 46, cy, 16, Math.PI, 0); x.stroke();
     }
-    x.strokeStyle = "rgba(255,255,255,.9)"; x.lineWidth = 4; x.strokeRect(14, 14, W - 28, H - 28);
-    x.lineWidth = 1.5; x.strokeRect(24, 24, W - 48, H - 48);
+    x.strokeStyle = "rgba(255,255,255,.95)"; x.lineWidth = 6; x.strokeRect(16, 16, W - 32, H - 32);
+    x.lineWidth = 2; x.strokeRect(30, 30, W - 60, H - 60);
     // 線裝：左側裝訂線與縫線
-    x.strokeStyle = "rgba(255,255,255,.95)"; x.lineWidth = 3;
-    for (let k = 0; k < 5; k++) { const y = 40 + k * ((H - 80) / 4); x.beginPath(); x.moveTo(0, y); x.lineTo(30, y); x.stroke(); x.beginPath(); x.arc(30, y, 3.5, 0, Math.PI * 2); x.fillStyle = "#fff"; x.fill(); }
-    // 白色題簽（直書書名）
-    x.fillStyle = "#f6f9ff"; x.fillRect(W - 112, 44, 66, 280); x.strokeStyle = "#173f86"; x.lineWidth = 3; x.strokeRect(W - 106, 50, 54, 268);
-    x.fillStyle = "#14326b"; x.textAlign = "center"; x.textBaseline = "middle";
+    x.strokeStyle = "#fff"; x.lineWidth = 4;
+    for (let k = 0; k < 5; k++) { const y = 56 + k * ((H - 112) / 4); x.beginPath(); x.moveTo(0, y); x.lineTo(40, y); x.stroke(); x.beginPath(); x.arc(40, y, 5, 0, Math.PI * 2); x.fillStyle = "#fff"; x.fill(); }
+    const SANS = '"Noto Sans TC","Noto Sans CJK TC","Noto Sans KR","PingFang TC","Microsoft JhengHei",sans-serif';
+    const SERIF = '"Noto Serif TC","Noto Serif CJK TC","Noto Sans TC","PingFang TC","Microsoft JhengHei",serif';
+    const outlined = (txt, px, py, stroke) => {
+      x.lineJoin = "round"; x.lineWidth = stroke; x.strokeStyle = "rgba(6,18,48,.92)"; x.strokeText(txt, px, py); x.fillText(txt, px, py);
+    };
+    // 白色題簽（直書書名）：題簽本身不透明，深藍字
     const title = tr(MANUALS[i]);
-    const vertical = /[\u4e00-\u9fff]/.test(title) && title.length <= 7;
+    const vertical = /[一-鿿]/.test(title) && title.length <= 7;
+    x.fillStyle = "#f7faff"; x.fillRect(W - 168, 132, 108, 360); x.strokeStyle = "#173f86"; x.lineWidth = 4; x.strokeRect(W - 160, 140, 92, 344);
+    x.fillStyle = "#0f2a5e"; x.textAlign = "center"; x.textBaseline = "middle";
     if (vertical) {
-      x.font = '900 40px "Noto Serif TC","Noto Serif CJK TC","Noto Sans TC","PingFang TC","Microsoft JhengHei",serif';
-      const step = Math.min(42, 250 / title.length);
-      [...title].forEach((ch, k) => x.fillText(ch, W - 79, 66 + step / 2 + k * step));
+      const step = Math.min(60, 320 / title.length);
+      x.font = `900 ${Math.round(step * 0.92)}px ${SERIF}`;
+      [...title].forEach((ch, k) => x.fillText(ch, W - 114, 152 + step / 2 + k * step));
     } else {
-      x.save(); x.translate(W - 79, 184); x.rotate(Math.PI / 2);
-      x.font = '800 24px "Noto Sans TC","Noto Sans CJK TC",sans-serif'; x.fillText(title, 0, 0); x.restore();
+      x.save(); x.translate(W - 114, 312); x.rotate(Math.PI / 2);
+      let fs = 40; x.font = `800 ${fs}px ${SANS}`;
+      while (x.measureText(title).width > 330 && fs > 20) { fs -= 2; x.font = `800 ${fs}px ${SANS}`; }
+      x.fillText(title, 0, 0); x.restore();
     }
-    // 資料庫名稱與角色
-    x.fillStyle = "#fff"; x.textAlign = "left";
-    x.font = '800 40px "Noto Sans TC","Noto Sans CJK TC",sans-serif'; x.fillText(DBS[i][0], 46, H - 92);
-    x.font = '500 22px "Noto Sans TC","Noto Sans CJK TC",sans-serif'; x.fillStyle = "rgba(255,255,255,.85)"; x.fillText(tr(DBS[i][1]), 46, H - 54);
-    x.font = '700 22px "Noto Sans TC","Noto Sans CJK TC",sans-serif'; x.fillStyle = "#cfe2ff"; x.fillText("★ " + tr(STAR_NAMES[i]), 46, 60);
-    const tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding; tex.anisotropy = 4;
+    // 星名（左上）、資料庫名稱（下方）：白字深色描邊
+    x.textAlign = "left"; x.textBaseline = "alphabetic"; x.fillStyle = "#e4efff";
+    x.font = `800 46px ${SANS}`; outlined("★ " + tr(STAR_NAMES[i]), 62, 100, 9);
+    x.fillStyle = "#fff";
+    // 資料庫名稱放大置底（角色說明放在點選後的介紹視窗，封面字太小反而看不清）
+    let fs = 120; x.font = `900 ${fs}px ${SANS}`;
+    while (x.measureText(DBS[i][0]).width > W - 96 && fs > 40) { fs -= 4; x.font = `900 ${fs}px ${SANS}`; }
+    outlined(DBS[i][0], 52, H - 62, 14);
+    const tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding; tex.anisotropy = 8;
     return tex;
   }
-  const DIPPER_TILT = -0.72;                          // 平面後傾，垂直方向約壓成 0.75 倍
-  const dbRing = new T.Group(); dbRing.position.set(FURN_X, FURN_Y + 0.2, 0); dbRing.rotation.x = DIPPER_TILT; scene.add(dbRing);
-  const dipperSpin = new T.Group(); dbRing.add(dipperSpin);   // 在平面內繞熔爐旋轉
-  const DIPPER_SCALE = 1.05;
-  const starPos = DIPPER.map(([x, y]) => new T.Vector3(x * DIPPER_SCALE, y * DIPPER_SCALE, 0));
-  const pageMat = new T.MeshStandardMaterial({ color: 0xf2f6ff, roughness: 0.8, transparent: true, opacity: 0.8 });
-  const backMat = new T.MeshStandardMaterial({ color: 0x1d4c9c, roughness: 0.6, transparent: true, opacity: 0.8 });
+  const DIPPER_SCALE = 4.9;                         // 天璣–天權最近（0.53），放大後仍大於書高，七本互不重疊
+  const ORBIT_R = 2.6, ORBIT_Y = FURN_Y + 6.55;      // 公轉半徑與高度（熔爐上方的空白區）
+  const dipper = new T.Group(); scene.add(dipper);   // 整座星斗：每格畫面面向鏡頭
+  const dcx = 1.36, dcy = -0.375;                    // 星斗外框中心，讓公轉以星斗中心為準
+  const starPos = DIPPER.map(([x, y]) => new T.Vector3((x - dcx) * DIPPER_SCALE, (y - dcy) * DIPPER_SCALE, 0));
+  const pageMat = new T.MeshStandardMaterial({ color: 0xf2f6ff, roughness: 0.8, transparent: true, opacity: 0.35, depthWrite: false });
+  const backMat = new T.MeshStandardMaterial({ color: 0x1d4c9c, roughness: 0.6, transparent: true, opacity: 0.3, depthWrite: false });
   const plaques = DBS.map(([name, role, color], i) => {
-    const cover = new T.MeshBasicMaterial({ map: coverTexture(i), transparent: true, opacity: 0.86, toneMapped: false });
-    const book = new T.Mesh(new T.BoxGeometry(1.45, 2.0, 0.24), [pageMat, backMat, pageMat, pageMat, cover, backMat]);
+    const cover = new T.MeshBasicMaterial({ map: coverTexture(i), transparent: true, opacity: 0.94, toneMapped: false, depthWrite: false });
+    const book = new T.Mesh(new T.BoxGeometry(BOOK_W, BOOK_H, 0.22), [pageMat, backMat, pageMat, pageMat, cover, backMat]);
     book.position.copy(starPos[i]); book.userData.pick = { type: "db", i };
-    const g = glow(0x9cc6ff, 3.4, 0.25); g.position.copy(starPos[i]);
-    const star = glow(0xffffff, 1.1, 0.9); star.position.copy(starPos[i]);   // 星點在書後方發亮
-    dipperSpin.add(g); dipperSpin.add(star); dipperSpin.add(book);
-    // 秘笈與熔爐之間的能量線
-    const lg = new T.BufferGeometry().setFromPoints([new T.Vector3(0, 0, 0), starPos[i].clone()]);
+    const g = glow(0x9cc6ff, 3.6, 0.12); g.position.copy(starPos[i]).setZ(-0.3);
+    const star = glow(0xffffff, 0.9, 0.9); star.position.copy(starPos[i]).add(new T.Vector3(0, BOOK_H / 2 + 0.35, 0));
+    dipper.add(g); dipper.add(star); dipper.add(book);
+    // 秘笈與熔爐之間的能量線（世界座標，每格更新端點）
+    const lg = new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3()]);
     const line = new T.Line(lg, new T.LineBasicMaterial({ color: new T.Color(color), transparent: true, opacity: 0.15, toneMapped: false }));
-    dipperSpin.add(line);
+    scene.add(line);
     return { m: book, g, star, line, cover };
   });
-  // 星斗連線（勺形）
-  const dipperLines = new T.LineSegments(new T.BufferGeometry().setFromPoints(DIPPER_LINKS.flatMap(([a, b]) => [starPos[a], starPos[b]])),
-    new T.LineBasicMaterial({ color: 0xdbe9ff, transparent: true, opacity: 0.75, toneMapped: false }));
-  dipperSpin.add(dipperLines);
+  // 星斗連線（勺形），連在書頂的星點上
+  const dipperLines = new T.LineSegments(new T.BufferGeometry().setFromPoints(DIPPER_LINKS.flatMap(([a, b]) => [plaques[a].star.position, plaques[b].star.position])),
+    new T.LineBasicMaterial({ color: 0xdbe9ff, transparent: true, opacity: 0.7, toneMapped: false }));
+  dipper.add(dipperLines);
   const dipperLabel = sprite(["北斗七星・七大國際資料庫"], 0.64, { color: "#cfe2ff" });
-  dipperLabel.position.set(FURN_X, FURN_Y + 6.9, -4); scene.add(dipperLabel);
+  dipperLabel.position.set(starPos[6].x, starPos[6].y - BOOK_H / 2 - 0.6, 0); dipper.add(dipperLabel);
+  const FURN_TOP = new T.Vector3(FURN_X, FURN_Y + 1.2, 0), _bookWorld = new T.Vector3();
+  let dipperShift = 0;                               // 登入框打開時星斗往左讓位
   const _camLocal = new T.Vector3();
 
   // ---------------- 上層：候選分子（球棍模型）＋發射平台 ----------------
@@ -557,13 +570,20 @@ window.startLogin3D = function (canvas, hud) {
     mouthGlow.material.opacity = 0.45 + 0.5 * smelt;
 
     // 七大資料庫依序點亮（1.0–5.2 秒）
-    dipperSpin.rotation.z = total * 0.085;            // 約 74 秒繞一圈（逆時針，與北斗繞北極星同向）
-    const ds = loginOpen ? 0.8 : 1; dipperSpin.scale.lerp(_camLocal.set(ds, ds, ds), Math.min(1, dt * 3));
+    // 星斗繞熔爐公轉：約 80 秒一圈；整座面向鏡頭。登入框打開時縮小一點，讓出右側
+    const orb = total * 0.078;
+    dipperShift += ((loginOpen ? -3.2 : 0) - dipperShift) * Math.min(1, dt * 3);
+    dipper.position.set(FURN_X + dipperShift + Math.sin(orb) * ORBIT_R, ORBIT_Y, Math.cos(orb) * ORBIT_R);
+    dipper.quaternion.copy(camera.quaternion);
+    const ds = loginOpen ? 0.72 : 1; dipper.scale.lerp(_camLocal.set(ds, ds, ds), Math.min(1, dt * 3));
+    dipper.updateMatrixWorld();
     plaques.forEach((p, i) => {
-      p.m.lookAt(camera.position);
+      p.m.getWorldPosition(_bookWorld);
+      const lp = p.line.geometry.attributes.position;
+      lp.setXYZ(0, FURN_TOP.x, FURN_TOP.y, FURN_TOP.z); lp.setXYZ(1, _bookWorld.x, _bookWorld.y - BOOK_H * 0.45 * dipper.scale.y, _bookWorld.z); lp.needsUpdate = true;
       const on = seg(t, 1.0 + i * 0.6, 1.3 + i * 0.6) * (1 - seg(t, 10.5, 11.5));
       const hov = hover && hover.type === "db" && hover.i === i ? 1 : 0;
-      p.cover.opacity = 0.72 + 0.26 * Math.max(on, hov); p.g.material.opacity = 0.22 + 0.5 * Math.max(on, hov); p.line.material.opacity = 0.1 + 0.6 * on;
+      p.cover.opacity = 0.9 + 0.1 * Math.max(on, hov); p.g.material.opacity = 0.1 + 0.35 * Math.max(on, hov); p.line.material.opacity = 0.1 + 0.6 * on;
       p.star.material.opacity = 0.6 + 0.4 * Math.sin(total * 3 + i);
       const sc = 1 + 0.1 * on + 0.18 * hov; p.m.scale.lerp(new T.Vector3(sc, sc, sc), 0.2);
     });

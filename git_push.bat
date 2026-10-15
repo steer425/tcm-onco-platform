@@ -33,7 +33,7 @@ rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
 set "EXPECTED_VER=1.46.5"
-set "DEFAULT_MSG=v1.46.5 Login page: seven databases as blue-white thread-bound manuals in a Big Dipper orbiting the furnace, click a manual or the herb field for an introduction, login box opens on clicking the furnace, larger herb field"
+set "DEFAULT_MSG=v1.46.5 Login page: seven databases as blue-white thread-bound manuals in a Big Dipper orbiting the furnace, click a manual or the herb field for an introduction, clicking the furnace opens or closes the login box, larger herb field"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"
