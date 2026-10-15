@@ -204,6 +204,43 @@ body.login-3d #login3dHud { display: block; }
   left: max(18px, env(safe-area-inset-left, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
 }
 .l3d-caption strong { color: #e8f3ef; font-weight: 500; }
+.l3d-hint { margin-top: 4px; color: #ffd98a; font-weight: 700; }
+body.login-3d #login3d { pointer-events: auto; }
+/* 登入框外層蓋滿整個畫面，3D 模式下要讓點擊穿過去到畫布（熔爐、秘笈、藥田），只有登入框本身接收點擊 */
+body.login-3d .login-wrap { pointer-events: none; }
+body.login-3d.login-open .login-card { pointer-events: auto; }
+.l3d-top { transition: left .8s ease, width .8s ease; }
+/* 3D 模式下登入框先藏起來，點熔爐後從右側滑入（平面版不受影響） */
+body.login-page .login-card { transition: opacity .6s ease, transform .6s ease; }
+body.login-3d:not(.login-open) .login-card { opacity: 0; transform: translateX(60px); pointer-events: none; visibility: hidden; }
+#l3dOpenLogin { display: none; }
+body.login-3d:not(.login-open) #l3dOpenLogin {
+  display: block; position: fixed; z-index: 2; right: max(24px, env(safe-area-inset-right, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+  padding: 10px 18px; font-size: 14px; font-weight: 700; color: #3a2508; background: #ffd27a; border: 0; border-radius: 999px;
+  box-shadow: 0 0 0 0 rgba(255,210,122,.6); animation: l3dPulse 2.2s ease-out infinite; cursor: pointer;
+}
+#l3dOpenLogin:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+@keyframes l3dPulse { 0% { box-shadow: 0 0 0 0 rgba(255,210,122,.55); } 100% { box-shadow: 0 0 0 18px rgba(255,210,122,0); } }
+/* 介紹視窗：秘笈用青花藍白，藥田用金色 */
+#l3dInfo { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgba(2,8,12,.55); backdrop-filter: blur(3px); }
+#l3dInfo[hidden] { display: none; }
+.l3d-info-card {
+  position: relative; width: min(460px, 100%); max-height: calc(100vh - 48px); overflow: auto; padding: 26px 26px 20px;
+  border-radius: 14px; color: #14326b; background: linear-gradient(160deg, #f7faff 0%, #e6efff 100%);
+  border: 2px solid #2257b0; box-shadow: 0 0 0 6px rgba(255,255,255,.65), 0 24px 70px rgba(0,0,0,.55);
+  font-family: 'Noto Sans TC','PingFang TC','Microsoft JhengHei',system-ui,sans-serif;
+}
+#l3dInfo[data-kind="herbs"] .l3d-info-card { color: #3a2508; background: linear-gradient(160deg, #fffaf0 0%, #fbeccd 100%); border-color: #b07a3a; }
+.l3d-info-manual { margin: 0; padding-right: 84px; font-size: 15px; font-weight: 900; letter-spacing: .2em; color: #2257b0; font-family: 'Noto Serif TC','Noto Serif CJK TC',serif; }
+.l3d-info-card h3 { margin: 4px 0 2px; font-size: 26px; font-weight: 900; }
+.l3d-info-sub { margin: 0 0 14px; font-size: 12.5px; opacity: .75; line-height: 1.5; }
+.l3d-info-body p { margin: 0 0 10px; font-size: 14px; line-height: 1.75; }
+.l3d-info-body a { display: inline-block; margin-top: 4px; font-weight: 700; color: #2257b0; }
+#l3dInfo[data-kind="herbs"] .l3d-info-body a { color: #8a5a10; }
+.l3d-info-foot { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid rgba(20,50,107,.2); font-size: 11.5px; opacity: .7; }
+.l3d-info-close { position: absolute; top: 12px; right: 12px; padding: 5px 10px; font-size: 12.5px; background: transparent; color: inherit; border: 1px solid currentColor; border-radius: 6px; cursor: pointer; }
+.l3d-info-close:focus-visible { outline: 2px solid #2257b0; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { #l3dOpenLogin { animation: none; } body.login-page .login-card { transition: none; } }
 
 /* 登入卡底部的聯絡資訊 */
 .site-contact { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid #e3e9e5; font-size: 12px; color: var(--muted); line-height: 1.6; }

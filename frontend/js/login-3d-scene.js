@@ -1,4 +1,4 @@
-// 登入頁 3D 研究流程動畫的場景（v1.46.4）。由 js/login-3d.js 在條件符合時延後載入並呼叫 startLogin3D()。
+// 登入頁 3D 研究流程動畫的場景（v1.46.4；v1.46.5 七本秘笈排成北斗七星繞熔爐、可點選）。由 js/login-3d.js 在條件符合時延後載入並呼叫 startLogin3D()。
 //
 // 一輪 12 秒：從人體取出 DNA 報告 → 沿螺旋篩檢致病基因、在螺旋上標定靶點 → 502 種中藥進熔爐、七大資料庫依序點亮
 // → 提煉候選分子 → 瞄準光線、逐一發射 → 靶點蛋白逐步虛弱 → 人體發出聖光。
@@ -89,6 +89,7 @@ window.startLogin3D = function (canvas, hud) {
 
   // ---------------- 底層：502 種中藥，人參在中心 ----------------
   const FURN_X = 3.2;
+  const HERB_R = 8.6;                          // 藥田半徑（v1.46.5 放大）
   const herbs = new T.Group(); herbs.position.set(FURN_X, -0.4, 0); scene.add(herbs);
   const leafGeo = new T.SphereGeometry(1, 8, 6); leafGeo.scale(0.16, 0.035, 0.07);
   const leafMat = new T.MeshStandardMaterial({ roughness: 0.55, metalness: 0.15 });
@@ -97,18 +98,21 @@ window.startLogin3D = function (canvas, hud) {
   const herbPal = [0xe2b866, 0x6fe0b0, 0xc9de8f, 0xd99a4e, 0x8fd9a6];
   const herbPos = [];
   for (let i = 0; i < HERB_COUNT; i++) {
-    const f = i / (HERB_COUNT - 1), r = 1.35 + 4.4 * Math.sqrt(f), a = i * 2.399963;
+    const f = i / (HERB_COUNT - 1), r = 1.6 + (HERB_R - 1.6) * Math.sqrt(f), a = i * 2.399963;
     const p = new T.Vector3(r * Math.cos(a), 0.08 * Math.sin(i * 1.7), r * Math.sin(a));
     herbPos.push(p);
     tmpE.set(0, -a + Math.PI / 2, 0.15 * Math.sin(i)); tmpQ.setFromEuler(tmpE);
-    const sc = 0.85 + 0.6 * ((i * 37) % 11) / 11;
+    const sc = 1.05 + 0.7 * ((i * 37) % 11) / 11;
     tmpM.compose(p, tmpQ, new T.Vector3(sc, sc, sc)); herbMesh.setMatrixAt(i, tmpM);
     herbMesh.setColorAt(i, tmpC.setHex(herbPal[i % herbPal.length]).convertSRGBToLinear());
   }
   herbs.add(herbMesh);
-  const herbRing = new T.Mesh(new T.RingGeometry(5.9, 6.0, 96), new T.MeshBasicMaterial({ color: 0xe2b866, transparent: true, opacity: 0.35, side: T.DoubleSide }));
+  const herbRing = new T.Mesh(new T.RingGeometry(HERB_R + 0.25, HERB_R + 0.37, 128), new T.MeshBasicMaterial({ color: 0xe2b866, transparent: true, opacity: 0.35, side: T.DoubleSide }));
   herbRing.rotation.x = -Math.PI / 2; herbs.add(herbRing);
-  const herbLabel = sprite(["502 種中藥"], 0.62, { color: "#e2b866" }); herbLabel.position.set(FURN_X, -0.1, 6.9); scene.add(herbLabel);
+  // 看不見的圓盤：讓整片藥田都點得到（只點葉片太難點中）
+  const herbHit = new T.Mesh(new T.CircleGeometry(HERB_R + 0.4, 64), new T.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+  herbHit.rotation.x = -Math.PI / 2; herbHit.position.y = 0.05; herbHit.userData.pick = { type: "herbs" }; herbs.add(herbHit);
+  const herbLabel = sprite(["502 種中藥"], 0.7, { color: "#e2b866" }); herbLabel.position.set(FURN_X, -0.3, HERB_R + 2.0); scene.add(herbLabel);
 
   // 人參：莖、三組五片掌狀複葉、紅色漿果、主根與鬚根
   function buildGinseng() {
@@ -159,10 +163,12 @@ window.startLogin3D = function (canvas, hud) {
   const profile = [[0.0, -1.05], [0.9, -1.05], [1.35, -0.75], [1.55, -0.2], [1.5, 0.45], [1.25, 0.9], [1.32, 1.0], [1.1, 1.05]]
     .map(([r, y]) => new T.Vector2(r, y));
   const body = new T.Mesh(new T.LatheGeometry(profile, 48), bronze); furnace.add(body);
+  body.userData.pick = { type: "furnace" };
   for (let k = 0; k < 3; k++) {
     const a = k * Math.PI * 2 / 3 + Math.PI / 6;
     const leg = new T.Mesh(new T.CylinderGeometry(0.12, 0.2, 1.7, 10), bronze);
     leg.position.set(Math.cos(a) * 0.95, -1.75, Math.sin(a) * 0.95); leg.rotation.z = Math.cos(a) * 0.12; leg.rotation.x = -Math.sin(a) * 0.12;
+    leg.userData.pick = { type: "furnace" };
     furnace.add(leg);
   }
   [-1, 1].forEach((s) => {
@@ -182,23 +188,86 @@ window.startLogin3D = function (canvas, hud) {
     blending: T.AdditiveBlending, depthWrite: false, toneMapped: false }));
   fire.position.copy(furnace.position); scene.add(fire);
   const furnLabel = sprite(["熔爐・整合七大資料庫"], 0.5, { color: "#e0a24a", bg: "rgba(20,12,4,.8)" }); furnLabel.position.set(FURN_X, 1.05, 2.6); scene.add(furnLabel);
+  // 「點擊熔爐開啟登入」提示：登入框開啟後消失
+  const loginHint = sprite(["點擊熔爐・開啟登入"], 0.62, { color: "#fff1c0", bg: "rgba(60,30,6,.85)" });
+  loginHint.position.set(FURN_X, 0.15, 3.2); scene.add(loginHint);
+  // 星斗轉到爐前時會經過這兩個標籤，讓標籤永遠畫在最上層才看得清楚
+  [furnLabel, loginHint].forEach((o) => { o.material.depthTest = false; o.renderOrder = 10; });
+  const furnHalo = new T.Mesh(new T.TorusGeometry(1.95, 0.04, 8, 80), new T.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0, toneMapped: false }));
+  furnHalo.rotation.x = Math.PI / 2; furnHalo.position.set(FURN_X, FURN_Y + 0.15, 0); scene.add(furnHalo);
 
-  // 七塊資料庫銘牌：環繞丹爐旋轉，熔煉時依序點亮
-  const dbRing = new T.Group(); dbRing.position.set(FURN_X, FURN_Y + 0.2, 0); scene.add(dbRing);
+  // 七本武林秘笈（線裝書，藍白相間、半透明），排成北斗七星，整座星斗繞著熔爐轉。熔煉時依序點亮，點選可看介紹
+  // 北斗七星：天樞、天璇、天璣、天權（斗身），玉衡、開陽、搖光（斗柄）。
+  // 熔爐放在斗身（斗口）裡，整座星斗像真實夜空的北斗繞北極星一樣，繞著熔爐轉；
+  // 斗身比真實比例放大，才圍得住熔爐。星斗所在平面向後傾，轉到前方時靠近鏡頭、後方時退遠
+  const DIPPER = [[-2.3, 1.6], [-2.1, -1.8], [2.1, -2.1], [2.2, 1.3], [4.0, 1.9], [5.7, 2.6], [7.5, 1.6]];
+  const DIPPER_LINKS = [[0, 1], [1, 2], [2, 3], [3, 0], [3, 4], [4, 5], [5, 6]];
+  const MANUALS = ["本草藥理真經", "萬化分子譜", "蛋白靶點錄", "經脈通路圖", "生化反應訣", "腫瘤基因秘錄", "細胞依存心法"];
+  const STAR_NAMES = ["天樞", "天璇", "天璣", "天權", "玉衡", "開陽", "搖光"];
+  function coverTexture(i) {
+    const W = 320, H = 450, c = document.createElement("canvas"); c.width = W; c.height = H;
+    const x = c.getContext("2d");
+    const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#2257b0"); g.addColorStop(1, "#173f86");
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+    // 青花紋：白色雲紋與回紋邊框（藍白相間）
+    x.strokeStyle = "rgba(255,255,255,.18)"; x.lineWidth = 3;
+    for (let k = 0; k < 7; k++) {
+      const cy = 60 + k * 58, cx = 120 + (k % 2) * 90;
+      x.beginPath(); x.arc(cx, cy, 22, Math.PI, 0); x.arc(cx + 34, cy, 12, Math.PI, 0); x.stroke();
+    }
+    x.strokeStyle = "rgba(255,255,255,.9)"; x.lineWidth = 4; x.strokeRect(14, 14, W - 28, H - 28);
+    x.lineWidth = 1.5; x.strokeRect(24, 24, W - 48, H - 48);
+    // 線裝：左側裝訂線與縫線
+    x.strokeStyle = "rgba(255,255,255,.95)"; x.lineWidth = 3;
+    for (let k = 0; k < 5; k++) { const y = 40 + k * ((H - 80) / 4); x.beginPath(); x.moveTo(0, y); x.lineTo(30, y); x.stroke(); x.beginPath(); x.arc(30, y, 3.5, 0, Math.PI * 2); x.fillStyle = "#fff"; x.fill(); }
+    // 白色題簽（直書書名）
+    x.fillStyle = "#f6f9ff"; x.fillRect(W - 112, 44, 66, 280); x.strokeStyle = "#173f86"; x.lineWidth = 3; x.strokeRect(W - 106, 50, 54, 268);
+    x.fillStyle = "#14326b"; x.textAlign = "center"; x.textBaseline = "middle";
+    const title = tr(MANUALS[i]);
+    const vertical = /[\u4e00-\u9fff]/.test(title) && title.length <= 7;
+    if (vertical) {
+      x.font = '900 40px "Noto Serif TC","Noto Serif CJK TC","Noto Sans TC","PingFang TC","Microsoft JhengHei",serif';
+      const step = Math.min(42, 250 / title.length);
+      [...title].forEach((ch, k) => x.fillText(ch, W - 79, 66 + step / 2 + k * step));
+    } else {
+      x.save(); x.translate(W - 79, 184); x.rotate(Math.PI / 2);
+      x.font = '800 24px "Noto Sans TC","Noto Sans CJK TC",sans-serif'; x.fillText(title, 0, 0); x.restore();
+    }
+    // 資料庫名稱與角色
+    x.fillStyle = "#fff"; x.textAlign = "left";
+    x.font = '800 40px "Noto Sans TC","Noto Sans CJK TC",sans-serif'; x.fillText(DBS[i][0], 46, H - 92);
+    x.font = '500 22px "Noto Sans TC","Noto Sans CJK TC",sans-serif'; x.fillStyle = "rgba(255,255,255,.85)"; x.fillText(tr(DBS[i][1]), 46, H - 54);
+    x.font = '700 22px "Noto Sans TC","Noto Sans CJK TC",sans-serif'; x.fillStyle = "#cfe2ff"; x.fillText("★ " + tr(STAR_NAMES[i]), 46, 60);
+    const tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding; tex.anisotropy = 4;
+    return tex;
+  }
+  const DIPPER_TILT = -0.72;                          // 平面後傾，垂直方向約壓成 0.75 倍
+  const dbRing = new T.Group(); dbRing.position.set(FURN_X, FURN_Y + 0.2, 0); dbRing.rotation.x = DIPPER_TILT; scene.add(dbRing);
+  const dipperSpin = new T.Group(); dbRing.add(dipperSpin);   // 在平面內繞熔爐旋轉
+  const DIPPER_SCALE = 1.05;
+  const starPos = DIPPER.map(([x, y]) => new T.Vector3(x * DIPPER_SCALE, y * DIPPER_SCALE, 0));
+  const pageMat = new T.MeshStandardMaterial({ color: 0xf2f6ff, roughness: 0.8, transparent: true, opacity: 0.8 });
+  const backMat = new T.MeshStandardMaterial({ color: 0x1d4c9c, roughness: 0.6, transparent: true, opacity: 0.8 });
   const plaques = DBS.map(([name, role, color], i) => {
-    const { tex, aspect } = labelTexture([name, role], { size: 56, bg: "rgba(5,16,20,.88)", color });
-    const mat = new T.MeshBasicMaterial({ map: tex, transparent: true, side: T.DoubleSide, depthWrite: false, toneMapped: false, opacity: 0.55 });
-    const h = 0.78, m = new T.Mesh(new T.PlaneGeometry(h * aspect, h), mat);
-    const a = i / DBS.length * Math.PI * 2;
-    m.position.set(Math.cos(a) * 4.7, (i % 2 ? 0.55 : -0.35), Math.sin(a) * 4.7);
-    const g = glow(new T.Color(color), 2.2, 0); g.position.copy(m.position);
-    dbRing.add(m); dbRing.add(g);
-    // 銘牌與爐子之間的能量線
-    const lg = new T.BufferGeometry().setFromPoints([new T.Vector3(0, 0, 0), m.position.clone()]);
+    const cover = new T.MeshBasicMaterial({ map: coverTexture(i), transparent: true, opacity: 0.86, toneMapped: false });
+    const book = new T.Mesh(new T.BoxGeometry(1.45, 2.0, 0.24), [pageMat, backMat, pageMat, pageMat, cover, backMat]);
+    book.position.copy(starPos[i]); book.userData.pick = { type: "db", i };
+    const g = glow(0x9cc6ff, 3.4, 0.25); g.position.copy(starPos[i]);
+    const star = glow(0xffffff, 1.1, 0.9); star.position.copy(starPos[i]);   // 星點在書後方發亮
+    dipperSpin.add(g); dipperSpin.add(star); dipperSpin.add(book);
+    // 秘笈與熔爐之間的能量線
+    const lg = new T.BufferGeometry().setFromPoints([new T.Vector3(0, 0, 0), starPos[i].clone()]);
     const line = new T.Line(lg, new T.LineBasicMaterial({ color: new T.Color(color), transparent: true, opacity: 0.15, toneMapped: false }));
-    dbRing.add(line);
-    return { m, g, line };
+    dipperSpin.add(line);
+    return { m: book, g, star, line, cover };
   });
+  // 星斗連線（勺形）
+  const dipperLines = new T.LineSegments(new T.BufferGeometry().setFromPoints(DIPPER_LINKS.flatMap(([a, b]) => [starPos[a], starPos[b]])),
+    new T.LineBasicMaterial({ color: 0xdbe9ff, transparent: true, opacity: 0.75, toneMapped: false }));
+  dipperSpin.add(dipperLines);
+  const dipperLabel = sprite(["北斗七星・七大國際資料庫"], 0.64, { color: "#cfe2ff" });
+  dipperLabel.position.set(FURN_X, FURN_Y + 6.9, -4); scene.add(dipperLabel);
+  const _camLocal = new T.Vector3();
 
   // ---------------- 上層：候選分子（球棍模型）＋發射平台 ----------------
   const PLAT_Y = FURN_Y + 2.6;
@@ -393,17 +462,39 @@ window.startLogin3D = function (canvas, hud) {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     const pad = Math.max(32, w * 0.04);
-    const cardZone = Math.max(340 + pad + 24, Math.min(460, w * 0.36) + pad);
-    const wide = true;
-    camera.setViewOffset(w, h, cardZone * 0.5, 0, w, h);
-    // 窄螢幕把鏡頭拉遠，整個場景放得下
-    const fitDist = wide ? 31 : 31 * Math.min(2.0, Math.max(1, 1.5 / (w / h)));
-    camera.userData.dist = fitDist;
+    cardZone = Math.max(340 + pad + 24, Math.min(460, w * 0.36) + pad);
+    viewW = w; viewH = h;
+    camera.userData.dist = 34;
     camera.updateProjectionMatrix();
     if (composer) { composer.setSize(w, h); bloom.setSize(w, h); }
-    hud.root.style.setProperty("--art-w", (w - cardZone) + "px");
+    hud.root.style.setProperty("--art-w", (loginOpen ? w - cardZone : w) + "px");
   }
+  // 登入框開啟前場景置中；開啟後整個場景往左讓出右側（每幀平滑移動）
+  let cardZone = 0, viewW = 1, viewH = 1, shift = 0, loginOpen = false, hover = null;
   window.addEventListener("resize", resize); resize();
+
+  // ---------------- 點選：熔爐開登入框、秘笈與藥田開介紹 ----------------
+  const pickables = [];
+  scene.traverse((o) => { if (o.userData && o.userData.pick) pickables.push(o); });
+  const ray = new T.Raycaster(), ndc = new T.Vector2();
+  function pickAt(ev) {
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObjects(pickables, false)[0];
+    return hit ? hit.object.userData.pick : null;
+  }
+  canvas.addEventListener("pointermove", (ev) => {
+    if (!active) return;
+    hover = pickAt(ev);
+    canvas.style.cursor = hover ? "pointer" : "default";
+  });
+  canvas.addEventListener("pointerleave", () => { hover = null; canvas.style.cursor = "default"; });
+  canvas.addEventListener("click", (ev) => {
+    if (!active) return;
+    const p = pickAt(ev);
+    if (p && hud.onPick) hud.onPick(p);
+  });
 
   // ---------------- 時間軸（一輪 12 秒） ----------------
   // 0.0–1.6 從人體取出 DNA 報告並向右推展 → 1.6–3.2 沿螺旋掃描、致病基因亮起 → 3.2–4.2 在螺旋上標定靶點
@@ -445,6 +536,8 @@ window.startLogin3D = function (canvas, hud) {
     const ang = orbitOn && !reduceMotion ? Math.sin(total * 0.12) * 0.26 : 0;
     camera.position.set(CAM_TARGET.x + Math.sin(ang) * dist, CAM_TARGET.y + 3.2 + Math.sin(total * 0.09) * 0.6, Math.cos(ang) * dist);
     camera.lookAt(CAM_TARGET);
+    shift += ((loginOpen ? cardZone * 0.5 : 0) - shift) * Math.min(1, dt * 4);
+    camera.setViewOffset(viewW, viewH, shift, 0, viewW, viewH);
 
     // 中藥盤自轉、藥氣上升（熔煉階段更旺）
     herbs.rotation.y = total * 0.08;
@@ -464,13 +557,22 @@ window.startLogin3D = function (canvas, hud) {
     mouthGlow.material.opacity = 0.45 + 0.5 * smelt;
 
     // 七大資料庫依序點亮（1.0–5.2 秒）
-    dbRing.rotation.y = total * 0.22;
+    dipperSpin.rotation.z = total * 0.085;            // 約 74 秒繞一圈（逆時針，與北斗繞北極星同向）
+    const ds = loginOpen ? 0.8 : 1; dipperSpin.scale.lerp(_camLocal.set(ds, ds, ds), Math.min(1, dt * 3));
     plaques.forEach((p, i) => {
       p.m.lookAt(camera.position);
       const on = seg(t, 1.0 + i * 0.6, 1.3 + i * 0.6) * (1 - seg(t, 10.5, 11.5));
-      p.m.material.opacity = 0.5 + 0.5 * on; p.g.material.opacity = 0.55 * on; p.line.material.opacity = 0.12 + 0.6 * on;
-      p.m.scale.setScalar(1 + 0.12 * on);
+      const hov = hover && hover.type === "db" && hover.i === i ? 1 : 0;
+      p.cover.opacity = 0.72 + 0.26 * Math.max(on, hov); p.g.material.opacity = 0.22 + 0.5 * Math.max(on, hov); p.line.material.opacity = 0.1 + 0.6 * on;
+      p.star.material.opacity = 0.6 + 0.4 * Math.sin(total * 3 + i);
+      const sc = 1 + 0.1 * on + 0.18 * hov; p.m.scale.lerp(new T.Vector3(sc, sc, sc), 0.2);
     });
+    // 熔爐：滑過時光環亮起；登入框還沒開時提示閃爍
+    const furnHov = hover && hover.type === "furnace" ? 1 : 0;
+    furnHalo.material.opacity = 0.25 * (loginOpen ? 0 : 1) * (0.5 + 0.5 * Math.sin(total * 4)) + 0.7 * furnHov;
+    loginHint.material.opacity = loginOpen ? Math.max(0, loginHint.material.opacity - dt * 2.5) : 0.75 + 0.25 * Math.sin(total * 3);
+    bronze.emissiveIntensity = 0.4 + 0.8 * furnHov;
+    herbRing.material.opacity = 0.35 + 0.5 * (hover && hover.type === "herbs" ? 1 : 0);
 
     // 候選分子成形（4.6–5.8）
     const mk = seg(t, 4.6, 5.8) * (1 - seg(t, 11.2, 11.9));
@@ -580,7 +682,17 @@ window.startLogin3D = function (canvas, hud) {
 
   return {
     setActive(on) { active = on; if (on) { last = performance.now(); resize(); } },
+    setLoginOpen(on) { loginOpen = on; resize(); },
     seek(s) { clockT = s; },        // 測試用
     pause(on) { paused = on; },     // 測試用
+    screenPoints() {                // 測試用：熔爐、七本秘笈、藥田前緣的螢幕座標
+      const rect = canvas.getBoundingClientRect();
+      const at = (o, local) => {
+        const v = (local || new T.Vector3()).clone(); o.localToWorld(v); v.project(camera);
+        return [rect.left + (v.x + 1) / 2 * rect.width, rect.top + (1 - v.y) / 2 * rect.height];
+      };
+      return { furnace: at(body, new T.Vector3(0, 0.1, 0)), books: plaques.map((p) => at(p.m)),
+               herbs: at(herbHit, new T.Vector3(0, -(HERB_R - 0.8), 0)) };
+    },
   };
 };

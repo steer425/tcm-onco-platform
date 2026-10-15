@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.46.4"
-set "DEFAULT_MSG=v1.46.4 3D research-workflow animation on the login page for wide screens (DNA report, target on the helix, herb furnace with seven databases, aimed candidate molecules, holy light), flat background kept for phones and fallbacks; includes the v1.46.3 login page changes"
+set "EXPECTED_VER=1.46.5"
+set "DEFAULT_MSG=v1.46.5 Login page: seven databases as blue-white thread-bound manuals in a Big Dipper orbiting the furnace, click a manual or the herb field for an introduction, login box opens on clicking the furnace, larger herb field"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"
