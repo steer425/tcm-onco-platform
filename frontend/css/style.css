@@ -232,13 +232,11 @@ body.login-3d:not(.login-open) #l3dOpenLogin {
 .l3d-panel.open { opacity: 1; transform: none; visibility: visible; pointer-events: auto; transition: opacity .5s ease, transform .5s ease; }
 .l3d-panel[data-kind="db"] { border-top: 5px solid #2257b0; }
 .l3d-panel[data-kind="herbs"] { border-top: 5px solid #d99a4e; }
-.l3d-panel[data-kind="wizard"] { border-top: 5px solid #6b3fa0; }
 .l3d-info-close { position: absolute; top: 12px; right: 12px; padding: 4px 10px; font-size: 12.5px; background: #fff; color: #4a5a52; border: 1px solid #c9d3cd; border-radius: 6px; cursor: pointer; }
 .l3d-info-close:hover { background: #f1f5f2; }
 .l3d-info-close:focus-visible { outline: 2px solid #2f6f4f; outline-offset: 2px; }
 .l3d-info-head { padding-right: 70px; }
 .l3d-info-manual { margin: 0; min-height: 1em; font-size: 13px; font-weight: 800; letter-spacing: .08em; color: #2257b0; font-family: 'Noto Serif TC','Noto Serif CJK TC',serif; }
-.l3d-panel[data-kind="wizard"] .l3d-info-manual { display: none; }
 .l3d-info-head h3 { margin: 2px 0 2px; font-size: 22px; font-weight: 800; color: #1f4f37; }
 .l3d-info-sub { margin: 0 0 6px; font-size: 11.5px; line-height: 1.45; color: #6b7a70; }
 .l3d-info-nav { display: flex; flex-wrap: wrap; gap: 3px 4px; align-items: center; padding: 7px 0 8px; border-top: 1px solid #e3e9e5; border-bottom: 1px solid #e3e9e5; }
@@ -246,17 +244,14 @@ body.login-3d:not(.login-open) #l3dOpenLogin {
 .l3d-chip { font-family: inherit; font-size: 10.5px; font-weight: 600; line-height: 1.2; padding: 2px 6px; border-radius: 999px; border: 1px solid #c8d6ec; background: #f2f6fd; color: #24467f; cursor: pointer; }
 .l3d-chip:hover, .l3d-chip:focus-visible { background: #2257b0; color: #fff; border-color: #2257b0; outline: none; }
 .l3d-panel[data-kind="herbs"] .l3d-chip { border-color: #ecd6b4; background: #fdf7ee; color: #7a5212; }
-.l3d-panel[data-kind="wizard"] .l3d-chip { border-color: #dacbee; background: #f7f2fd; color: #4f2c7d; }
 .l3d-info-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 4px 6px 0; scroll-behavior: smooth; }
 .l3d-info-body:focus-visible { outline: 2px solid #c8d6ec; }
 .l3d-info-body section { margin: 0 0 12px; }
 .l3d-tag { display: inline-block; margin-bottom: 4px; padding: 2px 9px; border-radius: 4px; font-size: 12px; font-weight: 800; letter-spacing: .04em; color: #fff; background: #2257b0; }
 .l3d-panel[data-kind="herbs"] .l3d-tag { background: #b57a2a; }
-.l3d-panel[data-kind="wizard"] .l3d-tag { background: #6b3fa0; }
 .l3d-info-body p { margin: 0; font-size: 13.5px; line-height: 1.75; color: #2b3a32; }
-.l3d-site, .l3d-mail { display: inline-block; margin: 6px 0 4px; padding: 7px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 700; text-decoration: none; color: #fff; background: #2f6f4f; }
-.l3d-mail { background: #6b3fa0; }
-.l3d-site:hover, .l3d-mail:hover { filter: brightness(1.1); }
+.l3d-site { display: inline-block; margin: 6px 0 4px; padding: 7px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 700; text-decoration: none; color: #fff; background: #2f6f4f; }
+.l3d-site:hover { filter: brightness(1.1); }
 .l3d-info-foot { margin: 6px 0 0; padding-top: 8px; border-top: 1px solid #e3e9e5; font-size: 11px; color: #8a978f; }
 @media (prefers-reduced-motion: reduce) { .l3d-panel, .l3d-panel.open { transition: none; } .l3d-info-body { scroll-behavior: auto; } }
 @media (prefers-reduced-motion: reduce) { #l3dOpenLogin { animation: none; } body.login-page .login-card { transition: none; } }

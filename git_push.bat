@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.46.6"
-set "DEFAULT_MSG=v1.46.6 Login page layout: person and DNA in the left 20 percent, seven manuals orbit the furnace in Big Dipper order with star names, flower garden, cute wizard with three animated actions and contact link, 1000-plus character tagged introductions in a hideable panel the same size as the login box"
+set "EXPECTED_VER=1.46.7"
+set "DEFAULT_MSG=v1.46.7 Login page: seven manuals fixed above the furnace in a Big Dipper that clears the furnace and launcher, glow as the cursor approaches, wider gap between person and DNA, info panel exactly matches the login box with field guide and further reading added, wizard removed"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

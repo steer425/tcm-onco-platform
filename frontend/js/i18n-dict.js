@@ -942,13 +942,11 @@ window.I18N_DICT = {
     "細胞依存心法": "Art of Cell Dependency",
     "點擊熔爐・開啟登入": "Click the furnace · sign in",
     "快速跳到": "Jump to",
-    "煉蠱巫師": "Gu-brewing Wizard",
-    "點我聯絡站長": "Click me to contact the maintainer",
     "開啟登入": "Sign in",
     "前往官方網站": "Visit official website",
     "UniProt 聯盟（EMBL-EBI、SIB、PIR）": "UniProt Consortium (EMBL-EBI, SIB, PIR)",
     "TCMSP 收錄、平台上架的藥材": "Herbs indexed in TCMSP and available on this platform",
-    "點選熔爐開啟／收起登入・點選秘笈、花園或巫師查看介紹": "Click the furnace to open or close sign-in · click a manual, the garden or the wizard for details",
+    "點選熔爐開啟／收起登入・點選秘笈或花園查看介紹": "Click the furnace to open or close sign-in · click a manual or the garden for details",
   },
   ko: {
     // ---- 導覽選單 ----
@@ -1883,12 +1881,10 @@ window.I18N_DICT = {
     "細胞依存心法": "세포의존심법",
     "點擊熔爐・開啟登入": "용광로 클릭 · 로그인",
     "快速跳到": "바로 가기",
-    "煉蠱巫師": "고(蠱)를 빚는 마법사",
-    "點我聯絡站長": "클릭하여 관리자에게 연락",
     "開啟登入": "로그인 열기",
     "前往官方網站": "공식 웹사이트로 이동",
     "UniProt 聯盟（EMBL-EBI、SIB、PIR）": "UniProt 컨소시엄 (EMBL-EBI, SIB, PIR)",
     "TCMSP 收錄、平台上架的藥材": "TCMSP에 수록되어 플랫폼에 등록된 약재",
-    "點選熔爐開啟／收起登入・點選秘笈、花園或巫師查看介紹": "용광로를 클릭해 로그인 열기/닫기 · 비급, 정원, 마법사를 클릭해 소개 보기",
+    "點選熔爐開啟／收起登入・點選秘笈或花園查看介紹": "용광로를 클릭해 로그인 열기/닫기 · 비급이나 정원을 클릭해 소개 보기",
   },
 };

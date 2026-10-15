@@ -31,8 +31,8 @@
 
   let canvas = null, hud = null, scene = null, loading = false, failed = false, loginOpen = false;
 
-  // 介紹內容（七本秘笈、花園、巫師）在 js/login-3d-info.js（三種語言各一份，v1.46.6）
-  let infoKey = null;                                    // 目前開著的介紹："db:0"…"db:6"、"herbs"、"wizard"
+  // 介紹內容（七本秘笈、花園）在 js/login-3d-info.js（三種語言各一份，v1.46.6）
+  let infoKey = null;                                    // 目前開著的介紹："db:0"…"db:6"、"herbs"
 
   function buildDom() {
     canvas = document.createElement("canvas");
@@ -61,7 +61,7 @@
     const gene = document.createElement("div"); gene.className = "l3d-gene"; row.appendChild(gene);
     top.append(tag, row);
     const cap = document.createElement("div"); cap.className = "l3d-caption";
-    const hint = document.createElement("div"); hint.className = "l3d-hint"; hint.textContent = t("點選熔爐開啟／收起登入・點選秘笈、花園或巫師查看介紹");
+    const hint = document.createElement("div"); hint.className = "l3d-hint"; hint.textContent = t("點選熔爐開啟／收起登入・點選秘笈或花園查看介紹");
     cap.appendChild(hint);
     const strong = document.createElement("strong"); strong.textContent = t("研究流程示意動畫");
     const rest = document.createElement("span"); rest.textContent = t("非療效宣稱・科研輔助工具，不作為醫療診斷或治療建議");
@@ -88,6 +88,7 @@
     dlg.querySelector(".l3d-info-close").addEventListener("click", closeInfo);
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && infoKey) closeInfo(); });
     window.addEventListener("resize", syncPanelBox);
+    if (window.ResizeObserver) new ResizeObserver(syncPanelBox).observe(document.querySelector(".login-card"));
 
     hud = { root, steps, gene, onPick };
   }
@@ -98,12 +99,11 @@
     const dlg = document.getElementById("l3dInfo"), card = document.querySelector(".login-card");
     if (!dlg || !card) return;
     dlg.style.left = card.offsetLeft + "px"; dlg.style.top = card.offsetTop + "px";
-    dlg.style.width = card.offsetWidth + "px"; dlg.style.height = Math.max(card.offsetHeight, 460) + "px";
+    dlg.style.width = card.offsetWidth + "px"; dlg.style.height = card.offsetHeight + "px";   // 與登入框完全同大小
   }
   function entryFor(key) {
     const I = window.LOGIN3D_INFO;
     if (key === "herbs") return I.pick(I.herbs);
-    if (key === "wizard") return I.pick(I.wizard);
     return I.pick(I.db[+key.split(":")[1]]);
   }
   function showInfo(key) {
@@ -123,9 +123,6 @@
       const tg = document.createElement("span"); tg.className = "l3d-tag"; tg.textContent = tag;
       const p = document.createElement("p"); p.textContent = text;
       sec.append(tg, p);
-      if (info.email && k === 2) {                           // 巫師：聯絡方式那段附上郵件連結
-        const a = document.createElement("a"); a.className = "l3d-mail"; a.href = "mailto:" + info.email; a.textContent = "✉ " + info.email; sec.appendChild(a);
-      }
       body.appendChild(sec);
       const chip = document.createElement("button"); chip.type = "button"; chip.className = "l3d-chip"; chip.textContent = tag;
       chip.addEventListener("click", () => { body.scrollTo({ top: sec.offsetTop - body.offsetTop - 4, behavior: "smooth" }); });
@@ -156,7 +153,6 @@
     if (p.type === "furnace") { if (loginOpen) closeLogin(); else openLogin(); }
     else if (p.type === "db") showInfo("db:" + p.i);
     else if (p.type === "herbs") showInfo("herbs");
-    else if (p.type === "wizard") showInfo("wizard");
   }
   // 登入框：3D 模式下先藏起來，點熔爐（或「開啟登入」鈕）才出現；打開後再點熔爐收起來。和介紹視窗同一時間只開一個
   function setLogin(on) {
