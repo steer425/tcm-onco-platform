@@ -1,4 +1,4 @@
-// 登入頁 3D 研究流程動畫的場景（v1.46.4；v1.46.5 七本秘笈；v1.46.6 版面重排與花園；v1.46.7 北斗固定於熔爐上方、移除巫師）。由 js/login-3d.js 在條件符合時延後載入並呼叫 startLogin3D()。
+// 登入頁 3D 研究流程動畫的場景（v1.46.4；v1.46.5 七本秘笈；v1.46.6 版面重排與花園；v1.46.7 北斗固定於熔爐上方、移除巫師；v1.46.8 文字改 HTML 疊層）。由 js/login-3d.js 在條件符合時延後載入並呼叫 startLogin3D()。
 //
 // 一輪 12 秒：從人體取出 DNA 報告 → 沿螺旋篩檢致病基因、在螺旋上標定靶點 → 502 種中藥進熔爐、七大資料庫依序點亮
 // → 提煉候選分子 → 瞄準光線、逐一發射 → 靶點蛋白逐步虛弱 → 人體發出聖光。
@@ -62,11 +62,53 @@ window.startLogin3D = function (canvas, hud) {
     const tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding; tex.anisotropy = 4;
     return { tex, aspect: c.width / c.height };
   }
-  function sprite(lines, height, opt) {
-    const { tex, aspect } = labelTexture(lines, opt);
-    const m = new T.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false });
-    const s = new T.Sprite(m); s.scale.set(height * aspect, height, 1);
-    return s;
+  // 場景文字一律用 HTML 疊在畫面上（v1.46.8）：貼圖文字縮小顯示會糊、又會被光暈後製暈開。
+  // 每格把 3D 位置投影到螢幕座標，再依距離換算字級；介面與舊的 sprite 相同（.position、.material.opacity），呼叫端不必改。
+  const labelLayer = document.createElement("div"); labelLayer.id = "login3dLabels"; labelLayer.setAttribute("aria-hidden", "true");
+  canvas.after(labelLayer);
+  const LABELS = [];
+  // lines：第一行主文字、其餘為小字；unit：主文字在 3D 中的字高（世界單位）；opt：color、bg、cls、vertical、minPx
+  function htmlLabel(lines, unit, opt) {
+    opt = opt || {};
+    const o = new T.Object3D(), el = document.createElement("div");
+    el.className = "l3d-lab" + (opt.cls ? " " + opt.cls : "") + (opt.vertical ? " l3d-lab-v" : "");
+    if (opt.color) el.style.color = opt.color;
+    if (opt.bg) { el.style.background = opt.bg; el.style.borderColor = opt.color || "#fff"; el.classList.add("l3d-lab-box"); }
+    lines.forEach((l, i) => {
+      const sp = document.createElement("span"); sp.className = i ? "l3d-lab-sub" : "l3d-lab-main";
+      sp.textContent = opt.vertical ? [...tr(l)].join("\n") : tr(l);      // 直書：逐字換行（比 writing-mode 在各瀏覽器穩定）
+      el.appendChild(sp);
+    });
+    labelLayer.appendChild(el);
+    o.material = { opacity: 1, depthTest: true, map: { dispose() {} }, dispose() { el.remove(); const k = LABELS.indexOf(o); if (k >= 0) LABELS.splice(k, 1); } };
+    o.userData.label = { el, unit, minPx: opt.minPx || 13, maxPx: opt.maxPx || 32, hideBelow: opt.hideBelow || 0 };
+    LABELS.push(o);
+    return o;
+  }
+  function sprite(lines, height, opt) { return htmlLabel(lines, height * 0.55, opt); }
+  const _lp = new T.Vector3(), _lq = new T.Vector3(), _camUp = new T.Vector3();
+  function attachedAndVisible(o) {
+    for (let p = o; p; p = p.parent) { if (!p.visible) return false; if (p === scene) return true; }
+    return false;
+  }
+  function updateLabels() {
+    const W = viewW, H = viewH;
+    _camUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+    for (const o of LABELS) {
+      const L = o.userData.label, el = L.el;
+      const op = o.material.opacity;
+      if (op <= 0.01 || !attachedAndVisible(o)) { if (el.style.display !== "none") el.style.display = "none"; continue; }
+      o.getWorldPosition(_lp); _lq.copy(_lp).addScaledVector(_camUp, L.unit);
+      _lp.project(camera); _lq.project(camera);
+      if (_lp.z > 1 || _lp.z < -1) { el.style.display = "none"; continue; }
+      const px = Math.abs(_lq.y - _lp.y) / 2 * H;                 // 主文字在螢幕上的高度（px）
+      if (L.hideBelow && px < L.hideBelow) { el.style.display = "none"; continue; }
+      const fs = Math.max(L.minPx, Math.min(L.maxPx, px));
+      el.style.display = "";
+      el.style.fontSize = fs.toFixed(1) + "px";
+      el.style.opacity = Math.min(1, op).toFixed(3);
+      el.style.transform = `translate(${((_lp.x + 1) / 2 * W).toFixed(1)}px, ${((1 - _lp.y) / 2 * H).toFixed(1)}px) translate(-50%, -50%)`;
+    }
   }
   // 柔光貼圖（光暈、粒子共用）
   const glowTex = (() => {
@@ -233,7 +275,7 @@ window.startLogin3D = function (canvas, hud) {
   const STAR_NAMES = ["天樞", "天璇", "天璣", "天權", "玉衡", "開陽", "瑤光"];
   const BOOK_W = 1.5, BOOK_H = 1.95;
   function coverTexture(i) {
-    // 封面底色半透明（看得到後面的星空），字一律不透明、加深色描邊，確保清楚
+    // 封面只畫圖案（青花紋、雙框、縫線、題簽）；資料庫名稱、書名、星名都用 HTML 疊上，才不會糊（v1.46.8）
     const W = 512, H = 666, c = document.createElement("canvas"); c.width = W; c.height = H;
     const x = c.getContext("2d");
     const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, "rgba(46,104,206,.4)"); g.addColorStop(1, "rgba(22,62,140,.48)");
@@ -247,31 +289,8 @@ window.startLogin3D = function (canvas, hud) {
     x.lineWidth = 2; x.strokeRect(30, 30, W - 60, H - 60);
     x.strokeStyle = "#fff"; x.lineWidth = 4;
     for (let k = 0; k < 5; k++) { const y = 56 + k * ((H - 112) / 4); x.beginPath(); x.moveTo(0, y); x.lineTo(40, y); x.stroke(); x.beginPath(); x.arc(40, y, 5, 0, Math.PI * 2); x.fillStyle = "#fff"; x.fill(); }
-    const SANS = '"Noto Sans TC","Noto Sans CJK TC","Noto Sans KR","PingFang TC","Microsoft JhengHei",sans-serif';
-    const SERIF = '"Noto Serif TC","Noto Serif CJK TC","Noto Sans TC","PingFang TC","Microsoft JhengHei",serif';
-    const outlined = (txt, px, py, stroke) => {
-      x.lineJoin = "round"; x.lineWidth = stroke; x.strokeStyle = "rgba(6,18,48,.92)"; x.strokeText(txt, px, py); x.fillText(txt, px, py);
-    };
-    const title = tr(MANUALS[i]);
-    const vertical = /[一-鿿]/.test(title) && title.length <= 7;
-    x.fillStyle = "#f7faff"; x.fillRect(W - 168, 132, 108, 360); x.strokeStyle = "#173f86"; x.lineWidth = 4; x.strokeRect(W - 160, 140, 92, 344);
-    x.fillStyle = "#0f2a5e"; x.textAlign = "center"; x.textBaseline = "middle";
-    if (vertical) {
-      const step = Math.min(60, 320 / title.length);
-      x.font = `900 ${Math.round(step * 0.92)}px ${SERIF}`;
-      [...title].forEach((ch, k) => x.fillText(ch, W - 114, 152 + step / 2 + k * step));
-    } else {
-      x.save(); x.translate(W - 114, 312); x.rotate(Math.PI / 2);
-      let fs = 40; x.font = `800 ${fs}px ${SANS}`;
-      while (x.measureText(title).width > 330 && fs > 20) { fs -= 2; x.font = `800 ${fs}px ${SANS}`; }
-      x.fillText(title, 0, 0); x.restore();
-    }
-    x.textAlign = "left"; x.textBaseline = "alphabetic"; x.fillStyle = "#e4efff";
-    x.font = `800 46px ${SANS}`; outlined("★ " + tr(STAR_NAMES[i]), 62, 100, 9);
-    x.fillStyle = "#fff";
-    let fs = 120; x.font = `900 ${fs}px ${SANS}`;
-    while (x.measureText(DBS[i][0]).width > W - 96 && fs > 40) { fs -= 4; x.font = `900 ${fs}px ${SANS}`; }
-    outlined(DBS[i][0], 52, H - 62, 14);
+    // 白色題簽（書名用 HTML 疊上，見 bookLabels）
+    x.fillStyle = "rgba(247,250,255,.5)"; x.fillRect(W - 150, 132, 76, 360); x.strokeStyle = "rgba(255,255,255,.8)"; x.lineWidth = 3; x.strokeRect(W - 144, 140, 64, 344);
     const tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding; tex.anisotropy = 8;
     return tex;
   }
@@ -282,18 +301,8 @@ window.startLogin3D = function (canvas, hud) {
   });
   // 星名直書在書的左側（放在書下方會擠到下一顆星，見上方說明）
   function starLabel(name) {
-    const txt = tr(name), chars = [...txt], c = document.createElement("canvas"), x = c.getContext("2d");
-    const fs = chars.length > 3 ? 40 : 56, pad = 14;
-    c.width = fs + pad * 2; c.height = Math.ceil(chars.length * fs * 1.08 + pad * 2);
-    x.fillStyle = "rgba(10,22,48,.85)"; x.strokeStyle = "#ffe9b0"; x.lineWidth = 3;
-    x.beginPath(); x.roundRect ? x.roundRect(2, 2, c.width - 4, c.height - 4, 12) : x.rect(2, 2, c.width - 4, c.height - 4); x.fill(); x.stroke();
-    x.fillStyle = "#ffe9b0"; x.textAlign = "center"; x.textBaseline = "middle";
-    x.font = `900 ${fs}px "Noto Sans TC","Noto Sans CJK TC","Noto Sans KR","PingFang TC","Microsoft JhengHei",sans-serif`;
-    chars.forEach((ch, k) => x.fillText(ch, c.width / 2, pad + fs * 1.08 * (k + 0.5)));
-    const tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding;
-    const sp = new T.Sprite(new T.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false }));
-    const h = Math.min(BOOK_H, 0.36 * chars.length + 0.2); sp.scale.set(h * c.width / c.height, h, 1);
-    return sp;
+    const cjk = /[\u4e00-\u9fff\uac00-\ud7af]/.test(tr(name));
+    return htmlLabel([name], 0.3, { color: "#ffe9b0", bg: "rgba(10,22,48,.85)", vertical: cjk, cls: "l3d-lab-star", minPx: 13, maxPx: 22 });
   }
   const plaques = DBS.map(([name, role, color], i) => {
     const grp = new T.Group(); grp.position.copy(starPos[i]); scene.add(grp);   // 每本一組：書、光暈、星點、星名，整組面向鏡頭
@@ -305,6 +314,12 @@ window.startLogin3D = function (canvas, hud) {
     const g = glow(0x9cc6ff, 3.2, 0.12); g.position.z = -0.3; grp.add(g);
     const star = glow(0xffffff, 0.8, 0.9); star.position.y = BOOK_H / 2 + 0.28; grp.add(star);
     const nameLab = starLabel(STAR_NAMES[i]); nameLab.position.set(-BOOK_W / 2 - 0.42, 0, 0); grp.add(nameLab);
+    // 封面上的字：資料庫名稱（下方、粗白字）與書名（右側題簽、直書；畫面太小時不顯示，以免變成看不清的小點）
+    const dbLab = htmlLabel([name], 0.3, { cls: "l3d-lab-db", minPx: 13, maxPx: 26 }); dbLab.position.set(-0.05, -BOOK_H * 0.33, 0.15); book.add(dbLab);
+    if (/[\u4e00-\u9fff\uac00-\ud7af]/.test(tr(MANUALS[i]))) {      // 英文書名太長放不進題簽，只在介紹視窗顯示
+      const ttl = htmlLabel([MANUALS[i]], 0.17, { cls: "l3d-lab-title", vertical: true, hideBelow: 9.5, minPx: 9.5, maxPx: 16 });
+      ttl.position.set(BOOK_W * 0.3, BOOK_H * 0.05, 0.15); book.add(ttl);
+    }
     return { m: book, grp, g, star, cover, pageMat, backMat, nameLab, near: 0 };
   });
   // 斗形連線：連在書頂的星點上（固定）
@@ -382,7 +397,7 @@ window.startLogin3D = function (canvas, hud) {
     part(new T.CylinderGeometry(0.25, 0.18, 2.4, 10, 3), s * 0.5, -1.0, 0);
   });
   const chestGlow = glow(0x5fd4ff, 2.8, 0); chestGlow.position.set(0, 4.8, 0.9); bodyG.add(chestGlow);
-  const bodyLabel = sprite(["受檢者"], 0.45, { color: "#5fd4ff" }); bodyLabel.position.set(BODY_X, -3.2, 0.5); scene.add(bodyLabel);
+  const bodyLabel = sprite(["受檢者"], 0.45, { color: "#5fd4ff" }); bodyLabel.position.set(BODY_X, -1.45, 0.5); scene.add(bodyLabel);
   const HOLO_CYAN = lin(0x5fd4ff), HOLO_GOLD = lin(0xffe7a8);
 
   // ---------------- DNA 報告：從人體取出，向右推展成雙股螺旋 ----------------
@@ -733,12 +748,13 @@ window.startLogin3D = function (canvas, hud) {
     });
 
     if (composer) composer.render(); else renderer.render(scene, camera);
+    updateLabels();
     if (!reduceMotion) requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 
   return {
-    setActive(on) { active = on; if (on) { last = performance.now(); resize(); } },
+    setActive(on) { active = on; labelLayer.style.display = on ? "" : "none"; if (on) { last = performance.now(); resize(); } },
     setLoginOpen(on) { loginOpen = on; resize(); },
     seek(s) { clockT = s; },        // 測試用
     pause(on) { paused = on; },     // 測試用

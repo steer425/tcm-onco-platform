@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.46.7"
-set "DEFAULT_MSG=v1.46.7 Login page: seven manuals fixed above the furnace in a Big Dipper that clears the furnace and launcher, glow as the cursor approaches, wider gap between person and DNA, info panel exactly matches the login box with field guide and further reading added, wizard removed"
+set "EXPECTED_VER=1.46.8"
+set "DEFAULT_MSG=v1.46.8 Login page 3D text is now sharp: all scene labels, star names and database names on the manuals are HTML overlays positioned each frame instead of blurry canvas textures"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

@@ -641,6 +641,9 @@ v1.46.3 起畫面上還有：502 種中藥（`HERB_COUNT`，以人參為中心�
 - **長篇介紹內容放 `js/login-3d-info.js`，不放 `i18n-dict.js`**：每段上千字，逐句放精確比對字典容易漏翻；
   該檔直接存 tw／en／ko 三份，cn 由繁中經 `window.loginT` 轉換（`login.js` 另外輸出 `window.loginLang`）。改內容時三種語言要一起改
 - 3D 物件的顏色一律 `lin()`（含 `emissive`）；漏掉的物件在畫面上會明顯偏白（v1.46.6 的巫師初版就是這樣；巫師已於 v1.46.7 移除）
+- **3D 場景的文字一律用 HTML 疊層，不要畫成貼圖（v1.46.8）**：貼圖文字縮成 20～30px 會糊，又會被 bloom 暈開。
+  用 `login-3d-scene.js` 的 `sprite()`／`htmlLabel()`：回傳一個 Object3D，`.position`／`.material.opacity` 照舊使用，
+  每格由 `updateLabels()` 投影定位；移除時呼叫 `.material.dispose()`（會一併移除 DOM）。字級下限 13px
 
 ### 查詢站版面工具只有一份：`frontend/js/qs-ui.js`（v1.45.0）
 

@@ -206,6 +206,19 @@ body.login-3d #login3dHud { display: block; }
 .l3d-caption strong { color: #e8f3ef; font-weight: 500; }
 .l3d-hint { margin-top: 4px; color: #ffd98a; font-weight: 700; }
 body.login-3d #login3d { pointer-events: auto; }
+/* 3D 場景的文字（v1.46.8）：HTML 疊在畫布上、每格由 login-3d-scene.js 定位，字才不會糊 */
+#login3dLabels { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; display: none; }
+body.login-3d #login3dLabels { display: block; }
+.l3d-lab { position: absolute; left: 0; top: 0; white-space: nowrap; text-align: center; line-height: 1.15; will-change: transform;
+  font-family: 'Noto Sans TC','PingFang TC','Microsoft JhengHei','Noto Sans KR',system-ui,sans-serif; font-weight: 800; letter-spacing: .02em;
+  color: #fff; text-shadow: 0 0 2px rgba(0,0,0,.95), 0 1px 3px rgba(0,0,0,.85), 0 0 8px rgba(0,0,0,.6); }
+.l3d-lab span { display: block; }
+.l3d-lab .l3d-lab-sub { font-size: .62em; font-weight: 500; opacity: .85; margin-top: .15em; }
+.l3d-lab-box { padding: .22em .55em; border: 1.5px solid; border-radius: .45em; text-shadow: none; }
+.l3d-lab-v span { white-space: pre; line-height: 1.12; }
+.l3d-lab-box.l3d-lab-v { padding: .35em .3em; }
+.l3d-lab-db { font-weight: 900; letter-spacing: .01em; text-shadow: 0 0 2px #061230, 0 0 3px #061230, 0 1px 4px rgba(0,0,0,.9); }
+.l3d-lab-title { color: #0f2a5e; font-family: 'Noto Serif TC','Noto Serif CJK TC','Noto Sans TC',serif; font-weight: 900; text-shadow: none; padding: 0; }
 /* 登入框外層蓋滿整個畫面，3D 模式下要讓點擊穿過去到畫布（熔爐、秘笈、藥田），只有登入框本身接收點擊 */
 body.login-3d .login-wrap { pointer-events: none; }
 body.login-3d.login-open .login-card { pointer-events: auto; }
