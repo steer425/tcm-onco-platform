@@ -221,25 +221,44 @@ body.login-3d:not(.login-open) #l3dOpenLogin {
 }
 #l3dOpenLogin:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 @keyframes l3dPulse { 0% { box-shadow: 0 0 0 0 rgba(255,210,122,.55); } 100% { box-shadow: 0 0 0 18px rgba(255,210,122,0); } }
-/* 介紹視窗：秘笈用青花藍白，藥田用金色 */
-#l3dInfo { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgba(2,8,12,.55); backdrop-filter: blur(3px); }
-#l3dInfo[hidden] { display: none; }
-.l3d-info-card {
-  position: relative; width: min(460px, 100%); max-height: calc(100vh - 48px); overflow: auto; padding: 26px 26px 20px;
-  border-radius: 14px; color: #14326b; background: linear-gradient(160deg, #f7faff 0%, #e6efff 100%);
-  border: 2px solid #2257b0; box-shadow: 0 0 0 6px rgba(255,255,255,.65), 0 24px 70px rgba(0,0,0,.55);
-  font-family: 'Noto Sans TC','PingFang TC','Microsoft JhengHei',system-ui,sans-serif;
+/* 介紹視窗（v1.46.6）：和登入框同位置、同大小、同樣式（JS 依登入框的 offset 設定 left/top/width/height），可收起 */
+.l3d-panel {
+  position: absolute; z-index: 3; box-sizing: border-box; display: flex; flex-direction: column;
+  background: #fff; border-radius: 12px; padding: 22px 22px 14px; box-shadow: 0 18px 48px rgba(0,0,0,.38);
+  color: #23332b; font-family: 'Noto Sans TC','PingFang TC','Microsoft JhengHei',system-ui,sans-serif;
+  opacity: 0; transform: translateX(60px); visibility: hidden; pointer-events: none;
+  transition: opacity .5s ease, transform .5s ease, visibility 0s linear .5s;
 }
-#l3dInfo[data-kind="herbs"] .l3d-info-card { color: #3a2508; background: linear-gradient(160deg, #fffaf0 0%, #fbeccd 100%); border-color: #b07a3a; }
-.l3d-info-manual { margin: 0; padding-right: 84px; font-size: 15px; font-weight: 900; letter-spacing: .2em; color: #2257b0; font-family: 'Noto Serif TC','Noto Serif CJK TC',serif; }
-.l3d-info-card h3 { margin: 4px 0 2px; font-size: 26px; font-weight: 900; }
-.l3d-info-sub { margin: 0 0 14px; font-size: 12.5px; opacity: .75; line-height: 1.5; }
-.l3d-info-body p { margin: 0 0 10px; font-size: 14px; line-height: 1.75; }
-.l3d-info-body a { display: inline-block; margin-top: 4px; font-weight: 700; color: #2257b0; }
-#l3dInfo[data-kind="herbs"] .l3d-info-body a { color: #8a5a10; }
-.l3d-info-foot { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid rgba(20,50,107,.2); font-size: 11.5px; opacity: .7; }
-.l3d-info-close { position: absolute; top: 12px; right: 12px; padding: 5px 10px; font-size: 12.5px; background: transparent; color: inherit; border: 1px solid currentColor; border-radius: 6px; cursor: pointer; }
-.l3d-info-close:focus-visible { outline: 2px solid #2257b0; outline-offset: 2px; }
+.l3d-panel.open { opacity: 1; transform: none; visibility: visible; pointer-events: auto; transition: opacity .5s ease, transform .5s ease; }
+.l3d-panel[data-kind="db"] { border-top: 5px solid #2257b0; }
+.l3d-panel[data-kind="herbs"] { border-top: 5px solid #d99a4e; }
+.l3d-panel[data-kind="wizard"] { border-top: 5px solid #6b3fa0; }
+.l3d-info-close { position: absolute; top: 12px; right: 12px; padding: 4px 10px; font-size: 12.5px; background: #fff; color: #4a5a52; border: 1px solid #c9d3cd; border-radius: 6px; cursor: pointer; }
+.l3d-info-close:hover { background: #f1f5f2; }
+.l3d-info-close:focus-visible { outline: 2px solid #2f6f4f; outline-offset: 2px; }
+.l3d-info-head { padding-right: 70px; }
+.l3d-info-manual { margin: 0; min-height: 1em; font-size: 13px; font-weight: 800; letter-spacing: .08em; color: #2257b0; font-family: 'Noto Serif TC','Noto Serif CJK TC',serif; }
+.l3d-panel[data-kind="wizard"] .l3d-info-manual { display: none; }
+.l3d-info-head h3 { margin: 2px 0 2px; font-size: 22px; font-weight: 800; color: #1f4f37; }
+.l3d-info-sub { margin: 0 0 6px; font-size: 11.5px; line-height: 1.45; color: #6b7a70; }
+.l3d-info-nav { display: flex; flex-wrap: wrap; gap: 3px 4px; align-items: center; padding: 7px 0 8px; border-top: 1px solid #e3e9e5; border-bottom: 1px solid #e3e9e5; }
+.l3d-nav-label { font-size: 11px; color: #8a978f; margin-right: 2px; }
+.l3d-chip { font-family: inherit; font-size: 10.5px; font-weight: 600; line-height: 1.2; padding: 2px 6px; border-radius: 999px; border: 1px solid #c8d6ec; background: #f2f6fd; color: #24467f; cursor: pointer; }
+.l3d-chip:hover, .l3d-chip:focus-visible { background: #2257b0; color: #fff; border-color: #2257b0; outline: none; }
+.l3d-panel[data-kind="herbs"] .l3d-chip { border-color: #ecd6b4; background: #fdf7ee; color: #7a5212; }
+.l3d-panel[data-kind="wizard"] .l3d-chip { border-color: #dacbee; background: #f7f2fd; color: #4f2c7d; }
+.l3d-info-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 4px 6px 0; scroll-behavior: smooth; }
+.l3d-info-body:focus-visible { outline: 2px solid #c8d6ec; }
+.l3d-info-body section { margin: 0 0 12px; }
+.l3d-tag { display: inline-block; margin-bottom: 4px; padding: 2px 9px; border-radius: 4px; font-size: 12px; font-weight: 800; letter-spacing: .04em; color: #fff; background: #2257b0; }
+.l3d-panel[data-kind="herbs"] .l3d-tag { background: #b57a2a; }
+.l3d-panel[data-kind="wizard"] .l3d-tag { background: #6b3fa0; }
+.l3d-info-body p { margin: 0; font-size: 13.5px; line-height: 1.75; color: #2b3a32; }
+.l3d-site, .l3d-mail { display: inline-block; margin: 6px 0 4px; padding: 7px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 700; text-decoration: none; color: #fff; background: #2f6f4f; }
+.l3d-mail { background: #6b3fa0; }
+.l3d-site:hover, .l3d-mail:hover { filter: brightness(1.1); }
+.l3d-info-foot { margin: 6px 0 0; padding-top: 8px; border-top: 1px solid #e3e9e5; font-size: 11px; color: #8a978f; }
+@media (prefers-reduced-motion: reduce) { .l3d-panel, .l3d-panel.open { transition: none; } .l3d-info-body { scroll-behavior: auto; } }
 @media (prefers-reduced-motion: reduce) { #l3dOpenLogin { animation: none; } body.login-page .login-card { transition: none; } }
 
 /* 登入卡底部的聯絡資訊 */

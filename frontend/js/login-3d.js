@@ -1,4 +1,4 @@
-// 登入頁 3D 研究流程動畫：載入器（v1.46.4；v1.46.5 加入點選互動與登入框延後開啟）
+// 登入頁 3D 研究流程動畫：載入器（v1.46.4；v1.46.5 點選互動與登入框延後開啟；v1.46.6 介紹視窗改成與登入框同位置同大小）
 //
 // 什麼時候用 3D、什麼時候用平面版（js/login-bg.js）：
 //   - 3D：寬螢幕（寬 ≥ 900、高 ≥ 560、橫向），瀏覽器支援 WebGL，且使用者沒有開「減少動態效果」
@@ -17,7 +17,7 @@
     "examples/js/postprocessing/RenderPass.js",
     "examples/js/postprocessing/ShaderPass.js",
     "examples/js/postprocessing/UnrealBloomPass.js",
-  ].map((f) => CDN + f).concat(["js/login-3d-scene.js"]);
+  ].map((f) => CDN + f).concat(["js/login-3d-info.js", "js/login-3d-scene.js"]);
 
   const t = (s) => (window.loginT ? window.loginT(s) : s);
   const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -31,42 +31,8 @@
 
   let canvas = null, hud = null, scene = null, loading = false, failed = false, loginOpen = false;
 
-  // 介紹視窗內容（v1.46.5）：七本秘笈＝七個資料庫，藥田＝502 種中藥。數字與平台實際資料一致
-  const DB_INFO = [
-    { name: "TCMSP", manual: "本草藥理真經", sub: "Traditional Chinese Medicine Systems Pharmacology Database・西北農林科技大學",
-      body: ["收錄中藥材、化學成分、ADME 藥動參數（口服生物利用度 OB、類藥性 DL 等）、作用靶點與相關疾病。",
-             "平台用途：分析鏈路的骨幹，藥材 → 成分 → 靶點 → 疾病都從這裡開始；活性成分以 OB ≥ 30%、DL ≥ 0.18 篩選。"],
-      url: "https://tcmsp-e.com/" },
-    { name: "PubChem", manual: "萬化分子譜", sub: "美國國家生物技術資訊中心（NCBI／NIH）",
-      body: ["全球最大的公開化合物資料庫，提供分子結構、SMILES、InChIKey、CAS 號與分子量。",
-             "平台用途：把中藥成分的名稱轉成真正的分子結構，並用分子量和 TCMSP 互相驗算。"],
-      url: "https://pubchem.ncbi.nlm.nih.gov/" },
-    { name: "UniProt", manual: "蛋白靶點錄", sub: "UniProt 聯盟（EMBL-EBI、SIB、PIR）",
-      body: ["權威的蛋白質序列與功能資料庫，提供每個蛋白對應的標準基因符號。",
-             "平台用途：把 TCMSP 的蛋白全名標準化成基因符號，癌症基因比對率從 2.6% 提升到 18%。"],
-      url: "https://www.uniprot.org/" },
-    { name: "KEGG", manual: "經脈通路圖", sub: "京都基因與基因體百科全書（京都大學）",
-      body: ["以通路圖描繪細胞內的訊號傳導與代謝網路，包含多條癌症相關通路。",
-             "平台用途：通路富集分析，看靶點集中落在哪些生物路徑上（人類通路 372 條）。"],
-      url: "https://www.kegg.jp/" },
-    { name: "Reactome", manual: "生化反應訣", sub: "開放原始碼的生物路徑資料庫（OICR、EMBL-EBI 等）",
-      body: ["以逐步反應的層級描述生物過程，分類比 KEGG 更細。",
-             "平台用途：與 KEGG 並行的通路富集分析（人類通路 2,867 條）。"],
-      url: "https://reactome.org/" },
-    { name: "OncoKB", manual: "腫瘤基因秘錄", sub: "Memorial Sloan Kettering 癌症中心",
-      body: ["精準腫瘤學知識庫，整理癌症相關基因與其臨床證據等級。",
-             "平台用途：平台「暗黑基因」清單的來源，比對中藥靶點中哪些是癌症基因。"],
-      url: "https://www.oncokb.org/" },
-    { name: "DepMap", manual: "細胞依存心法", sub: "Broad Institute 癌症依賴圖譜計畫",
-      body: ["以 CRISPR 實驗量測上千株腫瘤細胞對每個基因的依賴程度。",
-             "平台用途：檢查中藥靶點是否為特定腫瘤細胞株的選擇性依賴基因（24Q2 版，1,208 株細胞）。"],
-      url: "https://depmap.org/" },
-  ];
-  const HERB_INFO = { name: "502 種中藥", manual: "", sub: "TCMSP 收錄、平台上架的藥材",
-    body: ["平台收錄 TCMSP 的 502 種中藥材，每味藥材都連到它的化學成分、作用靶點與相關疾病。",
-           "平台以人參作為示範案例：190 種成分中有 22 種通過活性篩選，連到 118 個靶點。",
-           "登入後可在「TCMSP 藥材關聯查詢站」查詢任何一味藥材。"],
-    url: null };
+  // 介紹內容（七本秘笈、花園、巫師）在 js/login-3d-info.js（三種語言各一份，v1.46.6）
+  let infoKey = null;                                    // 目前開著的介紹："db:0"…"db:6"、"herbs"、"wizard"
 
   function buildDom() {
     canvas = document.createElement("canvas");
@@ -95,7 +61,7 @@
     const gene = document.createElement("div"); gene.className = "l3d-gene"; row.appendChild(gene);
     top.append(tag, row);
     const cap = document.createElement("div"); cap.className = "l3d-caption";
-    const hint = document.createElement("div"); hint.className = "l3d-hint"; hint.textContent = t("點選熔爐開啟／收起登入・點選秘笈或藥田查看介紹");
+    const hint = document.createElement("div"); hint.className = "l3d-hint"; hint.textContent = t("點選熔爐開啟／收起登入・點選秘笈、花園或巫師查看介紹");
     cap.appendChild(hint);
     const strong = document.createElement("strong"); strong.textContent = t("研究流程示意動畫");
     const rest = document.createElement("span"); rest.textContent = t("非療效宣稱・科研輔助工具，不作為醫療診斷或治療建議");
@@ -109,63 +75,105 @@
     openBtn.addEventListener("click", openLogin);
     document.body.appendChild(openBtn);
 
-    // 介紹視窗
+    // 介紹視窗：和登入框同位置、同大小、同樣式（v1.46.6），放在 .login-wrap 裡，以登入框的位置為準
     const dlg = document.createElement("div");
-    dlg.id = "l3dInfo"; dlg.hidden = true;
-    dlg.innerHTML = '<div class="l3d-info-card" role="dialog" aria-modal="true" aria-labelledby="l3dInfoTitle">' +
-      '<button type="button" class="l3d-info-close"></button><p class="l3d-info-manual"></p><h3 id="l3dInfoTitle"></h3>' +
-      '<p class="l3d-info-sub"></p><div class="l3d-info-body"></div><p class="l3d-info-foot"></p></div>';
-    document.body.appendChild(dlg);
+    dlg.id = "l3dInfo"; dlg.className = "l3d-panel"; dlg.setAttribute("role", "dialog"); dlg.setAttribute("aria-labelledby", "l3dInfoTitle");
+    dlg.setAttribute("aria-hidden", "true");
+    dlg.innerHTML = '<button type="button" class="l3d-info-close"></button>' +
+      '<div class="l3d-info-head"><p class="l3d-info-manual"></p><h3 id="l3dInfoTitle"></h3><p class="l3d-info-sub"></p></div>' +
+      '<nav class="l3d-info-nav" aria-label="sections"></nav><div class="l3d-info-body" tabindex="0"></div><p class="l3d-info-foot"></p>';
+    (document.querySelector(".login-wrap") || document.body).appendChild(dlg);
     dlg.querySelector(".l3d-info-close").textContent = "✕ " + t("關閉");
     dlg.querySelector(".l3d-info-foot").textContent = t("科研輔助工具，不作為醫療診斷或治療建議");
-    dlg.addEventListener("click", (e) => { if (e.target === dlg) closeInfo(); });
     dlg.querySelector(".l3d-info-close").addEventListener("click", closeInfo);
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !dlg.hidden) closeInfo(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && infoKey) closeInfo(); });
+    window.addEventListener("resize", syncPanelBox);
 
     hud = { root, steps, gene, onPick };
   }
 
   let lastFocus = null;
-  function showInfo(info, kind) {
-    const dlg = document.getElementById("l3dInfo");
-    dlg.dataset.kind = kind;
-    dlg.querySelector(".l3d-info-manual").textContent = info.manual ? "《" + t(info.manual) + "》" : "";
-    dlg.querySelector("h3").textContent = t(info.name);
-    dlg.querySelector(".l3d-info-sub").textContent = t(info.sub);
-    const body = dlg.querySelector(".l3d-info-body"); body.replaceChildren();
-    info.body.forEach((p) => { const el = document.createElement("p"); el.textContent = t(p); body.appendChild(el); });
+  // 介紹視窗的位置與大小跟登入框一致（登入框藏起來時仍佔版位，offset* 不受 transform 影響）
+  function syncPanelBox() {
+    const dlg = document.getElementById("l3dInfo"), card = document.querySelector(".login-card");
+    if (!dlg || !card) return;
+    dlg.style.left = card.offsetLeft + "px"; dlg.style.top = card.offsetTop + "px";
+    dlg.style.width = card.offsetWidth + "px"; dlg.style.height = Math.max(card.offsetHeight, 460) + "px";
+  }
+  function entryFor(key) {
+    const I = window.LOGIN3D_INFO;
+    if (key === "herbs") return I.pick(I.herbs);
+    if (key === "wizard") return I.pick(I.wizard);
+    return I.pick(I.db[+key.split(":")[1]]);
+  }
+  function showInfo(key) {
+    if (!window.LOGIN3D_INFO) return;
+    if (infoKey === key) { closeInfo(); return; }          // 再點同一個 → 收起
+    if (loginOpen) setLogin(false);
+    const info = entryFor(key), dlg = document.getElementById("l3dInfo");
+    dlg.dataset.kind = key.split(":")[0];
+    dlg.querySelector(".l3d-info-manual").textContent = [info.manual ? "《" + info.manual + "》" : "", info.star ? "★ " + info.star : ""].filter(Boolean).join("・");
+    dlg.querySelector("h3").textContent = info.name;
+    dlg.querySelector(".l3d-info-sub").textContent = info.sub;
+    const nav = dlg.querySelector(".l3d-info-nav"), body = dlg.querySelector(".l3d-info-body");
+    nav.replaceChildren(); body.replaceChildren(); body.scrollTop = 0;
+    const lab = document.createElement("span"); lab.className = "l3d-nav-label"; lab.textContent = t("快速跳到"); nav.appendChild(lab);
+    info.sections.forEach(([tag, text], k) => {
+      const sec = document.createElement("section"); sec.id = "l3dSec" + k;
+      const tg = document.createElement("span"); tg.className = "l3d-tag"; tg.textContent = tag;
+      const p = document.createElement("p"); p.textContent = text;
+      sec.append(tg, p);
+      if (info.email && k === 2) {                           // 巫師：聯絡方式那段附上郵件連結
+        const a = document.createElement("a"); a.className = "l3d-mail"; a.href = "mailto:" + info.email; a.textContent = "✉ " + info.email; sec.appendChild(a);
+      }
+      body.appendChild(sec);
+      const chip = document.createElement("button"); chip.type = "button"; chip.className = "l3d-chip"; chip.textContent = tag;
+      chip.addEventListener("click", () => { body.scrollTo({ top: sec.offsetTop - body.offsetTop - 4, behavior: "smooth" }); });
+      nav.appendChild(chip);
+    });
     if (info.url) {
-      const a = document.createElement("a"); a.href = info.url; a.target = "_blank"; a.rel = "noopener";
+      const a = document.createElement("a"); a.className = "l3d-site"; a.href = info.url; a.target = "_blank"; a.rel = "noopener";
       a.textContent = t("前往官方網站") + " ↗"; body.appendChild(a);
     }
-    lastFocus = document.activeElement;
-    dlg.hidden = false;
-    dlg.querySelector(".l3d-info-close").focus();
+    if (!infoKey) lastFocus = document.activeElement;
+    infoKey = key;
+    syncPanelBox();
+    dlg.classList.add("open"); dlg.setAttribute("aria-hidden", "false");
+    document.body.classList.add("l3d-info-open");
+    if (scene) scene.setLoginOpen(true);
+    dlg.querySelector(".l3d-info-close").focus({ preventScroll: true });
   }
   function closeInfo() {
+    if (!infoKey) return;
+    infoKey = null;
     const dlg = document.getElementById("l3dInfo");
-    dlg.hidden = true;
-    if (lastFocus && lastFocus.focus) lastFocus.focus();
+    dlg.classList.remove("open"); dlg.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("l3d-info-open");
+    if (scene) scene.setLoginOpen(loginOpen);
+    if (lastFocus && lastFocus.focus && document.contains(lastFocus)) lastFocus.focus({ preventScroll: true });
   }
   function onPick(p) {
     if (p.type === "furnace") { if (loginOpen) closeLogin(); else openLogin(); }
-    else if (p.type === "db") showInfo(DB_INFO[p.i], "db");
-    else if (p.type === "herbs") showInfo(HERB_INFO, "herbs");
+    else if (p.type === "db") showInfo("db:" + p.i);
+    else if (p.type === "herbs") showInfo("herbs");
+    else if (p.type === "wizard") showInfo("wizard");
   }
-  // 登入框：3D 模式下先藏起來，點熔爐（或「開啟登入」鈕）才出現；打開後再點熔爐收起來
+  // 登入框：3D 模式下先藏起來，點熔爐（或「開啟登入」鈕）才出現；打開後再點熔爐收起來。和介紹視窗同一時間只開一個
+  function setLogin(on) {
+    loginOpen = on;
+    document.body.classList.toggle("login-open", on);
+    if (scene) scene.setLoginOpen(on || !!infoKey);
+  }
   function closeLogin() {
     if (!loginOpen) return;
-    loginOpen = false;
     const card = document.querySelector(".login-card");
     if (card && card.contains(document.activeElement)) document.activeElement.blur();
-    document.body.classList.remove("login-open");
-    if (scene) scene.setLoginOpen(false);
+    setLogin(false);
   }
   function openLogin() {
     if (loginOpen) return;
-    loginOpen = true;
-    document.body.classList.add("login-open");
-    if (scene) scene.setLoginOpen(true);
+    if (infoKey) closeInfo();
+    setLogin(true);
     setTimeout(() => { const a = document.getElementById("account"); if (a) a.focus(); }, 450);
   }
 

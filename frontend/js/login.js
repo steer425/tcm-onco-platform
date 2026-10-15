@@ -43,6 +43,7 @@ const langSelect = document.getElementById("langSelect");
 const savedLoginLang = localStorage.getItem(LOGIN_LANG_STORAGE_KEY) || "en"; // 預設英文
 // 頁面載入之後才寫進畫面的文字（錯誤訊息、背景圖縮放後重畫的標籤）用這支轉換成目前語系
 window.loginT = (text) => convertLoginText(text, savedLoginLang);
+window.loginLang = savedLoginLang;   // 3D 介紹內容依語言取用（js/login-3d-info.js）
 langSelect.value = savedLoginLang;
 applyLoginLanguage(savedLoginLang);
 langSelect.addEventListener("change", (e) => {

@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.46.5"
-set "DEFAULT_MSG=v1.46.5 Login page: seven databases as blue-white thread-bound manuals in a Big Dipper orbiting the furnace, click a manual or the herb field for an introduction, clicking the furnace opens or closes the login box, larger herb field"
+set "EXPECTED_VER=1.46.6"
+set "DEFAULT_MSG=v1.46.6 Login page layout: person and DNA in the left 20 percent, seven manuals orbit the furnace in Big Dipper order with star names, flower garden, cute wizard with three animated actions and contact link, 1000-plus character tagged introductions in a hideable panel the same size as the login box"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"
