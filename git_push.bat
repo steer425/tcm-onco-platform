@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.46.2"
-set "DEFAULT_MSG=v1.46.2 keep the wrong-password message on screen instead of reloading the login page, and add a responsive login background showing herbs, AI, DNA testing and the seven integrated databases"
+set "EXPECTED_VER=1.46.4"
+set "DEFAULT_MSG=v1.46.4 3D research-workflow animation on the login page for wide screens (DNA report, target on the helix, herb furnace with seven databases, aimed candidate molecules, holy light), flat background kept for phones and fallbacks; includes the v1.46.3 login page changes"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"
