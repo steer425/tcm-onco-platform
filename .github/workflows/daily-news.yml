@@ -153,6 +153,9 @@ jobs:
               ("抓取", d.get("fetched")),
               ("主題過濾", d.get("filtered_out")),
               ("重複略過", d.get("duplicates")),
+              # v1.47.1 起分層：網址／內容／編號（PMID、NCT、DOI）／標題近似
+              ("　└ 網址／內容／編號／標題",
+               "／".join(str((d.get("dedupe") or {}).get(k, "—")) for k in ("url", "content", "id", "title"))),
               ("新增文章", d.get("new_articles")),
               ("每日精選", d.get("digest_size")),
               ("實體連結", d.get("linked_entities")),
@@ -250,9 +253,17 @@ jobs:
           dur = d.get("duration_ms")
           dur = f"{dur / 1000:.1f}s" if isinstance(dur, (int, float)) else "—"
 
+          # 抓取欄附上過濾與去重分層（不加新欄，月檔表頭才不會錯位）：
+          # 例「65（過濾 0；重複 網址 60・內容 2・編號 1・標題 1）」
+          fetched = cell("fetched")
+          dd = d.get("dedupe") or {}
+          if http == "200" and dd:
+              fetched += (f"（過濾 {d.get('filtered_out', '—')}；重複 網址 {dd.get('url', 0)}"
+                          f"・內容 {dd.get('content', 0)}・編號 {dd.get('id', 0)}・標題 {dd.get('title', 0)}）")
+
           row = " | ".join([
               "", now, ("排程" if event == "schedule" else "手動"),
-              cell("run_date"), status, cell("fetched"), cell("new_articles"),
+              cell("run_date"), status, fetched, cell("new_articles"),
               cell("digest_size"), cell("linked_entities"), dur, failed,
               f"[log]({run_url})", "",
           ])
