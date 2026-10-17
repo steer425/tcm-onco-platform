@@ -228,6 +228,8 @@ def mapping_stats(active_only: bool = Query(
         "excluded_breakdown": excluded,
         # 全庫視角，供對照
         "total_ingredients": total_all,
+        # 第二層佇列與批次共用 `_aglycone_queue()`，數字才對得上
+        "aglycone_second_tier": len(_aglycone_queue(db)),
         "overall": {
             "total": total_all,
             "resolved": whole["resolved"],
@@ -310,6 +312,98 @@ def resolve_batch(payload: ResolveIn,
             "remaining": max(0, remaining_before - len(items))}
 
 
+def _aglycone_parent(row: models.TcmspIngredientPubchem, name: str | None) -> dict | None:
+    """被否決的 `_qt` 列裡，第一層查到的那個母體苷。認不出或不是苷元誤配則回 None。
+
+    單筆命中時母體就存在這一列的結構欄位；多筆命中全部是母體苷時 cid 是空的、
+    母體在候選清單裡，取第一個「確實是糖基差」的候選。
+    """
+    cands = []
+    if row.cid and row.molecular_formula:
+        cands.append({"cid": row.cid, "molecular_formula": row.molecular_formula,
+                      "molecular_weight": row.molecular_weight})
+    cands += [c for c in loads(row.candidates, []) if c.get("cid") and c.get("molecular_formula")]
+    for c in cands:
+        if pc.glycoside_mismatch(name, row.tcmsp_mw, c.get("molecular_weight")):
+            return c
+    return None
+
+
+def _aglycone_queue(db: Session):
+    """第二層（苷元以分子式推算）的佇列。**統計與批次一律呼叫這一支**（理由同 `_ingredient_pool`）。
+
+    只收**自動**否決的苷元誤配：status=rejected、沒有審核者（人工否決的不動）、
+    名稱帶 `_qt`、找得到第一層查到的母體苷，且還沒跑過第二層。
+    回傳 [(row, name, parent), ...]。
+    """
+    rows = (db.query(models.TcmspIngredientPubchem, models.TcmspIngredient.molecule_name)
+            .join(models.TcmspIngredient,
+                  models.TcmspIngredient.mol_id == models.TcmspIngredientPubchem.mol_id)
+            .filter(models.TcmspIngredientPubchem.status == "rejected",
+                    models.TcmspIngredientPubchem.reviewed_by.is_(None),
+                    models.TcmspIngredientPubchem.method != "aglycone_formula")
+            .order_by(models.TcmspIngredientPubchem.mol_id).all())
+    out = []
+    for row, name in rows:
+        if not pc.is_aglycone(name):
+            continue
+        parent = _aglycone_parent(row, name)
+        if parent:
+            out.append((row, name, parent))
+    return out
+
+
+class AglyconeIn(BaseModel):
+    limit: int = Field(default=5, ge=1, le=20,
+                       description="每筆要查分子式與上千筆候選的指紋，比第一層慢很多，一批不要太大")
+
+
+@router.post("/resolve-aglycones", summary="（後台）苷元第二層：以分子式推算＋子結構比對重新解析")
+def resolve_aglycones(payload: AglyconeIn,
+                      current_user: models.User = Depends(require_admin),
+                      db: Session = Depends(get_db)):
+    queue = _aglycone_queue(db)
+    items = queue[:payload.limit]
+    tally = {"pending": 0, "unresolved": 0, "error": 0}
+    if not items:
+        return {"processed": 0, **tally, "remaining": 0}
+
+    results = pc.resolve_aglycones_many(
+        [(row.mol_id, name, row.tcmsp_mw, parent) for row, name, parent in items])
+    struct = ("canonical_smiles", "isomeric_smiles", "inchikey", "molecular_formula",
+              "molecular_weight", "iupac_name")
+    for row, name, parent in items:
+        r = results.get(row.mol_id) or {"status": "error"}
+        status = r.get("status", "error")
+        tally[status] = tally.get(status, 0) + 1
+        if status == "error":
+            continue                      # 不動，下次重跑
+        if status == "pending":
+            for f in struct:
+                setattr(row, f, r.get(f))
+            row.cid = r.get("cid")
+            row.cas_number = r.get("cas_number")
+            row.synonyms = dumps(r.get("synonyms") or [])
+        else:
+            # 找不到苷元：母體苷的結構不再掛在這一列（那是錯的分子），留在註記裡
+            for f in struct + ("cid", "cas_number"):
+                setattr(row, f, None)
+            row.synonyms = dumps([])
+        row.mw_delta = str(r["mw_delta"]) if r.get("mw_delta") is not None else None
+        row.method = "aglycone_formula"
+        row.status = status
+        row.confidence = str(r.get("confidence", 0))
+        row.candidates = dumps(r.get("candidates") or [])
+        row.note = r.get("note")
+
+    write_audit_log(db, current_user, "tcmsp_resolve_aglycones",
+                    target_type="tcmsp_ingredient_pubchem",
+                    detail=dumps({"processed": len(items), **tally}))
+    db.commit()
+    return {"processed": len(items), **tally,
+            "remaining": max(0, len(queue) - len(items) + tally["error"])}
+
+
 @router.get("/review", summary="（後台）待人工確認／查無結果的清單")
 def review_queue(status: str = Query("pending", pattern="^(pending|unresolved|error|rejected)$"),
                  mw_mismatch_only: bool = False,
@@ -351,7 +445,8 @@ def confirm_mapping(payload: ConfirmIn,
                       "molecular_formula", "molecular_weight", "iupac_name"):
             setattr(row, field, picked.get(field))
         row.cid = str(picked.get("cid"))
-        row.method = row.method if row.method == "exact" else "manual"
+        # 從第二層候選裡挑的，保留「分子式推算」的來源；其餘一律記為人工
+        row.method = row.method if row.method in ("exact", "aglycone_formula") else "manual"
     else:
         row.cid = payload.cid
         row.method = "manual"

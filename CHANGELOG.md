@@ -1,5 +1,94 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.48.1 — 2026-10-17（權限矩陣「可執行」標示是否生效；F1-9 查詢鈕依權限隱藏）
+
+技術債「前端依 can_execute 隱藏操作按鈕」。盤點結果與待辦清單的前提不同：
+
+- 後台的寫入**和讀取**端點幾乎全是 `require_admin`，只認「管理者」角色。權限矩陣的「可執行」勾選**只有 F1-9 真的有作用**，其他功能勾了也不會授權。
+- 前台查詢站上的管理者按鈕（Dashboard 版面編輯、通路同步）原本就依角色隱藏。
+
+### 修改
+- `app/deps.py`：`require_permission(..., need_execute=True)` 登記到 `EXECUTE_ENFORCED`。
+- `GET /roles/{id}/permissions` 每列新增 `execute_enforced`；`roles.js` 權限矩陣把不生效的「可執行」停用並標「不生效」，表格下方加說明。原本勾的值照樣保存，不會被洗掉。
+- `GET /literature/herbs/{id}` 新增 `can_collect`（與 POST /collect 同一張權限矩陣判定）；沒有權限的帳號看不到「開始查詢」列，改顯示需要執行權限的說明。
+- en／ko 字典補齊；`rules.md` 更正第五章那條錯誤的現況描述，並加規則：前端隱藏依據必須與後端判定同源。
+- `tests/test_literature_evidence.py` 新增 6 項：矩陣標示（只有 F1-9 生效）、一般使用者 can_collect=false、勾了可執行後畫面與後端一起放行。
+
+## v1.48.0 — 2026-10-17（F1-9 文獻證據分級：Step 5 PubMed）
+
+分析鏈路最後一個沒開始的站：把文獻綁到「藥材—活性成分—靶點」組合，讓 Step 6 每一個選擇性靶點（例如人參的 BCL2）都附得上文獻，
+研究報告才有東西可寫。
+
+### 做法
+- 查詢單位＝（藥材, 基因符號），靶點取 F1-8 通過選擇性門檻的那一份（共用 `depmap_analysis.select_herb_targets()`）。
+- 查詢式：藥材英文名／拼音＋打到該靶點的**活性成分**名稱 × 基因符號（含 BCL-2 寫法）與 TCMSP 蛋白名稱 × 癌症條件；依相關度抓回前 30 篇，命中總數另記。
+- 每篇依出版類型與摘要字詞分研究設計層級：統合分析 → 臨床試驗 → 人體觀察 → 動物 → 細胞 → 計算預測，綜述另列。
+- 另記：共現程度（同一句／摘要各自提到／只靠索引命中）、共現句、方向字詞（下調／上調，啟發式）、命中的是藥材還是成分、旗標（網絡藥理同源、含計算預測、撤稿）。
+- 「獨立證據」排除網絡藥理（靶點多取自 TCMSP，與本平台同源）、綜述、撤稿、只靠索引命中。
+
+### 新增
+- `app/literature_evidence.py`：分級規則、查詢式、PubMed 解析、`collect_queue()`（統計與批次共用）。
+- `app/routers/literature.py`：`GET /literature/herbs/{id}`、`GET /literature/herbs/{id}/genes/{symbol}`、`POST /literature/herbs/{id}/collect`（F1-9 can_execute，一次 1–10 個靶點，寫稽核 `literature_collect`）。
+- 資料表 `literature_searches`、`literature_evidence`（第 50、51 張；`create_all` 自動建立，**不需要 migrate_schema**），已加進唯讀快取。
+- 功能項目 F1-9、頁面 `literature-evidence.html`＋`js/literature-evidence.js`（en／ko 字典已補）；F1-8 導覽列加連結。
+- `tests/test_literature_evidence.py`：61 項（分級規則、方向、共現、權限、失敗不中斷、remaining＝實際處理數、重查不重複、稽核、唯讀快取）。
+
+### 環境變數（選用）
+- `NEWS_CONTACT_EMAIL`（沿用新聞模組）、`PUBMED_API_KEY`：有 key 時 NCBI 速率上限較高。
+
+### 已知限制
+- 未讀全文、未判斷結論正負；方向字詞只是讀文獻的線索。
+- 中文文獻（CNKI 等）不在 PubMed 範圍內。
+
+## v1.47.1 — 2026-10-17（新聞去重分層計數＋修正學術來源誤判）
+
+主線：查清「每日新聞抓了很多、新增很少」（10/16 抓 65 篇只新增 1 篇；10/04、10/05 兩天新增 0）。
+
+### 原因
+- 執行紀錄只記重複總數，看不出是網址已收過（正常）還是標題近似誤判（異常）。
+- 標題 simhash 門檻 12、比對窗口 14 天，套用在所有來源，包括有 PMID／DOI 的論文。實測不同研究的樣板標題
+  （只換癌別、只換皂苷編號）距離 8～13，全部會被當成重複。
+- DOI／NCT 比對大小寫敏感：資料庫存大寫、新抓到小寫時永遠比不到。
+
+### 修改
+- `app/news/service.py`
+  - `_dedupe()` 改為四層：url → content → id（同來源 PMID／NCT、跨來源 DOI）→ title（simhash）；回傳各層與各來源的計數。
+  - 有 PMID／NCT／DOI 的文章只用編號判斷，不做標題近似；標題比對池也只收沒有編號的既有文章。
+  - `SIMHASH_THRESHOLD` 12 → 6、`SIMHASH_WINDOW_DAYS` 14 → 7。
+  - 編號比對改為 `lower(trim())` 兩邊一致。
+  - `run_daily_collection()` 回傳新增 `dedupe`；`per_source[來源]` 新增 `filtered`、`dup`（各層計數）。
+- `.github/workflows/daily-news.yml`：摘要表加「網址／內容／編號／標題」一列；月紀錄的抓取欄附註，例如「65（過濾 0；重複 網址 60・內容 2・編號 1・標題 1）」。舊版後端沒有 `dedupe` 時照舊顯示。
+- `tests/test_news_dedupe.py`（新）：23 項，涵蓋四層判定、批內重複留高分、7 天窗口、樣板標題不誤判、大小寫、依來源計數。
+- `tests/test_news_e2e.py`：原本「PMID 不同、標題只差單複數應被擋下」的假資料與新規則相反，改成同 PMID 換網址再出現，斷言改看 `dedupe.id`。
+
+### 之後怎麼看
+下一次排程跑完，`news-run-log` 分支的月紀錄就會有分層數字。若「標題」層仍偏高，再看是哪個來源（`per_source[來源].dup.title`）。
+
+## v1.47.0 — 2026-10-17（苷元第二層解析：分子式推算＋子結構比對）
+
+分析主線第 5 項：補上 v1.42.9 被自動否決的 80 筆苷元誤配的重新解析路徑（人參 22 個活性成分中 3 筆在內）。
+
+### 為什麼不是「用 CAS／InChIKey 查」
+TCMSP 只給名稱與分子量，**沒有** CAS、InChIKey、分子式或結構；這些是從 PubChem 查回來的，不能拿來當查 PubChem 的鑰匙。
+被否決的 `_qt` 苷元手上真正可靠的是：第一層查到的**母體苷分子式**，以及分子量差算出的**是哪幾個糖基**。
+
+### 做法（`app/tcmsp_pubchem.py`）
+1. 母體苷分子式 − 糖基殘基（己糖 C6H10O5、去氧己糖 C6H10O4、戊糖 C5H8O4）＝苷元分子式；
+   三道驗算：差值湊得出糖基、元素扣得動、扣完的計算分子量與 TCMSP 相符（±0.5 Da）
+2. 以分子式查 PubChem（`fastformula`，最多 2,000 筆），分段取回性質與 881 位元子結構指紋（`Fingerprint2D`）
+3. 依「候選的結構特徵有多少比例也在母體苷裡」排序——苷元必須是母體苷結構的一部分；同平面結構的立體異構物另外提示
+4. **結果一律進待確認，不自動採用**；找不到則轉為查無結果（母體苷結構不再掛在該列）；連線失敗原封不動、下次重跑
+
+### 後台（成分標準化頁）
+- 新增「苷元第二層查詢」卡片：顯示尚有幾筆、每批 3～20 筆、執行記錄
+- 只處理**自動**否決的苷元誤配；人工否決、非苷元的否決列一律不動
+- 覆蓋率 `/stats` 新增 `aglycone_second_tier`，與批次 `/resolve-aglycones` 共用同一支佇列判定 `_aglycone_queue()`
+- 審核視窗的候選顯示「結構特徵包含於母體苷 %」與相似度；從候選挑選確認後保留 `aglycone_formula` 來源
+
+### 驗證
+- 新增 `tests/test_aglycone_second_tier.py`（47 項，含人參 Rh4、Rg1 的分子式推算）；既有 9 支回歸測試全過
+- PubChem 從開發環境連不到，HTTP 層以 fixture 取代；**真實查詢要在 Render 上按按鈕才會跑到**
+
 ## v1.46.8 — 2026-10-15（登入頁 3D 動畫的文字改為清晰的網頁文字）
 
 只影響寬螢幕的 3D 登入頁；手機與平面版不變。

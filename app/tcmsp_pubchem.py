@@ -28,6 +28,7 @@
 
 from __future__ import annotations
 
+import base64
 import itertools
 import json
 import logging
@@ -47,7 +48,7 @@ PROPS = ("CanonicalSMILES,IsomericSMILES,InChIKey,MolecularFormula,"
 IMAGE_URL = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/PNG"
 
 METHOD_CONFIDENCE = {"exact": 1.0, "cleaned": 0.8, "aglycone_parent": 0.5,
-                     "cas": 1.0, "manual": 1.0}
+                     "aglycone_formula": 0.6, "cas": 1.0, "manual": 1.0}
 
 # 多筆命中、但只有一筆分子量吻合時的信心分數。名稱與分子量兩條獨立證據都指向它，
 # 但名稱本身有歧義，所以不給滿分。
@@ -136,14 +137,23 @@ def _sugar_combination(delta: float):
     回傳 `(說明, 總質量)`，解釋不了則回 None。由少到多試，
     先命中的組合糖基數最少，也最可能是真的。
     """
+    combo = _sugar_combo(delta)
+    if not combo:
+        return None
+    parts = " + ".join(f"{combo.count(c)}×{c}" for c in dict.fromkeys(combo))
+    return parts, sum(SUGAR_RESIDUES[c] for c in combo)
+
+
+def _sugar_combo(delta: float):
+    """`_sugar_combination()` 的內部：回傳糖基名稱的 tuple（可重複），解釋不了則 None。
+
+    第二層查詢要用它從母體苷的分子式**扣掉**糖基，所以需要的是「哪幾個糖」，不只是說明文字。
+    """
     names = list(SUGAR_RESIDUES)
     for n in range(1, MAX_SUGAR_UNITS + 1):
         for combo in itertools.combinations_with_replacement(names, n):
-            total = sum(SUGAR_RESIDUES[c] for c in combo)
-            if abs(delta - total) <= MW_TOLERANCE:
-                parts = " + ".join(f"{combo.count(c)}×{c}"
-                                   for c in dict.fromkeys(combo))
-                return parts, total
+            if abs(delta - sum(SUGAR_RESIDUES[c] for c in combo)) <= MW_TOLERANCE:
+                return combo
     return None
 
 
@@ -321,6 +331,129 @@ def pick_cas(synonyms) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# 第二層：苷元以「分子式推算＋子結構比對」重新解析（v1.47.0）
+# ---------------------------------------------------------------------------
+#
+# 為什麼不是「用 CAS／InChIKey 查」：TCMSP 只給名稱與分子量，**沒有** CAS、InChIKey、
+# 分子式或結構——這些欄位是我們從 PubChem 查回來的，不能拿來當查 PubChem 的鑰匙。
+# 對被否決的 `_qt` 苷元，手上真正可靠的是兩件事：
+#   1. 母體苷的分子式（第一層查回來的，確定是那個糖苷）
+#   2. 差了哪幾個糖基（glycoside_mismatch() 用分子量差算出來的）
+# 糖苷水解＝每個糖基斷開時補回一分子水，所以「母體分子式 − 糖基殘基」就是苷元的分子式。
+# 再用 PubChem 的子結構指紋排序同分子式的候選：苷元必須是母體苷結構的一部分。
+#
+# 結果**永遠不自動採用**：同分子式異構物很多，指紋也分不出立體異構物，一律交給人確認。
+
+# 糖基殘基（脫水後）的分子式，與 SUGAR_RESIDUES 的質量一一對應
+SUGAR_FORMULA = {
+    "己糖（葡萄糖等）": {"C": 6, "H": 10, "O": 5},
+    "去氧己糖（鼠李糖等）": {"C": 6, "H": 10, "O": 4},
+    "戊糖（木糖、阿拉伯糖等）": {"C": 5, "H": 8, "O": 4},
+}
+ATOMIC_MASS = {"C": 12.011, "H": 1.008, "N": 14.007, "O": 15.999, "S": 32.06, "P": 30.974,
+               "F": 18.998, "Cl": 35.45, "Br": 79.904, "I": 126.904}
+FORMULA_RE = re.compile(r"([A-Z][a-z]?)(\d*)")
+FORMULA_MAX_RECORDS = 2000      # 分子式查詢最多取幾個 CID（大分子的異構物可能上千）
+PROP_CHUNK = 150                # 一次查幾個 CID 的性質（放在網址裡，不能太長）
+CONTAIN_MIN = 0.9               # 候選的指紋至少要有這麼多比例包含在母體苷裡，才算「像是它的一部分」
+SECOND_TIER_KEEP = 8            # 存幾個候選給審核者看
+
+
+def parse_formula(formula: str | None) -> dict | None:
+    """'C30H52O4' → {'C': 30, 'H': 52, 'O': 4}。帶電荷、點號（鹽、混合物）或認不得的元素回 None。"""
+    f = (formula or "").strip()
+    if not f or re.search(r"[^A-Za-z0-9]", f):
+        return None
+    out: dict = {}
+    pos = 0
+    for m in FORMULA_RE.finditer(f):
+        if m.start() != pos:
+            return None
+        el, n = m.group(1), int(m.group(2) or 1)
+        if el not in ATOMIC_MASS:
+            return None
+        out[el] = out.get(el, 0) + n
+        pos = m.end()
+    return out if pos == len(f) and out else None
+
+
+def format_formula(counts: dict) -> str:
+    """Hill 排序：C、H 在前，其餘依字母。與 PubChem 的寫法一致。"""
+    keys = [k for k in ("C", "H") if counts.get(k)] + sorted(k for k in counts if k not in ("C", "H") and counts[k])
+    return "".join(f"{k}{counts[k] if counts[k] != 1 else ''}" for k in keys)
+
+
+def formula_mass(counts: dict) -> float:
+    return round(sum(ATOMIC_MASS[k] * n for k, n in counts.items()), 3)
+
+
+def aglycone_formula(parent_formula, tcmsp_mw, parent_mw) -> dict:
+    """從母體苷推算苷元的分子式。回傳 {ok, formula, mass, sugars, reason}。
+
+    三道檢查都過才算 ok：
+      1. 分子量差能用 1~4 個糖基解釋（與 glycoside_mismatch() 同一套組合）
+      2. 母體分子式扣得動（每個元素都不會變成負數）
+      3. 扣完後的計算分子量與 TCMSP 的分子量相符（±0.5 Da）——這是獨立的驗算，
+         確保「差值湊得出糖基」不是巧合
+    """
+    a, b = _num(tcmsp_mw), _num(parent_mw)
+    parent = parse_formula(parent_formula)
+    if a is None or b is None or parent is None:
+        return {"ok": False, "reason": "缺少 TCMSP 分子量、母體苷分子量或可解析的母體分子式"}
+    combo = _sugar_combo(round(b - a, 3)) if b > a else None
+    if not combo:
+        return {"ok": False, "reason": f"分子量差 {round(b - a, 3)} Da 無法以 1~{MAX_SUGAR_UNITS} 個糖基解釋"}
+    agly = dict(parent)
+    for sugar in combo:
+        for el, n in SUGAR_FORMULA[sugar].items():
+            agly[el] = agly.get(el, 0) - n
+    if any(v < 0 for v in agly.values()):
+        return {"ok": False, "reason": f"母體分子式 {parent_formula} 扣不掉這些糖基"}
+    agly = {k: v for k, v in agly.items() if v}
+    mass = formula_mass(agly)
+    sugars = " + ".join(f"{combo.count(c)}×{c}" for c in dict.fromkeys(combo))
+    if abs(mass - a) > MW_TOLERANCE:
+        return {"ok": False, "reason": f"扣除 {sugars} 後算出 {format_formula(agly)}（{mass}），"
+                                       f"與 TCMSP 分子量 {a} 不符"}
+    return {"ok": True, "formula": format_formula(agly), "mass": mass, "sugars": sugars, "reason": ""}
+
+
+def fp_bits(b64: str | None) -> set | None:
+    """PubChem `Fingerprint2D`（881 位元子結構指紋，base64）→ 有設的位元編號集合。
+
+    格式：前 4 個位元組是位元數（big-endian），之後依序是位元，每個位元組由高位開始。
+    """
+    if not b64:
+        return None
+    try:
+        raw = base64.b64decode(b64)
+    except Exception:  # noqa: BLE001
+        return None
+    if len(raw) < 5:
+        return None
+    n = int.from_bytes(raw[:4], "big")
+    data = raw[4:]
+    return {i for i in range(min(n, len(data) * 8)) if (data[i // 8] >> (7 - i % 8)) & 1}
+
+
+def fp_containment(candidate: set, parent: set) -> float:
+    """候選的特徵有多少比例也出現在母體苷裡（1.0 = 全部都有）。
+
+    PubChem 的子結構指紋是「含有某種結構片段」的位元，片段越多位元越多；
+    如果候選真的是母體苷的一部分，它有的片段母體苷一定也有。
+    **這是必要條件不是充分條件**——1.0 不代表一定是子結構，但低於 1 多半不是。
+    """
+    if not candidate:
+        return 0.0
+    return round(len(candidate & parent) / len(candidate), 4)
+
+
+def fp_tanimoto(a: set, b: set) -> float:
+    u = len(a | b)
+    return round(len(a & b) / u, 4) if u else 0.0
+
+
+# ---------------------------------------------------------------------------
 # 外部呼叫（測試裡整支被取代）
 # ---------------------------------------------------------------------------
 
@@ -352,6 +485,104 @@ def fetch_synonyms(client: httpx.Client, cid: str) -> list:
         return []
     info = (data.get("InformationList") or {}).get("Information") or []
     return (info[0].get("Synonym") if info else []) or []
+
+
+def search_by_formula(client: httpx.Client, formula: str,
+                      max_records: int = FORMULA_MAX_RECORDS) -> list:
+    """以分子式查 CID（只含這些元素，不允許其他元素）。"""
+    data = _get(client, f"{BASE}/fastformula/{quote(formula, safe='')}/cids/JSON"
+                        f"?MaxRecords={int(max_records)}")
+    if not data:
+        return []
+    return [str(c) for c in ((data.get("IdentifierList") or {}).get("CID") or [])]
+
+
+def fetch_properties(client: httpx.Client, cids: list, pause: float = 0.25) -> list:
+    """一批 CID 的性質（含子結構指紋），分段查詢以免網址過長。"""
+    out = []
+    cids = [str(c) for c in cids if str(c).isdigit()]
+    for i in range(0, len(cids), PROP_CHUNK):
+        if i:
+            time.sleep(pause)
+        chunk = ",".join(cids[i:i + PROP_CHUNK])
+        data = _get(client, f"{BASE}/cid/{chunk}/property/{PROPS},Fingerprint2D/JSON")
+        out.extend(((data or {}).get("PropertyTable") or {}).get("Properties") or [])
+    return out
+
+
+def resolve_aglycone(client: httpx.Client, name: str, tcmsp_mw, parent: dict) -> dict:
+    """第二層：被否決的 `_qt` 苷元，從母體苷推算分子式後重新找候選。
+
+    `parent` 是第一層查回來的母體苷（至少要有 cid、molecular_formula、molecular_weight）。
+    回傳的 status 只有 pending（找到像樣的候選，等人確認）、unresolved（推算不出或找不到）、
+    error（連線失敗，之後可重跑）。**永遠不會是 auto。**
+    """
+    try:
+        derived = aglycone_formula(parent.get("molecular_formula"), tcmsp_mw,
+                                   parent.get("molecular_weight"))
+        base = {"method": "aglycone_formula", "tcmsp_mw": tcmsp_mw, "candidates": [],
+                "derived_formula": derived.get("formula")}
+        head = (f"第一層以母體名查到 CID {parent.get('cid')}（{parent.get('molecular_formula')}，"
+                f"{parent.get('molecular_weight')}）是帶糖基的母體苷，已否決。")
+        if not derived["ok"]:
+            return {**base, "status": "unresolved", "confidence": 0.0,
+                    "note": f"{head}第二層無法推算苷元分子式：{derived['reason']}"}
+
+        cids = search_by_formula(client, derived["formula"])
+        cids = [c for c in cids if c != str(parent.get("cid"))]
+        step = (f"{head}第二層：扣除 {derived['sugars']} 推算苷元為 {derived['formula']}"
+                f"（計算分子量 {derived['mass']}，TCMSP {tcmsp_mw}）")
+        if not cids:
+            return {**base, "status": "unresolved", "confidence": 0.0,
+                    "note": f"{step}，但 PubChem 查無此分子式的化合物"}
+
+        time.sleep(0.25)
+        props = fetch_properties(client, cids + [str(parent.get("cid"))])
+        pfp = next((fp_bits(p.get("Fingerprint2D")) for p in props
+                    if str(p.get("CID")) == str(parent.get("cid"))), None)
+        if not pfp:
+            return {**base, "status": "error", "confidence": 0.0,
+                    "note": f"{step}；取不到母體苷的結構指紋，稍後重跑"}
+
+        ranked = []
+        for p in props:
+            if str(p.get("CID")) == str(parent.get("cid")):
+                continue
+            fp = fp_bits(p.get("Fingerprint2D"))
+            if not fp:
+                continue
+            c = parse_property(p)
+            c["containment"] = fp_containment(fp, pfp)
+            c["similarity"] = fp_tanimoto(fp, pfp)
+            c["mw_delta"] = mw_check(tcmsp_mw, c.get("molecular_weight"))["delta"]
+            ranked.append(c)
+        ranked.sort(key=lambda c: (-c["containment"], -c["similarity"],
+                                   c["mw_delta"] if c["mw_delta"] is not None else 1e9))
+        top = ranked[0] if ranked else None
+        if not top or top["containment"] < CONTAIN_MIN:
+            return {**base, "status": "unresolved", "confidence": 0.0,
+                    "candidates": ranked[:SECOND_TIER_KEEP],
+                    "note": f"{step}；PubChem 有 {len(cids)} 筆同分子式化合物，"
+                            f"但沒有一筆的結構特徵像是母體苷的一部分"}
+
+        # 同一平面結構（InChIKey 第一段相同）的立體異構物，指紋分不出來
+        conn = (top.get("inchikey") or "")[:14]
+        same_2d = [c for c in ranked if conn and (c.get("inchikey") or "")[:14] == conn]
+        full = [c for c in ranked if c["containment"] >= 1.0]
+        clear = top["containment"] >= 1.0 and len({(c.get("inchikey") or "")[:14] for c in full}) == 1
+        note = (f"{step}；PubChem 有 {len(cids)} 筆同分子式化合物，依「是否為母體苷結構的一部分」排序，"
+                f"第一名 CID {top['cid']} 的結構特徵 {round(top['containment'] * 100)}% 包含在母體苷中")
+        if len(same_2d) > 1:
+            note += f"；其中 {len(same_2d)} 筆是同一平面結構的立體異構物（指紋分不出），請依母體苷的立體構型挑選"
+        elif not clear:
+            note += "；另有不同結構的候選同樣吻合，請比對結構"
+        note += "。結構推算結果一律需人工確認"
+        return {**top, **base, "candidates": ranked[:SECOND_TIER_KEEP], "status": "pending",
+                "confidence": METHOD_CONFIDENCE["aglycone_formula"] if clear else 0.4, "note": note}
+    except Exception as exc:  # noqa: BLE001
+        logger.error("苷元第二層解析失敗（%s）：%s", name, exc)
+        return {"method": "aglycone_formula", "status": "error", "confidence": 0.0,
+                "candidates": [], "tcmsp_mw": tcmsp_mw, "note": f"第二層查詢失敗：{str(exc)[:200]}"}
 
 
 def resolve_name(client: httpx.Client, name: str, tcmsp_mw=None) -> dict:
@@ -529,6 +760,33 @@ def resolve_many(items: list, *, timeout: float = 25.0, pause: float = 0.25,
                     result["cas_number"] = pick_cas(syns)
                 except Exception as exc:  # noqa: BLE001
                     # 拿不到 CAS 不該讓整筆解析失敗——主要欄位已經有了
+                    logger.warning("取 CAS 失敗（cid=%s）：%s", result.get("cid"), exc)
+            out[mol_id] = result
+            if i + 1 < len(items):
+                time.sleep(pause)
+    return out
+
+
+def resolve_aglycones_many(items: list, *, timeout: float = 30.0, pause: float = 0.25) -> dict:
+    """第二層批次。`items` 是 [(mol_id, name, tcmsp_mw, parent), ...]，回傳 {mol_id: 結果}。
+
+    每筆約 2～15 次請求（分子式查詢＋分段取性質＋第一名的同義詞），間隔照樣 0.25 秒。
+    """
+    out: dict = {}
+    if not items:
+        return out
+    headers = {"Accept": "application/json",
+               "User-Agent": "TCM-Onco-Platform/1.0 (research; aglycone resolution)"}
+    with httpx.Client(headers=headers, timeout=timeout, follow_redirects=True) as client:
+        for i, (mol_id, name, mw, parent) in enumerate(items):
+            result = resolve_aglycone(client, name, mw, parent)
+            if result.get("status") == "pending" and result.get("cid"):
+                try:
+                    time.sleep(pause)
+                    syns = fetch_synonyms(client, result["cid"])
+                    result["synonyms"] = syns[:20]
+                    result["cas_number"] = pick_cas(syns)
+                except Exception as exc:  # noqa: BLE001
                     logger.warning("取 CAS 失敗（cid=%s）：%s", result.get("cid"), exc)
             out[mol_id] = result
             if i + 1 < len(items):

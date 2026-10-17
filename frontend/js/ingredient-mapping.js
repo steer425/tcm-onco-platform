@@ -15,6 +15,7 @@ const STATUS_LABEL = {
 };
 const METHOD_LABEL = {
   exact: "原名精確命中", cleaned: "清理名稱後命中", aglycone_parent: "苷元改查母體名",
+  aglycone_formula: "苷元第二層：分子式推算＋子結構比對",
   cas: "以 CAS 反查", manual: "人工指定",
 };
 
@@ -67,6 +68,12 @@ let LAST_STATS = null;
 async function loadStats() {
   const s = await api(`/tcmsp/ingredient-mapping/stats?active_only=${activeOnly()}`);
   LAST_STATS = s;
+  const am = document.getElementById("aglyMsg");
+  if (am && !am.dataset.busy) {
+    am.textContent = s.aglycone_second_tier
+      ? `尚有 ${s.aglycone_second_tier} 筆自動否決的苷元可做第二層查詢。`
+      : "沒有需要做第二層查詢的苷元。";
+  }
   const bs = s.by_status;
   const ex = s.excluded_breakdown || {};
   const poolLabel = s.active_only ? "活性成分（母體）" : "有名稱的成分（母體）";
@@ -194,6 +201,39 @@ async function loadQueue() {
   });
 }
 
+// ---------------------------------------------------------------- 苷元第二層
+
+async function runAglycone() {
+  const btn = document.getElementById("aglyBtn");
+  const msg = document.getElementById("aglyMsg");
+  const log = document.getElementById("aglyLog");
+  btn.disabled = true; msg.dataset.busy = "1";
+  msg.textContent = "執行中（每筆要比對上百到上千個同分子式化合物，一筆約數秒到半分鐘），請不要關閉頁面…";
+  try {
+    const r = await api("/tcmsp/ingredient-mapping/resolve-aglycones", {
+      method: "POST",
+      body: JSON.stringify({ limit: parseInt(document.getElementById("aglyLimit").value, 10) }),
+    });
+    const line = r.processed === 0
+      ? "沒有需要做第二層查詢的苷元了。"
+      : `本批 ${r.processed} 筆：找到候選、轉為待確認 ${r.pending}、找不到苷元 ${r.unresolved}、` +
+        `連線失敗 ${r.error}（下次會重跑）；尚有 ${r.remaining} 筆。`;
+    log.textContent = `${new Date().toLocaleTimeString()}  ${line}\n${log.textContent}`;
+    // 先重新載入卡片與清單（忙碌旗標還在，卡片不會蓋掉這裡的訊息），最後才寫結果訊息
+    await loadStats();
+    await loadQueue();
+    delete msg.dataset.busy;
+    msg.textContent = (r.error && r.error === r.processed)
+      ? "整批都連線失敗——這個環境可能連不到 PubChem，請改在 Render 上執行。"
+      : (r.remaining > 0 ? "還沒跑完，可以再按一次。" : "第二層查詢已全部處理完畢。");
+  } catch (err) {
+    delete msg.dataset.busy;
+    msg.textContent = `執行失敗：${err.message || err}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // ---------------------------------------------------------------- 審核彈窗
 
 function openReview(idx) {
@@ -223,6 +263,7 @@ function openReview(idx) {
             <b>CID ${esc(c.cid || "—")}</b> ${esc(c.molecular_formula || "")}
             <div class="hint-msg">分子量 ${esc(c.molecular_weight || "—")}
               ${it.tcmsp_mw ? `／ TCMSP ${esc(it.tcmsp_mw)}` : ""}</div>
+            ${c.containment != null ? `<div class="hint-msg">結構特徵包含於母體苷 ${Math.round(c.containment * 100)}%・與母體相似度 ${Math.round((c.similarity || 0) * 100)}%</div>` : ""}
             ${c.inchikey ? `<div class="mono">${esc(c.inchikey)}</div>` : ""}
             ${c.iupac_name ? `<div class="hint-msg">${esc(c.iupac_name)}</div>` : ""}
           </div>
@@ -318,6 +359,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadStats(); await loadQueue();
   });
   document.getElementById("resolveBtn").addEventListener("click", runBatch);
+  document.getElementById("aglyBtn").addEventListener("click", runAglycone);
   document.getElementById("lookupBtn").addEventListener("click", runLookup);
   document.getElementById("lookupInput").addEventListener("keydown", e => {
     if (e.key === "Enter") runLookup();

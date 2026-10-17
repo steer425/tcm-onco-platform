@@ -49,6 +49,9 @@ CACHED_TABLES = [
     "depmap_gene_dependency",
     "depmap_gene_summary",
     "depmap_import_runs",
+    # v1.48.0：Step 5 文獻證據（F1-9）。searched_by 只是使用者 id，API 不回傳。
+    "literature_searches",
+    "literature_evidence",
     # 新聞模組：每日重點新聞屬於「每天更新一次、供大量前台讀取」的參考資料，適合快取。
     # 刻意不快取 user_news_bookmarks（使用者個人收藏，綁 users 外鍵）與 news_settings
     # （管理設定，讀取量小），維持「不快取帳號/使用者相關資料」的既有原則。

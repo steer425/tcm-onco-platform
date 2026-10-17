@@ -111,6 +111,27 @@
     </div>
 
     <div class="card">
+      <h3 style="margin-top:0;">苷元第二層查詢（分子式推算＋子結構比對）</h3>
+      <p class="hint-msg" style="margin-top:0;">
+        名稱帶 <code>_qt</code> 的成分是<b>苷元</b>（糖苷去掉糖之後的部分）。第一層用名稱查 PubChem 時，
+        常查到的是<b>帶糖基的母體苷</b>，這些已被自動否決。第二層從母體苷的分子式扣掉糖基，
+        推算苷元應有的分子式，再找出同分子式、且結構確實是母體苷一部分的化合物。
+        <b>結果一律進「待確認」，不會自動採用</b>——同分子式的異構物很多，立體構型也要靠人判斷。
+        人工否決過的不會被動到。
+      </p>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <label style="margin:0;">每批筆數</label>
+        <select id="aglyLimit" style="max-width:110px;">
+          <option value="3">3</option><option value="5" selected>5</option>
+          <option value="10">10</option><option value="20">20</option>
+        </select>
+        <button id="aglyBtn">執行一批</button>
+        <span class="hint-msg" id="aglyMsg"></span>
+      </div>
+      <div id="aglyLog" class="hint-msg" style="margin-top:10px; white-space:pre-wrap;"></div>
+    </div>
+
+    <div class="card">
       <h3 style="margin-top:0;">人工審核</h3>
       <div class="tabs" id="queueTabs">
         <button data-status="pending" class="on">待確認</button>

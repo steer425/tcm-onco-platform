@@ -13,6 +13,7 @@ import json
 import logging
 from datetime import date, datetime, timedelta, timezone
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import models
@@ -31,8 +32,14 @@ from .summarizer import summarize
 logger = logging.getLogger(__name__)
 
 TAIPEI = timezone(timedelta(hours=8))   # 台灣全年 UTC+8，無日光節約
-# 漢明距離 ≤12 視為近似重複。實測：僅差一字的中英標題 4–9，主題不同 25–37。
-SIMHASH_THRESHOLD = 12
+# 標題近似（simhash）只用在**沒有編號的來源**（新聞、官網公告）。v1.47.1 由 12 收到 6、比對窗口 14 → 7 天。
+# 實測（v1.47.1）：只差單複數 3；「Erratum: 原標題」7；樣板標題只換癌別（肺癌 vs 胃癌的統合分析）8、
+# 換大腸癌／胃癌 12、換 Rg3／Rh2 13——後三組是不同研究，舊門檻 12 全部會被當成重複丟掉。
+# 12 配上 14 天的整池 any() 比對，比對池越大誤判越多（10/04、10/05 連兩天新增 0 的最可能原因）。
+SIMHASH_THRESHOLD = 6
+SIMHASH_WINDOW_DAYS = 7
+# 去重各層的代碼（寫進執行紀錄，見 `_dedupe()`）
+DEDUPE_LAYERS = ("url", "content", "id", "title")
 
 DEFAULT_SETTINGS = {
     "daily_digest_size": 10,
@@ -189,11 +196,16 @@ def run_daily_collection(
         rel = relevance(it)
         if rel < settings["min_relevance_score"]:
             filtered += 1
+            if it.source_slug in stats:
+                stats[it.source_slug]["filtered"] = stats[it.source_slug].get("filtered", 0) + 1
             continue
         candidates.append((it, classify(it), rel))
 
-    # ---- 3) 去重 ----
-    fresh, dup_count = _dedupe(db, candidates)
+    # ---- 3) 去重（各層、各來源分開計數，寫進 per_source 與回傳結果）----
+    fresh, dup_count, dedupe = _dedupe(db, candidates)
+    for slug, layers in dedupe["by_source"].items():
+        if slug in stats:
+            stats[slug]["dup"] = layers
 
     # ---- 4) AI 摘要 ----
     summaries = summarize([(it, meta) for it, meta, _ in fresh],
@@ -315,6 +327,9 @@ def run_daily_collection(
         "fetched": len(items),
         "filtered_out": filtered,
         "duplicates": dup_count,
+        # 重複分層：url 網址、content 內容、id 編號（PMID／NCT／DOI）、title 標題近似。
+        # v1.47.1 以前只有合計，分不出是哪一層把文章擋掉，每次都只能推論
+        "dedupe": dedupe["total"],
         "new_articles": len(persisted),
         "digest_size": len(picked),
         "linked_entities": linked_total,
@@ -361,10 +376,38 @@ def _link_entities(db: Session, article: models.NewsArticle,
     return count, names
 
 
+def _identity_keys(item: RawItem) -> list[str]:
+    """學術來源的身分鍵：同一來源的 PMID／NCT 編號，以及跨來源通用的 DOI。沒有則回空清單。"""
+    keys = []
+    if item.external_id:
+        keys.append(f"ext:{item.source_slug}:{item.external_id.strip().lower()}")
+    if item.doi:
+        keys.append(f"doi:{item.doi.strip().lower()}")
+    return keys
+
+
 def _dedupe(db: Session, candidates: list[tuple[RawItem, dict, float]]):
-    """三層去重：URL hash → 內容 hash → 標題 simhash 近似。"""
+    """四層去重，回傳 `(保留, 重複合計, 分層計數)`。
+
+    | 層 | 判定 | 適用 |
+    |---|---|---|
+    | url | 網址雜湊已存在 | 全部 |
+    | content | 標題＋摘要前 600 字雜湊已存在 | 全部 |
+    | id | PMID／NCT（同來源）或 DOI 已存在 | 有編號的學術來源 |
+    | title | 標題 simhash 與近 7 天任一標題距離 ≤ 6 | **只用在沒有編號的來源** |
+
+    ## v1.47.1：有編號的學術來源不做標題近似
+
+    PubMed、ClinicalTrials.gov 的同一篇有編號可以直接認；而「標題長得像」對論文特別容易誤判——
+    「X 對 Y 癌的療效：系統性回顧與統合分析」這類樣板標題，兩篇不同研究的 simhash 距離可以很近。
+    舊版把它們全部丟進近 14 天整池 `any()` 比對，比對池越大誤判越多。
+
+    分層計數回傳 `{"total": {層: 篇數}, "by_source": {來源: {層: 篇數}}}`，
+    寫進執行紀錄後，下次「新增很少」一眼就看得出是沒有新稿（url）還是誤判（title）。
+    """
+    empty = {"total": {k: 0 for k in DEDUPE_LAYERS}, "by_source": {}}
     if not candidates:
-        return [], 0
+        return [], 0, empty
 
     url_hashes = [c[0].url_hash for c in candidates]
     content_hashes = [c[0].content_hash for c in candidates]
@@ -374,33 +417,66 @@ def _dedupe(db: Session, candidates: list[tuple[RawItem, dict, float]]):
     known_content = {r[0] for r in db.query(models.NewsArticle.content_hash)
                      .filter(models.NewsArticle.content_hash.in_(content_hashes)).all() if r[0]}
 
-    cutoff = datetime.utcnow() - timedelta(days=14)
+    # 編號層：只撈這一批出現過的編號，不掃全表。
+    # 兩邊都轉小寫比：DOI 不分大小寫（10.1000/ABC = 10.1000/abc），各來源回傳的 NCT 大小寫也不一致；
+    # 只在 Python 端轉小寫、SQL 端用 in_() 原樣比，資料庫裡大寫的那筆就永遠比不到（v1.47.1 測試抓到）。
+    ext_ids = {c[0].external_id.strip().lower() for c in candidates if c[0].external_id}
+    dois = {c[0].doi.strip().lower() for c in candidates if c[0].doi}
+    known_ids = set()
+    if ext_ids:
+        for ext, slug in (db.query(models.NewsArticle.external_id, models.NewsSource.slug)
+                          .join(models.NewsSource, models.NewsSource.id == models.NewsArticle.source_id)
+                          .filter(func.lower(func.trim(models.NewsArticle.external_id)).in_(list(ext_ids))).all()):
+            known_ids.add(f"ext:{slug}:{ext.strip().lower()}")
+    if dois:
+        for (d,) in (db.query(models.NewsArticle.doi)
+                     .filter(func.lower(func.trim(models.NewsArticle.doi)).in_(list(dois))).all()):
+            if d:
+                known_ids.add(f"doi:{d.strip().lower()}")
+
+    cutoff = datetime.utcnow() - timedelta(days=SIMHASH_WINDOW_DAYS)
     recent_simhashes = [r[0] for r in db.query(models.NewsArticle.title_simhash)
                         .filter(models.NewsArticle.collected_at >= cutoff,
-                                models.NewsArticle.title_simhash.isnot(None)).all() if r[0]]
+                                models.NewsArticle.title_simhash.isnot(None),
+                                models.NewsArticle.external_id.is_(None),
+                                models.NewsArticle.doi.is_(None)).all() if r[0]]
 
-    kept, dup = [], 0
-    seen_url, seen_content, batch_sim = set(), set(), []
+    kept = []
+    total = {k: 0 for k in DEDUPE_LAYERS}
+    by_source: dict = {}
+    seen_url, seen_content, seen_ids, batch_sim = set(), set(), set(), []
+
+    def mark(item, layer):
+        total[layer] += 1
+        src = by_source.setdefault(item.source_slug, {k: 0 for k in DEDUPE_LAYERS})
+        src[layer] += 1
 
     # 高分優先保留，重複時留下權威度較高的版本
     for item, meta, rel in sorted(candidates, key=lambda c: -c[2]):
         if item.url_hash in known_urls or item.url_hash in seen_url:
-            dup += 1
+            mark(item, "url")
             continue
         if item.content_hash in known_content or item.content_hash in seen_content:
-            dup += 1
+            mark(item, "content")
             continue
-        sh = f"{simhash64(item.title) & 0xFFFFFFFFFFFFFFFF:016x}"
-        if any(_hamming_hex(sh, other) <= SIMHASH_THRESHOLD
-               for other in recent_simhashes + batch_sim):
-            dup += 1
-            continue
+        ids = _identity_keys(item)
+        if ids:
+            if any(k in known_ids or k in seen_ids for k in ids):
+                mark(item, "id")
+                continue
+        else:
+            sh = f"{simhash64(item.title) & 0xFFFFFFFFFFFFFFFF:016x}"
+            if any(_hamming_hex(sh, other) <= SIMHASH_THRESHOLD
+                   for other in recent_simhashes + batch_sim):
+                mark(item, "title")
+                continue
+            batch_sim.append(sh)
         kept.append((item, meta, rel))
         seen_url.add(item.url_hash)
         seen_content.add(item.content_hash)
-        batch_sim.append(sh)
+        seen_ids.update(ids)
 
-    return kept, dup
+    return kept, sum(total.values()), {"total": total, "by_source": by_source}
 
 
 def _hamming_hex(a: str, b: str) -> int:

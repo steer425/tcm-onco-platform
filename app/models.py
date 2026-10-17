@@ -1284,3 +1284,53 @@ class DepMapImportRun(Base):
     source_files = Column(Text, nullable=True)       # JSON 字串，含檔名與 md5
     note = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class LiteratureSearch(Base):
+    """Step 5 文獻證據：一次 PubMed 查詢 ＝ 一個（藥材, 基因符號）組合。第 50 張表。
+
+    同一組合重查就覆蓋（唯一鍵），保留查詢式與命中總數——之後被問「這幾篇是怎麼找來的」，
+    答案必須是一條能貼回 PubMed 重跑的查詢式，而不是「系統找的」。
+    """
+    __tablename__ = "literature_searches"
+    __table_args__ = (UniqueConstraint("herb_id", "gene_symbol", name="uq_lit_search_herb_gene"),)
+
+    id = Column(String, primary_key=True, default=gen_id)
+    herb_id = Column(Integer, ForeignKey("tcmsp_herbs.id"), nullable=False, index=True)
+    gene_symbol = Column(String, nullable=False, index=True)
+    query_term = Column(Text, nullable=False)
+    total_count = Column(Integer, default=0, nullable=False)   # PubMed 命中總數（可能大於實際抓回的）
+    n_fetched = Column(Integer, default=0, nullable=False)
+    status = Column(String, nullable=False, default="ok")      # ok / empty / error
+    error = Column(Text, nullable=True)
+    grading_version = Column(String, nullable=True)            # 分級規則版本，改規則後可判斷要不要重分
+    searched_by = Column(String, ForeignKey("users.id"), nullable=True)
+    searched_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class LiteratureEvidence(Base):
+    """Step 5 文獻證據：查詢抓回的單篇文章與它的分級。第 51 張表。
+
+    `level` 是**研究設計**層級，不是「這篇證明了成分作用於靶點」——PubMed 命中只代表共同出現
+    （規格 C 的 tier 4「文獻共現」）。`comention` 區分同一句提到／摘要各自提到／只靠查詢索引命中，
+    `direction` 是共現句裡的作用方向字詞（啟發式），兩者都只是讀文獻的線索。
+    """
+    __tablename__ = "literature_evidence"
+    __table_args__ = (UniqueConstraint("search_id", "pmid", name="uq_lit_evidence_search_pmid"),)
+
+    id = Column(String, primary_key=True, default=gen_id)
+    search_id = Column(String, ForeignKey("literature_searches.id"), nullable=False, index=True)
+    pmid = Column(String, nullable=False, index=True)
+    title = Column(Text, nullable=False)
+    journal = Column(String, nullable=True)
+    pub_year = Column(Integer, nullable=True)
+    doi = Column(String, nullable=True)
+    pub_types = Column(Text, nullable=True)          # JSON 陣列字串
+    level = Column(String, nullable=False)           # meta / trial / human_obs / animal / cell / computational / review / unknown
+    level_rank = Column(Integer, nullable=False)     # 數字越小越強，排序用
+    comention = Column(String, nullable=False)       # sentence / abstract / index_only
+    direction = Column(String, nullable=True)        # down / up / mixed / None
+    matched_entities = Column(Text, nullable=True)   # JSON：[{"kind": "herb"/"ingredient", "term": ..., "mol_id": ...}]
+    evidence_sentence = Column(Text, nullable=True)  # 共現句原文（外部文字，前端必須跳脫）
+    flags = Column(Text, nullable=True)              # JSON 陣列：circular / includes_computational / retracted ...
+    created_at = Column(DateTime, default=datetime.utcnow)

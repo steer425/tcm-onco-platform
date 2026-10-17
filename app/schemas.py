@@ -152,6 +152,8 @@ class RolePermissionOut(BaseModel):
     feature_name: str
     can_view: bool
     can_execute: bool
+    # 後端是否真的檢查這個功能的 can_execute（見 deps.EXECUTE_ENFORCED）；False＝操作只限管理者
+    execute_enforced: bool = False
     notes: Optional[str]
     # 全站共用設定（顯示用，供權限矩陣視窗一併編輯）
     enabled: bool

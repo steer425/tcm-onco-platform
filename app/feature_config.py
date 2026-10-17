@@ -159,6 +159,11 @@ FEATURE_CONFIG = [
     {"code": "F1-8", "module": "目標一/二", "name": "腫瘤細胞株依賴查詢站（DepMap，預設人參）",
      "nav_label": "腫瘤細胞株依賴", "page_url": "tumor-cells.html",
      "show_frontend": True, "show_backend": True, "sort_order": 77},
+    # 目標一 Step 5：PubMed 文獻證據分級。查詢的靶點就是 F1-8 通過選擇性門檻的那一份
+    # （共用 depmap_analysis.select_herb_targets）。查看＝can_view；向 PubMed 查詢＝can_execute。
+    {"code": "F1-9", "module": "目標一/二", "name": "文獻證據分級（PubMed，預設人參）",
+     "nav_label": "文獻證據分級", "page_url": "literature-evidence.html",
+     "show_frontend": True, "show_backend": True, "sort_order": 78},
 
     # ---- 其餘目標零基礎建設項目：現在都有對應頁面可查看/設定 ----
     {"code": "F0-1", "module": "目標零", "name": "前後台架構規劃",

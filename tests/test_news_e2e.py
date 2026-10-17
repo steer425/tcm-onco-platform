@@ -64,10 +64,11 @@ FAKE_ITEMS = [
        "Scutellariae Radix decoction in gastric cancer: a randomized controlled trial",
        "We randomized 210 patients with gastric cancer. AKT1 signaling was measured.",
        study_design="Randomized Controlled Trial", external_id="40000001"),
-    # 近似重複（只差複數 s）→ 應被 simhash 擋下
+    # 同一篇換了網址再出現（同 PMID）→ 應被編號層擋下。
+    # v1.47.1 起有編號的學術來源不做標題近似：PMID 不同就是不同論文，標題再像也保留。
     mk("pubmed",
        "Scutellariae Radix decoction in gastric cancer: a randomized controlled trials",
-       "duplicate-ish", study_design="Randomized Controlled Trial", external_id="40000002"),
+       "duplicate-ish", study_design="Randomized Controlled Trial", external_id="40000001"),
     # 臨床前（應排最後）
     mk("pubmed", "Network pharmacology and molecular docking of a herbal formula in liver cancer",
        "In vitro cytotoxic assay on HepG2 cell line with in silico molecular docking.",
@@ -147,7 +148,7 @@ def main():
           f"新增 {result['new_articles']}、精選 {result['digest_size']}、實體連結 {result['linked_entities']}")
     check("部分來源失敗 → status=partial", result["status"] == "partial", result["status"])
     check("不相關的 WHO 新聞被過濾", result["filtered_out"] >= 1, result["filtered_out"])
-    check("近似重複被擋下", result["duplicates"] >= 1, result["duplicates"])
+    check("重複被擋下（同 PMID）", result["duplicates"] >= 1 and result.get("dedupe", {}).get("id", 0) >= 1, result.get("dedupe"))
     check("有建立實體連結", result["linked_entities"] > 0, result["linked_entities"])
 
     # ---------- 前台每日新聞 ----------

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.database import get_db
-from app.deps import require_admin, write_audit_log
+from app.deps import EXECUTE_ENFORCED, require_admin, write_audit_log
 
 router = APIRouter(tags=["權限矩陣管理"])
 
@@ -73,6 +73,7 @@ def get_role_permissions(role_id: str, db: Session = Depends(get_db), admin: mod
             feature_id=f.id, feature_code=f.code, feature_name=f.name,
             can_view=p.can_view if p else False,
             can_execute=p.can_execute if p else False,
+            execute_enforced=f.code in EXECUTE_ENFORCED,
             notes=p.notes if p else None,
             enabled=f.enabled, show_frontend=f.show_frontend, show_backend=f.show_backend,
             nav_label=f.nav_label, page_url=f.page_url, sort_order=f.sort_order,

@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.46.8"
-set "DEFAULT_MSG=v1.46.8 Login page 3D text is now sharp: all scene labels, star names and database names on the manuals are HTML overlays positioned each frame instead of blurry canvas textures"
+set "EXPECTED_VER=1.48.1"
+set "DEFAULT_MSG=v1.48.1 Permission matrix marks can_execute as not enforced where the backend only allows admins; F1-9 search button hidden without execute permission"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

@@ -48,8 +48,16 @@ def require_admin(current_user: models.User = Depends(get_current_user)) -> mode
     return current_user
 
 
+# 實際有在後端檢查 can_execute 的功能代碼（`require_permission(..., need_execute=True)` 被呼叫時登記）。
+# v1.48.1 盤點：絕大多數後台操作用的是 `require_admin`（只認「管理者」角色），權限矩陣的「可執行」
+# 對它們**不生效**。權限矩陣用這份清單標出哪些功能的「可執行」真的有作用，避免管理者誤以為勾了就能授權。
+EXECUTE_ENFORCED: set[str] = set()
+
+
 def require_permission(feature_code: str, need_execute: bool = True):
     """依角色權限矩陣檢查目前使用者是否可執行(或可見)指定功能"""
+    if need_execute:
+        EXECUTE_ENFORCED.add(feature_code)
 
     def checker(
         current_user: models.User = Depends(get_current_user),

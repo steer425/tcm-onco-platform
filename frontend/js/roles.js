@@ -113,7 +113,11 @@ window.openPermModal = async (roleId, roleName) => {
         ${p.page_url ? `<div class="host-detail">路徑：frontend\\${p.page_url}</div>` : '<div class="host-detail">（無獨立頁面，例如 Dashboard 小工具或純權限開關）</div>'}
       </td>
       <td class="chk-cell"><input type="checkbox" data-field="can_view" ${p.can_view ? "checked" : ""}></td>
-      <td class="chk-cell"><input type="checkbox" data-field="can_execute" ${p.can_execute ? "checked" : ""}></td>
+      <td class="chk-cell">${p.execute_enforced
+        ? `<input type="checkbox" data-field="can_execute" ${p.can_execute ? "checked" : ""}>`
+        : `<input type="checkbox" data-field="can_execute" ${p.can_execute ? "checked" : ""} disabled
+             title="這個功能的操作目前只限「管理者」角色，勾選不會授權">
+           <div class="host-detail">不生效</div>`}</td>
       <td class="chk-cell"><input type="checkbox" data-field="enabled" ${p.enabled ? "checked" : ""}></td>
       <td class="chk-cell"><input type="checkbox" data-field="show_frontend" ${p.show_frontend ? "checked" : ""}></td>
       <td class="chk-cell"><input type="checkbox" data-field="show_backend" ${p.show_backend ? "checked" : ""}></td>
@@ -138,6 +142,7 @@ window.openPermModal = async (roleId, roleName) => {
       </thead>
       <tbody>${rows}</tbody>
     </table>
+    <p class="host-detail" style="margin-top:8px;">「可執行」只對標示可勾選的功能生效（後端有依權限矩陣檢查）；標「不生效」的功能，操作一律只限「管理者」角色，勾選不會授權。</p>
   `;
   document.getElementById("permModal").style.display = "flex";
 };
