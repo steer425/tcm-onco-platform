@@ -1122,6 +1122,16 @@ JSON → gzip → Fernet 一段一行，檔尾一段是各表筆數（還原時�
 - 前端輪詢遇到一次斷線不可直接判定失敗：伺服器可能正在重啟或喚醒
 - 加大新資料表前，先想一下備份會不會因此變大；這個專案的備份是在 512 MB 記憶體的機器上跑
 
+### 需要授權的檔案下載：在點擊當下開另存新檔，不要 fetch 完再程式點擊（v1.48.5）
+
+帶 Authorization 標頭的下載不能用一般連結，只能 fetch。fetch 很久之後才 `a.click()`，瀏覽器已不算使用者操作；
+同一頁之前若自動下載過，Chrome 會當成「自動下載多個檔案」默默擋掉（使用者只看到「按了沒反應」）。
+
+- 點擊事件裡**先**呼叫 `showSaveFilePicker()`（必須在使用者操作的當下），選好位置再 fetch，用 `response.body` 串流寫入
+- 不支援時退回 blob＋`<a download>`，`<a>` 要先 `appendChild` 進頁面（Firefox 才會下載），並告訴使用者檔案在哪
+- 不要在背景工作完成時自動觸發下載；給一個按鈕讓使用者按
+- 下載過程要有進度或狀態文字，伺服器慢的時候才不會被當成沒反應
+
 ### SQLAlchemy 2.0：`Connection.execution_options()` 會改掉那條連線（v1.48.4）
 
 `db.connection().execution_options(stream_results=True)` 回傳的是**同一個** Connection，設定一直留著，

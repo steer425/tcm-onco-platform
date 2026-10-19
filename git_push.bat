@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.48.4"
-set "DEFAULT_MSG=v1.48.4 Fix backup stuck as running on PostgreSQL: streaming options scoped to each SELECT instead of the session connection; live progress in backup notes; UTC times shown correctly"
+set "EXPECTED_VER=1.48.5"
+set "DEFAULT_MSG=v1.48.5 Backup download: Save button opens a Save As dialog immediately (choose folder), streams to disk with progress; fallback download explains where the file went; no more silent block"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

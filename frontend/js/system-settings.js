@@ -245,43 +245,113 @@ function formatBytes(bytes) {
   return (bytes / 1024 / 1024).toFixed(1) + " MB";
 }
 
+let BACKUP_JOBS = {};   // id → 紀錄（儲存時要用檔名與大小）
+
 async function loadBackupJobs() {
   const tbody = document.getElementById("backupJobsBody");
   try {
     const jobs = await api("/backup-jobs");
+    BACKUP_JOBS = Object.fromEntries(jobs.map(j => [j.id, j]));
     tbody.innerHTML = jobs.map(j => `
       <tr>
         <td>${fmtUtc(j.started_at)}</td>
         <td>${j.status === 'success' ? '✓ 成功' : j.status === 'failed' ? '✗ 失敗' : '進行中'}</td>
         <td>${formatBytes(j.size_bytes)}</td>
         <td>${esc(j.notes || "")}</td>
-        <td>${j.status === 'success' ? `<a href="#" onclick="downloadBackup('${j.id}'); return false;">下載</a>` : ""}</td>
+        <td>${j.status === 'success' ? `<button type="button" class="backup-save-btn" data-job="${esc(j.id)}">儲存…</button>` : ""}</td>
       </tr>
     `).join("") || '<tr><td colspan="5" class="hint-msg">尚無備份紀錄</td></tr>';
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5" class="hint-msg">載入失敗：${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="hint-msg">載入失敗：${esc(err.message)}</td></tr>`;
   }
 }
 
-window.downloadBackup = async (jobId) => {
-  try {
-    const token = getToken();
-    const res = await fetch((API_BASE || "") + `/system-settings/backup-database/${jobId}/download`, {
-      headers: { "Authorization": "Bearer " + token },
-    });
-    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || `HTTP ${res.status}`); }
-    const blob = await res.blob();
-    const disposition = res.headers.get("Content-Disposition") || "";
-    const match = disposition.match(/filename="(.+?)"/);
-    const filename = match ? match[1] : "backup.enc";
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = filename; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 3000);
-  } catch (err) {
-    alert("下載失敗：" + err.message);
+function backupFilename(job) {
+  const p = (job && job.file_path) || "";
+  const base = p.split(/[\\/]/).pop();
+  return base && base.endsWith(".enc") ? base : `backup_${(job && job.id) || "unknown"}.enc`;
+}
+
+/* 儲存備份檔（v1.48.5）
+ *
+ * 舊寫法：fetch 整個檔案進記憶體 → 建立 <a download> → 程式點擊。兩個問題：
+ *   1. 正式環境伺服器慢，fetch 超過幾秒後「程式點擊」已不算使用者操作；加上建立備份後已自動下載過一次，
+ *      Chrome 判定成「網站自動下載多個檔案」直接擋掉，只在網址列出現小圖示——使用者看到的是「按了沒反應」。
+ *      Firefox 則要求 <a> 必須在 DOM 裡才會下載。
+ *   2. 只能存到瀏覽器預設的下載資料夾。
+ * 新寫法：**在按鈕的點擊事件裡先開「另存新檔」對話框**（showSaveFilePicker，必須在使用者操作的當下呼叫），
+ * 使用者選好位置後才開始下載，邊下載邊寫入（不佔記憶體），並顯示進度。
+ * 不支援的瀏覽器（Firefox、Safari）退回一般下載，<a> 先掛進 DOM 再點，並說明檔案會在哪裡。
+ */
+async function saveBackup(jobId, btn) {
+  const job = BACKUP_JOBS[jobId] || { id: jobId };
+  const msg = document.getElementById("backupMsg");
+  const filename = backupFilename(job);
+  const url = (API_BASE || "") + `/system-settings/backup-database/${jobId}/download`;
+  const total = job.size_bytes || 0;
+  let handle = null;
+
+  if (window.showSaveFilePicker) {
+    try {
+      handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: "加密資料庫備份", accept: { "application/octet-stream": [".enc"] } }],
+      });
+    } catch (err) {
+      if (err && err.name === "AbortError") { msg.textContent = "已取消儲存。"; return; }
+      handle = null;   // 其他錯誤（例如被瀏覽器政策擋）就退回一般下載
+    }
   }
-};
+
+  if (btn) btn.disabled = true;
+  msg.textContent = "下載中…";
+  try {
+    const res = await fetch(url, { headers: { "Authorization": "Bearer " + getToken() } });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.detail || `HTTP ${res.status}`);
+    }
+    if (handle) {
+      const writable = await handle.createWritable();
+      const reader = res.body.getReader();
+      let done = 0;
+      for (;;) {
+        const { value, done: finished } = await reader.read();
+        if (finished) break;
+        await writable.write(value);
+        done += value.byteLength;
+        msg.textContent = total
+          ? `下載中… ${formatBytes(done)} / ${formatBytes(total)}（${Math.min(100, Math.round(done / total * 100))}%）`
+          : `下載中… ${formatBytes(done)}`;
+      }
+      await writable.close();
+      msg.textContent = `已儲存：${handle.name}（${formatBytes(done)}）。這份檔案含帳號與病患資料，請放在安全的位置。`;
+    } else {
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      const href = URL.createObjectURL(blob);
+      a.href = href;
+      a.download = filename;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 10000);
+      msg.textContent = `已交給瀏覽器下載：${filename}，會存到瀏覽器的預設下載資料夾。`
+        + "若要每次自選位置，請改用 Chrome／Edge，或在瀏覽器設定開啟「下載前詢問每個檔案的儲存位置」。";
+    }
+  } catch (err) {
+    msg.textContent = "儲存失敗：" + err.message;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+window.downloadBackup = (jobId) => saveBackup(jobId, null);   // 舊的呼叫點相容
+
+document.getElementById("backupJobsBody").addEventListener("click", (e) => {
+  const btn = e.target.closest(".backup-save-btn");
+  if (btn) saveBackup(btn.dataset.job, btn);
+});
 
 document.getElementById("createBackupBtn").addEventListener("click", async () => {
   const btn = document.getElementById("createBackupBtn");
@@ -331,9 +401,11 @@ document.getElementById("createBackupBtn").addEventListener("click", async () =>
     if (!finalStatus) {
       msg.textContent = "備份仍在處理中，請稍後重新整理頁面查看結果（背景作業會持續執行，不受這個頁面影響）";
     } else if (finalStatus.status === "success") {
-      msg.textContent = "備份完成 ✓ 正在自動下載...";
-      await window.downloadBackup(finalStatus.id);
-      setTimeout(() => { msg.textContent = ""; }, 3000);
+      // 不再自動下載（v1.48.5）：輪詢結束時已不在使用者操作的當下，瀏覽器不讓開「另存新檔」，
+      // 自動下載還會讓下一次手動下載被當成「自動下載多個檔案」擋掉。改成給一個按鈕讓使用者按。
+      msg.innerHTML = `備份完成 ✓ ${esc(finalStatus.notes || "")}　`
+        + `<button type="button" class="backup-save-btn" data-job="${esc(finalStatus.id)}">儲存備份檔…</button>`;
+      msg.querySelector(".backup-save-btn").addEventListener("click", (e) => saveBackup(finalStatus.id, e.currentTarget));
     } else {
       msg.textContent = "備份失敗：" + (finalStatus.notes || "未知錯誤");
     }
