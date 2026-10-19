@@ -29,3 +29,8 @@ node_modules/
 # 測試腳本自己建的 SQLite（v1.42.10）。v1.42.9 push 時 test_ingredient_mapping.db 被 `git add .` 帶上去了
 test*.db
 *.db-journal
+# v1.48.2：備份檔與還原演練產物。備份含帳號、病患、DNA 資料；git_push.bat 用 `git add .`，
+# 放在專案資料夾裡就會被推上 GitHub。加密的 .enc 也不進版控。
+*.enc
+restore*.db
+restore*.md

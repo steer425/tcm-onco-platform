@@ -13,15 +13,13 @@
 縮小快取範圍可以讓重建速度更快、佔用空間更小。
 """
 import datetime
-import json
+import os
 from pathlib import Path
 
-from cryptography.fernet import Fernet
-from sqlalchemy import DateTime, create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app import models
-from app.backup_service import _get_fernet_key
 
 LOCAL_CACHE_DB_PATH = Path(__file__).resolve().parent.parent / "backups" / "local_query_cache.db"
 
@@ -84,15 +82,18 @@ def is_local_cache_available() -> bool:
 
 
 def rebuild_local_cache(latest_backup_job) -> int:
-    """從最新一次成功備份的加密內容，重新建立本機端查詢快取。回傳寫入的資料列總數。"""
+    """從最新一次成功備份的加密內容，重新建立本機端查詢快取。回傳寫入的資料列總數。
+
+    v1.48.2：還原邏輯（日期字串轉回 datetime、略過多餘欄位）改呼叫 `backup_restore.restore_dump()`，
+    與命令列還原工具共用同一份，只是限定 CACHED_TABLES。
+    """
+    from app.backup_restore import restore_dump
+
     if not latest_backup_job or not latest_backup_job.file_path:
         raise ValueError("找不到可用的備份紀錄，無法建立本機端快取")
 
-    with open(latest_backup_job.file_path, "rb") as f:
-        encrypted = f.read()
-    fernet = Fernet(_get_fernet_key())
-    dump = json.loads(fernet.decrypt(encrypted))
-    tables_data = dump.get("tables", {})
+    if not os.path.exists(latest_backup_job.file_path):
+        raise ValueError("最新一次備份的檔案已不在伺服器上（Render 部署或重啟後會清空），請先重新建立一次備份")
 
     LOCAL_CACHE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     if LOCAL_CACHE_DB_PATH.exists():
@@ -102,35 +103,9 @@ def rebuild_local_cache(latest_backup_job) -> int:
     _local_engine = None  # 強制下次 _get_local_engine() 重新建立連線，指向剛清空重建的檔案
     engine = _get_local_engine()
 
-    # 只在本機快取資料庫裡建立我們需要的那幾張表（用主資料庫的表結構定義），不用整份 schema
-    tables_to_create = [t for t in models.Base.metadata.sorted_tables if t.name in CACHED_TABLES]
-    models.Base.metadata.create_all(bind=engine, tables=tables_to_create)
-
-    total_rows = 0
-    with engine.begin() as conn:
-        for table_name in CACHED_TABLES:
-            rows = tables_data.get(table_name, [])
-            if not rows:
-                continue
-            table_obj = next((t for t in tables_to_create if t.name == table_name), None)
-            if table_obj is None:
-                continue
-
-            # 備份 JSON 裡的日期時間是用 .isoformat() 存成字串（app/backup_service.py 的 _serialize_row），
-            # 但這裡要把資料寫回一個有正式 DateTime 欄位型別的資料表，SQLite 的 DateTime 型別只接受
-            # 真正的 Python datetime 物件，不接受字串，插入前要轉換回來，不然會直接噴 TypeError。
-            datetime_cols = [c.name for c in table_obj.columns if isinstance(c.type, DateTime)]
-            if datetime_cols:
-                for row in rows:
-                    for col in datetime_cols:
-                        val = row.get(col)
-                        if isinstance(val, str) and val:
-                            row[col] = datetime.datetime.fromisoformat(val)
-
-            conn.execute(table_obj.insert(), rows)
-            total_rows += len(rows)
-
-    return total_rows
+    # 直接從檔案逐段讀（v1.48.3）：整份載入記憶體在 Render 免費方案會撐爆
+    rep = restore_dump(engine, latest_backup_job.file_path, tables=CACHED_TABLES, require_empty=False)
+    return sum(v["in_target"] for v in rep["tables"].values())
 
 
 def get_local_cache_info():

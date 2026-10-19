@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.48.1"
-set "DEFAULT_MSG=v1.48.1 Permission matrix marks can_execute as not enforced where the backend only allows admins; F1-9 search button hidden without execute permission"
+set "EXPECTED_VER=1.48.3"
+set "DEFAULT_MSG=v1.48.3 Database backup restore tool (empty target only) and streaming backups: fixes production backup crash from running out of memory; stuck running backups marked failed on startup"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

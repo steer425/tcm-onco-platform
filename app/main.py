@@ -19,7 +19,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="TCM 中藥腫瘤篩選平台 - 後台系統 API（目標零）",
     description="帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄 / 每日重點新聞（含多語系簡短摘要）",
-    version="1.48.1",
+    version="1.48.3",
 )
 
 ALLOWED_ORIGINS = [
@@ -37,7 +37,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["Content-Length"],  # 跨網域請求預設不會公開回應標頭給 JS 讀取，進度條需要這個才能算出下載百分比
+    # 跨網域請求預設不會公開回應標頭給 JS 讀取：Content-Length 給進度條算百分比；
+    # Content-Disposition 讓備份下載保留伺服器給的檔名（backup_日期_時間.enc），否則一律變成 backup.enc（v1.48.3）
+    expose_headers=["Content-Length", "Content-Disposition"],
 )
 
 # ---------------------------------------------------------------------------
@@ -120,6 +122,12 @@ def on_startup():
     db = SessionLocal()
     try:
         seed_default_data(db)
+        # 上一個行程沒做完的備份不會再完成，改成 failed 並寫明原因（v1.48.3）
+        from app.backup_service import mark_interrupted_backups
+        try:
+            mark_interrupted_backups(db)
+        except Exception:  # noqa: BLE001 — 這一步失敗不能擋住開機
+            db.rollback()
     finally:
         db.close()
 

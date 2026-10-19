@@ -44,7 +44,7 @@
       </p>
       <table>
         <thead><tr><th>卡片</th><th>啟用</th><th>前台顯示</th><th>後台顯示</th><th></th></tr></thead>
-        <tbody id="dashWidgetsBody">載入中...</tbody>
+        <tbody id="dashWidgetsBody"><tr><td colspan="5" class="hint-msg">載入中...</td></tr></tbody>
       </table>
     </div>
 
@@ -70,13 +70,14 @@
       <p class="hint-msg" style="margin-top:0;">
         建立一份完整的資料庫備份並下載到你自己的電腦。備份路徑由系統自動決定（不開放自訂），檔案內容用加密方式儲存
         （備份裡含病患個資、DNA 資料、密碼雜湊等高度敏感資訊，即使檔案外流，沒有伺服器的密鑰也無法讀取內容）。
-        這一版還沒有做「還原」功能，只能匯出。
+        <b>建立後請立刻下載</b>：伺服器每次部署或重啟都會清空上面的檔案，下載到自己電腦的那份才是真正的備份。<br>
+        還原請在自己電腦執行 <code>python -m app.restore_backup 備份檔.enc --target sqlite:///還原.db</code>，只會還原到空的資料庫，不會覆蓋任何現有資料。
       </p>
       <button id="createBackupBtn">建立備份並下載</button>
       <span id="backupMsg" class="hint-msg"></span>
       <table style="margin-top:14px;">
         <thead><tr><th>時間</th><th>狀態</th><th>大小</th><th>備注</th><th></th></tr></thead>
-        <tbody id="backupJobsBody">載入中...</tbody>
+        <tbody id="backupJobsBody"><tr><td colspan="5" class="hint-msg">載入中...</td></tr></tbody>
       </table>
     </div>
 

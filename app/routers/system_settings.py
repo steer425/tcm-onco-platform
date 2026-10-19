@@ -1,5 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
 from app import models
@@ -189,20 +189,16 @@ def download_backup(job_id: str, db: Session = Depends(get_db), admin: models.Us
     if not job or not job.file_path:
         raise HTTPException(status_code=404, detail="找不到備份紀錄，或這筆紀錄還沒有實際備份檔案")
 
-    from app.backup_service import read_backup_file
-    try:
-        content = read_backup_file(job.file_path)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="備份檔案在伺服器上已經不存在（可能已被清除）")
+    import os
+    if not os.path.exists(job.file_path):
+        raise HTTPException(status_code=404,
+                            detail="備份檔案在伺服器上已經不存在：Render 每次部署或重啟都會清空伺服器上的檔案。請重新建立一次備份並立刻下載。")
 
     write_audit_log(db, admin, "download_backup", "backup_job", job.id, "下載加密備份檔案到本機")
 
-    filename = job.file_path.split("/")[-1]
-    return Response(
-        content=content,
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    # 串流回傳（v1.48.3）：舊寫法整個檔案讀進記憶體再回傳，大檔在免費方案會撐爆
+    filename = os.path.basename(job.file_path)
+    return FileResponse(job.file_path, media_type="application/octet-stream", filename=filename)
 
 
 # ---------------------------------------------------------------------------

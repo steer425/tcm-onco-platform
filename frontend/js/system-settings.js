@@ -227,6 +227,9 @@ document.getElementById("saveGraphLimitsBtn").addEventListener("click", async ()
 loadGraphLimits();
 
 // ---------- 資料庫備份到本機 ----------
+const esc = (v) => String(v == null ? "" : v)
+  .replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
 function formatBytes(bytes) {
   if (bytes == null) return "-";
   if (bytes < 1024) return bytes + " B";
@@ -243,7 +246,7 @@ async function loadBackupJobs() {
         <td>${new Date(j.started_at).toLocaleString("zh-Hant")}</td>
         <td>${j.status === 'success' ? '✓ 成功' : j.status === 'failed' ? '✗ 失敗' : '進行中'}</td>
         <td>${formatBytes(j.size_bytes)}</td>
-        <td>${j.notes || ""}</td>
+        <td>${esc(j.notes || "")}</td>
         <td>${j.status === 'success' ? `<a href="#" onclick="downloadBackup('${j.id}'); return false;">下載</a>` : ""}</td>
       </tr>
     `).join("") || '<tr><td colspan="5" class="hint-msg">尚無備份紀錄</td></tr>';
@@ -282,18 +285,35 @@ document.getElementById("createBackupBtn").addEventListener("click", async () =>
     await loadBackupJobs();
 
     // 備份是在背景執行的（避免正式環境資料量大時，同步等待整個HTTP請求逾時），
-    // 這裡改成輪詢查詢這筆紀錄的狀態，最多等 2 分鐘，每 2 秒查一次
+    // 這裡改成輪詢查詢這筆紀錄的狀態，最多等 5 分鐘，每 2 秒查一次。
+    // v1.48.3：輪詢途中連不上伺服器**不等於備份失敗**——伺服器可能正在重啟或喚醒，
+    // 不要一次斷線就丟出「備份失敗」。連續斷線就停下來說明，等伺服器回來後重新整理即可看到結果
+    // （伺服器若真的在備份途中重啟，開機時會把那筆紀錄改成「失敗」並寫明原因）。
     const jobId = job.id;
     let finalStatus = null;
-    for (let i = 0; i < 60; i++) {
+    let offline = 0;
+    for (let i = 0; i < 150; i++) {
       await new Promise(r => setTimeout(r, 2000));
-      const jobs = await api("/backup-jobs");
+      let jobs;
+      try {
+        jobs = await api("/backup-jobs");
+        offline = 0;
+      } catch (pollErr) {
+        offline += 1;
+        msg.textContent = `伺服器暫時沒有回應（可能正在重啟），繼續等待…（${offline}）`;
+        if (offline >= 15) break;
+        continue;
+      }
       const current = jobs.find(j => j.id === jobId);
       if (current && current.status !== "running") {
         finalStatus = current;
         break;
       }
       msg.textContent = `背景處理中，已等待 ${(i + 1) * 2} 秒...`;
+    }
+    if (offline >= 15) {
+      msg.textContent = "伺服器連續 30 秒沒有回應，備份可能因伺服器重啟而中斷。請稍候一兩分鐘重新整理頁面查看結果；若顯示失敗，再重新建立一次。";
+      return;
     }
     await loadBackupJobs();
 
