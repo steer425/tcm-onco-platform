@@ -8,6 +8,7 @@
   3. 金鑰不符給看得懂的訊息（換過 TCM_JWT_SECRET 是最可能的情境）
   4. 舊備份遇到新 schema（多欄、少表）照樣能還原，報表寫清楚差異
   5. 唯讀快取重建走同一支 restore_dump
+  7. （v1.48.4）備份不可改動 session 連線的執行選項；設定 TEST_PG_URL 時另在 PostgreSQL 上實測
   6. （v1.48.3）格式 2 分段串流：記憶體與資料量無關；檔案被截斷或中段損毀 → 拒絕且整批 rollback；
      舊格式 1 的備份照樣能還原；伺服器重啟留下的「進行中」紀錄開機時改成失敗
 """
@@ -239,6 +240,50 @@ def main():
     except Exception:  # noqa: BLE001
         grow = 9999
     check("**15 萬列備份時，記憶體增加 < 40 MB**（舊寫法 40 萬列峰值 546 MB）", grow < 40, grow)
+
+    print("\n【備份不可改動 session 的連線設定（v1.48.4）】")
+    sdb = SessionLocal()
+    p2, _ = create_encrypted_backup(sdb)
+    opts = dict(sdb.connection().get_execution_options())
+    check("**備份結束後，同一個 session 的連線沒有殘留 stream_results**（v1.48.3 在 PostgreSQL 上因此卡住）",
+          "stream_results" not in opts and "yield_per" not in opts, opts)
+    jj = models.BackupJob(status=models.BackupStatus.running)
+    sdb.add(jj)
+    sdb.commit()
+    jj.status = models.BackupStatus.success
+    sdb.commit()
+    check("備份後同一個 session 還能正常 UPDATE", sdb.query(models.BackupJob).get(jj.id).status == models.BackupStatus.success)
+    sdb.close()
+    os.remove(p2)
+    seen = []
+    sdb = SessionLocal()
+    p3, _ = create_encrypted_backup(sdb, progress=lambda *a: seen.append(a))
+    sdb.close()
+    total3 = sum(br.decrypt_backup(p3)["counts"].values())
+    os.remove(p3)
+    check("進度回呼：每張表至少一次、最後一次是最後一張表、累計列數等於這份備份的總筆數",
+          len(seen) >= len(models.Base.metadata.sorted_tables)
+          and seen[-1][0] == seen[-1][1] == len(models.Base.metadata.sorted_tables)
+          and seen[-1][4] == total3, (len(seen), seen[-1][:2], seen[-1][4], total3))
+
+    pg = os.environ.get("TEST_PG_URL")
+    if pg:
+        print("\n【PostgreSQL（TEST_PG_URL）】")
+        pg_eng = create_engine(pg)
+        models.Base.metadata.create_all(pg_eng)
+        PgSession = sessionmaker(bind=pg_eng)
+        pdb = PgSession()
+        pp, _ = create_encrypted_backup(pdb, progress=lambda *a: None)
+        job = models.BackupJob(status=models.BackupStatus.running)
+        pdb.add(job)
+        pdb.commit()
+        job.status = models.BackupStatus.success
+        pdb.commit()
+        check("PostgreSQL：備份後同一個 session 還能 UPDATE", True)
+        pdb.close()
+        os.remove(pp)
+    else:
+        print("  （未設定 TEST_PG_URL，略過 PostgreSQL 實測；上線前改到備份相關程式時請設定後再跑一次）")
 
     print("\n【網頁端：下載串流、伺服器重啟留下的紀錄】")
     from fastapi.testclient import TestClient

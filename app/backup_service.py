@@ -34,7 +34,7 @@ from datetime import datetime
 from pathlib import Path
 
 from cryptography.fernet import Fernet
-from sqlalchemy import text
+from sqlalchemy import DateTime, text
 
 from app import models
 from app.security import SECRET_KEY
@@ -63,34 +63,65 @@ def _serialize_row(row) -> dict:
 
 def _seal(fernet: Fernet, obj) -> bytes:
     raw = json.dumps(obj, ensure_ascii=False, default=str).encode("utf-8")
-    return fernet.encrypt(gzip.compress(raw, compresslevel=6)) + b"\n"
+    # 壓縮等級 1：正式環境只有 0.1 顆 CPU，等級 6 的壓縮時間是 1 的兩倍多，檔案只小一點
+    return fernet.encrypt(gzip.compress(raw, compresslevel=1)) + b"\n"
 
 
-def write_backup_stream(db, out, chunk_rows: int = CHUNK_ROWS) -> dict:
+def write_backup_stream(db, out, chunk_rows: int = CHUNK_ROWS, progress=None) -> dict:
     """把整個資料庫以格式 2 寫進 out（binary file）。回傳 {表: 筆數}。
 
     逐表用 stream_results 分批讀，PostgreSQL 會用伺服器端游標，不會一次把整張表拉進記憶體。
+
+    progress(i, n_tables, table, table_rows, total_rows, elapsed_s) 每段寫完呼叫一次（呼叫端自行節流）。
+    v1.48.4：正式環境（0.1 顆 CPU、資料庫在另一個機房）跑了 15 分鐘沒完成，卻看不到卡在哪——
+    進度要寫得出來，下次才知道是哪張表、多少列、每段多久。
     """
+    import time as _time
+
     fernet = Fernet(_get_fernet_key())
     out.write(MAGIC)
     counts = {}
-    conn = db.connection().execution_options(stream_results=True, yield_per=chunk_rows)
-    for table in models.Base.metadata.sorted_tables:
+    tables = models.Base.metadata.sorted_tables
+    t0, total = _time.monotonic(), 0
+    # ⚠️ 串流選項只能掛在「這一道 SELECT」上，不能掛在連線上。
+    # SQLAlchemy 2.0 的 Connection.execution_options() 會**直接改掉這條連線**（回傳的是同一個物件），
+    # 之後同一個 session 的 UPDATE 也被當成伺服器端游標送出，PostgreSQL 回
+    # 「syntax error at or near "UPDATE"」——v1.48.3 上線後備份檔其實寫完了，卻在把紀錄改成成功時失敗，
+    # 錯誤處理用同一條連線再失敗一次，紀錄就永遠停在「進行中」（10/19 實際發生）。SQLite 忽略這個選項，測試抓不到。
+    conn = db.connection()
+    for i, table in enumerate(tables, start=1):
         n = 0
-        result = conn.execute(text(f'SELECT * FROM "{table.name}"'))
+        stmt = text(f'SELECT * FROM "{table.name}"').execution_options(
+            stream_results=True, yield_per=chunk_rows)
+        result = conn.execute(stmt)
+        keys = list(result.keys())
+        # 逐列 row._mapping 取值是備份最花 CPU 的一步（本機實測佔 6 成）；改成 zip 一次配對
+        dt_idx = [k for k, c in enumerate(keys) if c in {col.name for col in table.columns
+                                                         if isinstance(col.type, DateTime)}]
         for part in result.partitions(chunk_rows):
-            rows = [_serialize_row(r) for r in part]
+            rows = []
+            for r in part:
+                vals = list(r)
+                for k in dt_idx:
+                    if isinstance(vals[k], datetime):
+                        vals[k] = vals[k].isoformat()
+                rows.append(dict(zip(keys, vals)))
             out.write(_seal(fernet, {"t": table.name, "r": rows}))
             n += len(rows)
+            total += len(rows)
+            if progress:
+                progress(i, len(tables), table.name, n, total, _time.monotonic() - t0)
         if n == 0:
             out.write(_seal(fernet, {"t": table.name, "r": []}))   # 讓還原端知道這張表存在、只是空的
+            if progress:
+                progress(i, len(tables), table.name, 0, total, _time.monotonic() - t0)
         counts[table.name] = n
     out.write(_seal(fernet, {"meta": {"format": 2, "exported_at": datetime.utcnow().isoformat(),
                                       "counts": counts}}))
     return counts
 
 
-def create_encrypted_backup(db) -> tuple:
+def create_encrypted_backup(db, progress=None) -> tuple:
     """建立一份加密備份檔案，回傳 (file_path, size_bytes)。路徑由系統自動決定，不開放使用者指定。"""
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -98,7 +129,7 @@ def create_encrypted_backup(db) -> tuple:
     partial = file_path.with_suffix(".enc.partial")
     try:
         with open(partial, "wb") as f:
-            write_backup_stream(db, f)
+            write_backup_stream(db, f, progress=progress)
         os.replace(partial, file_path)
     finally:
         if partial.exists():

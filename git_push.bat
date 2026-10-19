@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.48.3"
-set "DEFAULT_MSG=v1.48.3 Database backup restore tool (empty target only) and streaming backups: fixes production backup crash from running out of memory; stuck running backups marked failed on startup"
+set "EXPECTED_VER=1.48.4"
+set "DEFAULT_MSG=v1.48.4 Fix backup stuck as running on PostgreSQL: streaming options scoped to each SELECT instead of the session connection; live progress in backup notes; UTC times shown correctly"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

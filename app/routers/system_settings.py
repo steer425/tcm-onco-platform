@@ -158,20 +158,53 @@ def create_backup(background_tasks: BackgroundTasks, db: Session = Depends(get_d
             bg_job = bg_db.query(models.BackupJob).filter(models.BackupJob.id == job_id).first()
             if not bg_job:
                 return
+            # 進度寫回紀錄的備註（v1.48.4）：前端輪詢時看得到「第幾張表、幾列、幾秒」，
+            # 卡住時才知道卡在哪。必須用另一個 session 寫——bg_db 的連線正開著伺服器端游標串流讀資料，
+            # 在它上面 commit 會把游標關掉。每 3 秒最多寫一次，避免拖慢備份本身。
+            import time as _time
+            last = {"t": 0.0}
+            summary = {}
+            sqlite = bg_db.get_bind().dialect.name == "sqlite"
+
+            def _progress(i, n, table, table_rows, total_rows, elapsed):
+                summary.update(tables=n, rows=total_rows, seconds=elapsed)
+                now = _time.monotonic()
+                # SQLite（本機開發）：讀取中的連線持有共享鎖，另一個 session 寫入會卡在 busy timeout，
+                # 反而拖慢備份。本機資料量小，不寫進度
+                if sqlite or now - last["t"] < 3:
+                    return
+                last["t"] = now
+                pdb = SessionLocal()
+                try:
+                    pj = pdb.query(models.BackupJob).filter(models.BackupJob.id == job_id).first()
+                    if pj and pj.status == models.BackupStatus.running:
+                        pj.notes = (f"處理中：第 {i}/{n} 張表 {table}（這張表已讀 {table_rows:,} 列），"
+                                    f"累計 {total_rows:,} 列，已經過 {int(elapsed)} 秒")
+                        pdb.commit()
+                except Exception:  # noqa: BLE001 — 進度寫不進去不影響備份本身
+                    pdb.rollback()
+                finally:
+                    pdb.close()
+
             try:
-                file_path, size_bytes = create_encrypted_backup(bg_db)
+                file_path, size_bytes = create_encrypted_backup(bg_db, progress=_progress)
+                bg_db.expire_all()
+                bg_job = bg_db.query(models.BackupJob).filter(models.BackupJob.id == job_id).first()
                 bg_job.status = models.BackupStatus.success
                 bg_job.file_path = file_path
                 bg_job.size_bytes = size_bytes
-                bg_job.notes = "手動觸發，透過系統設定頁面下載到本機"
+                bg_job.notes = (f"手動觸發，透過系統設定頁面下載到本機（{summary.get('tables', 0)} 張表、"
+                                f"{summary.get('rows', 0):,} 列，耗時 {int(summary.get('seconds', 0))} 秒）")
                 bg_job.finished_at = _dt.datetime.utcnow()
                 bg_db.commit()
                 admin_user = bg_db.query(models.User).filter(models.User.id == admin_id).first()
                 if admin_user:
                     write_audit_log(bg_db, admin_user, "create_backup", "backup_job", job_id, f"建立資料庫備份，檔案大小 {size_bytes} bytes")
             except Exception as e:
+                bg_db.rollback()
+                bg_job = bg_db.query(models.BackupJob).filter(models.BackupJob.id == job_id).first()
                 bg_job.status = models.BackupStatus.failed
-                bg_job.notes = f"備份失敗：{e}"
+                bg_job.notes = f"備份失敗：{type(e).__name__}: {str(e)[:500]}"
                 bg_job.finished_at = _dt.datetime.utcnow()
                 bg_db.commit()
         finally:

@@ -230,6 +230,14 @@ loadGraphLimits();
 const esc = (v) => String(v == null ? "" : v)
   .replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+// 後端存的是 UTC、沒有帶時區（datetime.utcnow().isoformat()），直接 new Date() 會被當成本地時間，
+// 畫面上整整差 8 小時（10/19 回報的「上午 9:55」其實是台灣 17:55）。沒帶時區就補 Z 當 UTC 解讀。
+function fmtUtc(s) {
+  if (!s) return "-";
+  const iso = /[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : s + "Z";
+  return new Date(iso).toLocaleString("zh-Hant");
+}
+
 function formatBytes(bytes) {
   if (bytes == null) return "-";
   if (bytes < 1024) return bytes + " B";
@@ -243,7 +251,7 @@ async function loadBackupJobs() {
     const jobs = await api("/backup-jobs");
     tbody.innerHTML = jobs.map(j => `
       <tr>
-        <td>${new Date(j.started_at).toLocaleString("zh-Hant")}</td>
+        <td>${fmtUtc(j.started_at)}</td>
         <td>${j.status === 'success' ? '✓ 成功' : j.status === 'failed' ? '✗ 失敗' : '進行中'}</td>
         <td>${formatBytes(j.size_bytes)}</td>
         <td>${esc(j.notes || "")}</td>
@@ -285,14 +293,14 @@ document.getElementById("createBackupBtn").addEventListener("click", async () =>
     await loadBackupJobs();
 
     // 備份是在背景執行的（避免正式環境資料量大時，同步等待整個HTTP請求逾時），
-    // 這裡改成輪詢查詢這筆紀錄的狀態，最多等 5 分鐘，每 2 秒查一次。
+    // 這裡改成輪詢查詢這筆紀錄的狀態，最多等 20 分鐘，每 2 秒查一次；處理中顯示後端回報的進度（v1.48.4）。
     // v1.48.3：輪詢途中連不上伺服器**不等於備份失敗**——伺服器可能正在重啟或喚醒，
     // 不要一次斷線就丟出「備份失敗」。連續斷線就停下來說明，等伺服器回來後重新整理即可看到結果
     // （伺服器若真的在備份途中重啟，開機時會把那筆紀錄改成「失敗」並寫明原因）。
     const jobId = job.id;
     let finalStatus = null;
     let offline = 0;
-    for (let i = 0; i < 150; i++) {
+    for (let i = 0; i < 600; i++) {
       await new Promise(r => setTimeout(r, 2000));
       let jobs;
       try {
@@ -309,7 +317,10 @@ document.getElementById("createBackupBtn").addEventListener("click", async () =>
         finalStatus = current;
         break;
       }
-      msg.textContent = `背景處理中，已等待 ${(i + 1) * 2} 秒...`;
+      msg.textContent = (current && current.notes && current.notes.startsWith("處理中"))
+        ? current.notes
+        : `背景處理中，已等待 ${(i + 1) * 2} 秒...`;
+      if (i % 5 === 4) loadBackupJobs();
     }
     if (offline >= 15) {
       msg.textContent = "伺服器連續 30 秒沒有回應，備份可能因伺服器重啟而中斷。請稍候一兩分鐘重新整理頁面查看結果；若顯示失敗，再重新建立一次。";
@@ -338,7 +349,7 @@ loadBackupJobs();
 // ---------- 唯讀模式（連線本機端資料庫） ----------
 function formatLocalCacheInfo(cache) {
   if (!cache) return "目前還沒有本機端查詢快取。";
-  return `本機端查詢快取建立於：${new Date(cache.built_at).toLocaleString("zh-Hant")}，大小 ${formatBytes(cache.size_bytes)}`;
+  return `本機端查詢快取建立於：${fmtUtc(cache.built_at)}，大小 ${formatBytes(cache.size_bytes)}`;
 }
 
 async function loadReadOnlyMode() {

@@ -1122,6 +1122,16 @@ JSON → gzip → Fernet 一段一行，檔尾一段是各表筆數（還原時�
 - 前端輪詢遇到一次斷線不可直接判定失敗：伺服器可能正在重啟或喚醒
 - 加大新資料表前，先想一下備份會不會因此變大；這個專案的備份是在 512 MB 記憶體的機器上跑
 
+### SQLAlchemy 2.0：`Connection.execution_options()` 會改掉那條連線（v1.48.4）
+
+`db.connection().execution_options(stream_results=True)` 回傳的是**同一個** Connection，設定一直留著，
+之後同一個 session 的 UPDATE 也變成伺服器端游標，PostgreSQL 回 `syntax error at or near "UPDATE"`（v1.48.3 備份卡在「進行中」）。
+
+- 串流、`yield_per` 這類選項一律掛在**單一 statement** 上：`text(...).execution_options(...)` 或 `select(...).execution_options(...)`
+- **SQLite 會默默忽略這類選項，本機測試抓不到**。動到資料庫連線行為的程式（串流、游標、交易、鎖），上線前要在 PostgreSQL 實測，
+  而且要測到「同一個流程的最後一步」（例如寫回狀態），不能只測主體。`tests/test_backup_restore.py` 在設定 `TEST_PG_URL` 時會跑 PostgreSQL
+- 背景工作的錯誤處理先 `rollback()` 再寫失敗狀態；不要用剛出錯的連線直接寫
+
 ### 還原（v1.48.2）
 
 `app/backup_restore.py`＋命令列入口 `python -m app.restore_backup 備份檔.enc --target <空資料庫網址>`。
