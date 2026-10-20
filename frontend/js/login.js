@@ -185,3 +185,13 @@ document.getElementById("facebookLoginBtn").addEventListener("click", () => {
   };
   showLoginError(messages[err] || ("第三方登入失敗：" + err));
 })();
+
+// v1.49.0：被登出（改密碼、登出所有裝置、管理者強制登出、登入已撤銷）時，把原因顯示在登入頁
+(function showLogoutReason() {
+  let reason = null;
+  try {
+    reason = sessionStorage.getItem("tcm_logout_reason");
+    if (reason) sessionStorage.removeItem("tcm_logout_reason");
+  } catch (e) { /* 私密視窗 */ }
+  if (reason) showLoginError(reason);
+})();

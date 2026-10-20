@@ -18,7 +18,8 @@ from app.oauth_google import (
     FRONTEND_BASE_URL, build_google_auth_url, exchange_code_for_userinfo as google_exchange_code_for_userinfo,
     google_oauth_configured,
 )
-from app.security import create_access_token, create_oauth_state_token, hash_password, verify_oauth_state_token, verify_password
+from app import account_security as sec
+from app.security import create_oauth_state_token, hash_password, verify_oauth_state_token, verify_password
 
 router = APIRouter(prefix="/auth", tags=["登入與帳號申請"])
 
@@ -115,13 +116,18 @@ def _handle_oauth_login(db: Session, provider: models.OAuthProvider, provider_us
     db.commit()
     db.refresh(login_log)
 
-    token = create_access_token({"sub": user.id, "acc": user.account})
+    token = sec.issue_token(user, login_log.id)
     write_audit_log(db, user, f"login_{provider.value}", "user", user.id, f"{user.account} 以 {provider_label} 帳號登入")
     return RedirectResponse(f"{FRONTEND_BASE_URL}/oauth_callback.html?token={token}&login_log_id={login_log.id}")
 
 
 @router.post("/apply", response_model=schemas.ApplicationOut, summary="申請新帳號")
 def apply_account(payload: schemas.ApplyAccountRequest, db: Session = Depends(get_db)):
+    problem = sec.account_problem(payload.account) or sec.password_problem(payload.password, payload.account)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
+    if payload.notes and len(payload.notes) > 500:
+        raise HTTPException(status_code=400, detail="申請說明請在 500 字以內")
     existing = db.query(models.User).filter(models.User.account == payload.account).first()
     if existing:
         raise HTTPException(status_code=400, detail="此帳號已存在或已提出申請")
@@ -146,14 +152,33 @@ def apply_account(payload: schemas.ApplyAccountRequest, db: Session = Depends(ge
 @router.post("/login", response_model=schemas.TokenResponse, summary="登入")
 def login(payload: schemas.LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.account == payload.account).first()
-    if not user or not verify_password(payload.password, user.password_hash):
+    client_ip = request.client.host if request.client else None
+    if not user:
+        sec.burn_password_check(payload.password)   # 讓「帳號不存在」與「密碼錯」一樣慢
+        write_audit_log(db, None, "login_failed", "user", None,
+                        f"登入失敗（帳號不存在）：{payload.account[:64]}，IP {client_ip or '未知'}")
+        raise HTTPException(status_code=401, detail="帳號或密碼錯誤")
+    # v1.49.0：連續失敗 5 次鎖 15 分鐘。鎖定中連密碼都不比對，避免被拿來繼續猜
+    remaining = sec.lock_remaining_minutes(user)
+    if remaining:
+        raise HTTPException(status_code=429,
+                            detail=f"密碼錯誤次數過多，帳號暫時鎖定，請 {remaining} 分鐘後再試，或請管理者解鎖")
+    if not verify_password(payload.password, user.password_hash):
+        locked = sec.register_failure(user)
+        db.commit()
+        write_audit_log(db, user, "login_failed", "user", user.id,
+                        f"{user.account} 密碼錯誤，IP {client_ip or '未知'}"
+                        + (f"；連續 {sec.MAX_FAILED} 次，鎖定 {sec.LOCK_MINUTES} 分鐘" if locked else ""))
+        if locked:
+            raise HTTPException(status_code=429,
+                                detail=f"密碼錯誤次數過多，帳號已鎖定 {sec.LOCK_MINUTES} 分鐘，或請管理者解鎖")
         raise HTTPException(status_code=401, detail="帳號或密碼錯誤")
     if user.status == models.UserStatus.pending:
         raise HTTPException(status_code=403, detail="帳號審核中，請等待管理者審核通過")
     if user.status == models.UserStatus.suspended:
         raise HTTPException(status_code=403, detail=f"帳號已停用：{user.suspend_reason or '未填寫原因'}")
 
-    client_ip = request.client.host if request.client else None
+    sec.register_success(user)
     login_log = models.LoginLog(
         user_id=user.id,
         account=user.account,
@@ -165,7 +190,7 @@ def login(payload: schemas.LoginRequest, request: Request, db: Session = Depends
     db.commit()
     db.refresh(login_log)
 
-    token = create_access_token({"sub": user.id, "acc": user.account})
+    token = sec.issue_token(user, login_log.id)
     write_audit_log(db, user, "login", "user", user.id, f"{user.account} 登入系統")
     return schemas.TokenResponse(access_token=token, login_log_id=login_log.id)
 

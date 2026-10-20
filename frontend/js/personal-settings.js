@@ -207,6 +207,12 @@ document.getElementById("pwForm").addEventListener("submit", async (e) => {
     msg.className = "ok-msg";
     msg.textContent = `${r.message}${r.note ? "　" + r.note : ""}`;
     document.getElementById("pwForm").reset();
+    // v1.49.0：改密碼後所有登入（包含這一個）都已失效，留在這頁只會一直 401；停 3 秒讓人看到訊息再回登入頁
+    if (r.relogin) {
+      try { sessionStorage.setItem("tcm_logout_reason", r.message); } catch (e) { /* 私密視窗 */ }
+      setTimeout(() => { clearSession(); window.location.href = "index.html"; }, 3000);
+      return;
+    }
     loadProfile();
     loadAuditLogs();
   } catch (err) {
@@ -214,6 +220,19 @@ document.getElementById("pwForm").addEventListener("submit", async (e) => {
     msg.textContent = err.message || "變更失敗";
   } finally {
     btn.disabled = false;
+  }
+});
+// v1.49.0：登出所有裝置（懷疑帳號被盜用時用；這一台也會登出）
+document.getElementById("logoutAllBtn").addEventListener("click", async () => {
+  if (!confirm("確定要登出所有裝置嗎？包含這一台，之後要重新登入。")) return;
+  const m = document.getElementById("logoutAllMsg");
+  try {
+    const r = await api("/me/logout-all", { method: "POST" });
+    m.textContent = r.message;
+    try { sessionStorage.setItem("tcm_logout_reason", r.message); } catch (e) { /* 私密視窗 */ }
+    setTimeout(() => { clearSession(); window.location.href = "index.html"; }, 2000);
+  } catch (err) {
+    m.textContent = "失敗：" + err.message;
   }
 });
 document.getElementById("loginMore").addEventListener("click", () => { loginLimit += 50; loadLoginLogs(); });

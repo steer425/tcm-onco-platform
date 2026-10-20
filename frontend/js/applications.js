@@ -8,6 +8,10 @@ async function loadUserInfo() {
 
 const statusLabel = { pending: "審核中", approved: "已核准", rejected: "已駁回" };
 
+// 外部輸入（申請人填的帳號、備註）一律跳脫後才放進畫面（v1.49.0）
+const escHtml = (v) => String(v == null ? "" : v)
+  .replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
 async function loadApplications() {
   const status = document.getElementById("statusFilter").value;
   const params = new URLSearchParams();
@@ -18,13 +22,13 @@ async function loadApplications() {
   list.forEach((a) => {
     const tr = document.createElement("tr");
     const actions = a.status === "pending"
-      ? `<button onclick="reviewApp('${a.id}', true)">核准</button>
-         <button class="danger" onclick="reviewApp('${a.id}', false)">駁回</button>`
-      : `<button class="danger" onclick="deleteApp('${a.id}')">刪除紀錄</button>`;
+      ? `<button onclick="reviewApp('${escHtml(a.id)}', true)">核准</button>
+         <button class="danger" onclick="reviewApp('${escHtml(a.id)}', false)">駁回</button>`
+      : `<button class="danger" onclick="deleteApp('${escHtml(a.id)}')">刪除紀錄</button>`;
     tr.innerHTML = `
-      <td>${a.account}</td>
-      <td><span class="tag">${statusLabel[a.status] || a.status}</span></td>
-      <td>${a.notes || ""}</td>
+      <td>${escHtml(a.account)}</td>
+      <td><span class="tag">${escHtml(statusLabel[a.status] || a.status)}</span></td>
+      <td>${escHtml(a.notes || "")}</td>
       <td>${new Date(a.created_at).toLocaleString()}</td>
       <td class="actions">${actions}</td>
     `;

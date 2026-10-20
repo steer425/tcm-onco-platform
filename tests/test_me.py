@@ -102,6 +102,9 @@ def main(client):
     # 管理者對 bob 做事：alice 不該看到
     bob = db.query(models.User).filter(models.User.account == "bob").first()
     client.put(f"/users/{bob.id}", headers=A, json={"notes": "bob only"})
+    # v1.49.0：管理者重設密碼 → alice 原本的登入全部失效
+    check("**管理者重設密碼後，alice 原本的 token 失效**", client.get("/me/profile", headers=H).status_code == 401)
+    H = {"Authorization": f"Bearer {login(client, 'alice', 'AdminSet99').json()['access_token']}"}
     au = client.get("/me/audit-logs", headers=H).json()
     other = [i for i in au["items"] if not i["by_me"]]
     check("**看得到管理者對自己帳號的操作**，標示為他人操作",
@@ -127,14 +130,16 @@ def main(client):
           put(cur, "密碼" * 12 + "a1").status_code == 400)
 
     r = put(cur, "Better2026z")
-    check("合格的新密碼 → 200，並提醒其他工作階段不會立刻失效",
-          r.status_code == 200 and "8 小時" in r.json()["note"], r.text)
+    check("合格的新密碼 → 200，要求重新登入（v1.49.0：所有裝置含自己都登出）",
+          r.status_code == 200 and r.json().get("relogin") is True, r.text)
+    check("改密碼後這個 token 也失效", client.get("/me/profile", headers=H).status_code == 401)
     check("舊密碼不能再登入", login(client, "alice", cur).status_code == 401)
     check("新密碼可以登入", login(client, "alice", "Better2026z").status_code == 200)
     log = (db.query(models.AuditLog).filter(models.AuditLog.action == "change_own_password").all())
     check("寫入一筆 change_own_password 稽核", len(log) == 1)
     check("**稽核不含任何密碼內容**",
           all(x not in (log[0].detail or "") for x in ("Better2026z", cur)), log[0].detail)
+    H = {"Authorization": f"Bearer {login(client, 'alice', 'Better2026z').json()['access_token']}"}
     check("個人資訊顯示最近一次自行變更密碼", client.get("/me/profile", headers=H).json()["password_changed_at"])
     check("輸錯目前密碼不寫稽核（避免雜訊）", db.query(models.AuditLog).filter(
         models.AuditLog.action == "change_own_password").count() == 1)

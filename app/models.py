@@ -50,6 +50,10 @@ class User(Base):
     status = Column(Enum(UserStatus), default=UserStatus.pending, nullable=False)
     suspend_reason = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
+    # v1.49.0 帳號安全（見 app/account_security.py）。全部可為空：舊資料讀到 None 當 0／未鎖。
+    token_version = Column(Integer, nullable=True)        # 改密碼／停用／登出所有裝置時 +1，舊 token 全部失效
+    failed_login_count = Column(Integer, nullable=True)   # 連續登入失敗次數
+    locked_until = Column(DateTime, nullable=True)        # 鎖定到何時（UTC）
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

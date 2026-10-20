@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.48.5"
-set "DEFAULT_MSG=v1.48.5 Backup download: Save button opens a Save As dialog immediately (choose folder), streams to disk with progress; fallback download explains where the file went; no more silent block"
+set "EXPECTED_VER=1.49.1"
+set "DEFAULT_MSG=v1.49.1 TCMSP herb graph: herb name label readable; includes v1.49.0 account security (XSS fix on account review, login lockout, revocable tokens, password rules)"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

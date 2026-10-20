@@ -1677,7 +1677,7 @@ function renderNetwork(){
     const herb = herbsById.get(currentHerbId);
     const nodes = new vis.DataSet();
     const edges = new vis.DataSet();
-    nodes.add({id:'herb', label: zhConv(herb.herb_cn_name) + '\n' + (herb.herb_en_name||''), shape:'dot', size:30, color:graphLegend.getColor('herb'), font:{color:'#111',size:14,bold:true}});
+    nodes.add({id:'herb', label: zhConv(herb.herb_cn_name) + '\n' + (herb.herb_en_name||''), shape:'dot', size:30, color:graphLegend.getColor('herb'), font:{color:'#fff',size:15,bold:true,strokeWidth:4,strokeColor:'#000'}});
 
     const usedTargets = new Map(); // tar_id -> count
     if(layerVisibility.ingredients){

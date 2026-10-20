@@ -53,6 +53,10 @@ ALTER_STATEMENTS = [
     "ALTER TABLE tcmsp_diseases ADD COLUMN tumor_class VARCHAR",
     "ALTER TABLE tcmsp_diseases ADD COLUMN tumor_basis VARCHAR",
     "CREATE INDEX IF NOT EXISTS ix_tcmsp_diseases_tumor_class ON tcmsp_diseases (tumor_class)",
+    # v1.49.0 帳號安全。伺服器啟動時也會自動補（account_security.ensure_auth_columns），這裡列著讓兩邊一致
+    "ALTER TABLE users ADD COLUMN token_version INTEGER",
+    "ALTER TABLE users ADD COLUMN failed_login_count INTEGER",
+    "ALTER TABLE users ADD COLUMN locked_until TIMESTAMP",
 ]
 
 

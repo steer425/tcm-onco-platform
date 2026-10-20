@@ -3,6 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app import account_security as sec
 from app import models, schemas
 from app.database import get_db
 from app.deps import require_admin, write_audit_log
@@ -31,6 +32,9 @@ def list_users(keyword: Optional[str] = None, status_filter: Optional[str] = Non
 @router.post("", response_model=schemas.UserOut, summary="新增帳號（管理者直接建立，略過審核）")
 def create_user(payload: schemas.UserCreate, db: Session = Depends(get_db),
                  admin: models.User = Depends(require_admin)):
+    problem = sec.account_problem(payload.account) or sec.password_problem(payload.password, payload.account)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
     if db.query(models.User).filter(models.User.account == payload.account).first():
         raise HTTPException(status_code=400, detail="帳號已存在")
     user = models.User(
@@ -58,7 +62,14 @@ def update_user(user_id: str, payload: schemas.UserUpdate, db: Session = Depends
     # 記下這次改了哪些欄位：本人會在「個人化設定 → 異動紀錄」看到這一筆（v1.44.0），
     # 只寫「更新帳號」的話，被重設密碼或被改角色的人看不出發生了什麼。**密碼內容絕不寫入。**
     changed = []
+    revoke = False
+    if payload.password:
+        problem = sec.password_problem(payload.password, user.account)
+        if problem:
+            raise HTTPException(status_code=400, detail=problem)
     if payload.status is not None:
+        if payload.status != models.UserStatus.active and user.status == models.UserStatus.active:
+            revoke = True   # 停用／退回審核：已登入的裝置立刻失效，不用等 8 小時
         if user.status != payload.status:
             changed.append(f"狀態 → {payload.status.value if hasattr(payload.status, 'value') else payload.status}")
         user.status = payload.status
@@ -69,11 +80,16 @@ def update_user(user_id: str, payload: schemas.UserUpdate, db: Session = Depends
     if payload.password:
         user.password_hash = hash_password(payload.password)
         changed.append("重設密碼")
+        revoke = True
+        sec.register_success(user)   # 重設密碼順便解除鎖定
     if payload.role_ids is not None:
         changed.append("調整角色")
         db.query(models.UserRole).filter(models.UserRole.user_id == user.id).delete()
         for rid in payload.role_ids:
             db.add(models.UserRole(user_id=user.id, role_id=rid))
+    if revoke:
+        n = sec.revoke_all_sessions(db, user)
+        changed.append(f"登出所有裝置（{n} 個登入）")
     db.commit()
     db.refresh(user)
     write_audit_log(db, admin, "update_user", "user", user.id,
@@ -92,3 +108,28 @@ def delete_user(user_id: str, reason: Optional[str] = "後台刪除", db: Sessio
     db.commit()
     write_audit_log(db, admin, "delete_user_soft", "user", user.id, f"軟刪除帳號 {user.account}: {reason}")
     return {"message": "已停用（軟刪除）"}
+
+
+@router.post("/{user_id}/unlock", response_model=schemas.UserOut, summary="解除登入失敗鎖定（v1.49.0）")
+def unlock_user(user_id: str, db: Session = Depends(get_db), admin: models.User = Depends(require_admin)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="找不到帳號")
+    sec.register_success(user)
+    db.commit()
+    db.refresh(user)
+    write_audit_log(db, admin, "unlock_user", "user", user.id, f"解除 {user.account} 的登入鎖定")
+    return _to_out(user)
+
+
+@router.post("/{user_id}/revoke-sessions", summary="強制登出這個帳號的所有裝置（v1.49.0）")
+def revoke_user_sessions(user_id: str, db: Session = Depends(get_db),
+                         admin: models.User = Depends(require_admin)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="找不到帳號")
+    n = sec.revoke_all_sessions(db, user)
+    db.commit()
+    write_audit_log(db, admin, "revoke_sessions", "user", user.id,
+                    f"強制登出 {user.account} 的所有裝置（關閉 {n} 個登入）")
+    return {"ok": True, "closed": n}

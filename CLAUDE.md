@@ -64,7 +64,7 @@ Four site languages: `tw` (original, untouched), `cn` (OpenCC glyph conversion, 
 - Graph color legend (`js/graph-legend.js`) is a shared component across all six relationship-graph pages — reuse `graphLegend.getColor('xxx')`, don't hardcode hex colors, and mount it separately for both the inline and fullscreen graph containers.
 
 ### Auth/permissions model
-JWT bearer auth (`app/security.py`), role-based via `UserRole`/`Role`/`RolePermission`. No password reset flow, no JWT revocation (logout only records the logout timestamp — token remains valid until natural expiry, a known limitation).
+JWT bearer auth (`app/security.py`), role-based via `UserRole`/`Role`/`RolePermission`. Since v1.49.0 tokens are revocable: they carry `tv` (the user's `token_version`) and `lid` (the LoginLog id), checked on every request in `get_current_user`. Logout invalidates that one token; password change/reset, suspension, "log out all devices" and admin force-logout bump `token_version` via `account_security.revoke_all_sessions()`. Login locks for 15 minutes after 5 failures. Account-name format and password rules live in `app/account_security.py` — use them everywhere an account or password is set. User-supplied text (account names, notes) must be escaped before going into `innerHTML`, admin pages included (stored-XSS fixed in v1.49.0). No self-service password reset flow.
 
 ## Versioning / release process (rules.md §9 — don't skip steps)
 Every shipped version must update all five of these consistently, or the in-app version-info page will disagree with reality:

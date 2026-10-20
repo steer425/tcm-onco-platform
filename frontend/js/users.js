@@ -9,6 +9,10 @@ async function loadUserInfo() {
   } catch (err) {}
 }
 
+// 外部輸入（申請人填的帳號、備註）一律跳脫後才放進畫面（v1.49.0）
+const escHtml = (v) => String(v == null ? "" : v)
+  .replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
 const statusLabel = { pending: "審核中", active: "啟用", suspended: "停用中" };
 
 async function loadRolesForSelect() {
@@ -37,15 +41,22 @@ function renderUsers() {
   tbody.innerHTML = "";
   allUsers.forEach((u) => {
     const tr = document.createElement("tr");
+    // 鎖定狀態（v1.49.0）：後端時間是 UTC、不帶時區，補 Z 再轉本地時間
+    const lockedUntil = u.locked_until ? new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(u.locked_until) ? u.locked_until : u.locked_until + "Z") : null;
+    const locked = lockedUntil && lockedUntil > new Date();
+    const id = escHtml(u.id);
     tr.innerHTML = `
-      <td>${u.account}</td>
-      <td><span class="tag">${statusLabel[u.status] || u.status}</span></td>
-      <td>${(u.role_names || []).join("、")}</td>
-      <td>${u.suspend_reason || ""}</td>
-      <td>${u.notes || ""}</td>
+      <td>${escHtml(u.account)}</td>
+      <td><span class="tag">${escHtml(statusLabel[u.status] || u.status)}</span>
+        ${locked ? `<div class="hint-msg" style="margin:4px 0 0;color:#c0533e;">登入鎖定至 ${escHtml(lockedUntil.toLocaleString("zh-Hant"))}</div>` : ""}</td>
+      <td>${escHtml((u.role_names || []).join("、"))}</td>
+      <td>${escHtml(u.suspend_reason || "")}</td>
+      <td>${escHtml(u.notes || "")}</td>
       <td class="actions">
-        <button class="secondary" onclick="openEditUser('${u.id}')">編輯</button>
-        <button class="danger" onclick="deleteUser('${u.id}')">刪除</button>
+        <button class="secondary" onclick="openEditUser('${id}')">編輯</button>
+        ${locked ? `<button class="secondary" onclick="unlockUser('${id}')">解除鎖定</button>` : ""}
+        <button class="secondary" onclick="revokeSessions('${id}')">強制登出</button>
+        <button class="danger" onclick="deleteUser('${id}')">刪除</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -138,3 +149,19 @@ window.deleteUser = async (id) => {
 
 loadUserInfo();
 loadUsers();
+
+// v1.49.0：解除登入失敗鎖定、強制登出所有裝置
+window.unlockUser = async (id) => {
+  try {
+    await api(`/users/${encodeURIComponent(id)}/unlock`, { method: "POST" });
+    await loadUsers();
+  } catch (err) { alert("解除鎖定失敗：" + err.message); }
+};
+window.revokeSessions = async (id) => {
+  const u = (allUsers || []).find((x) => x.id === id);
+  if (!confirm(`確定要強制登出「${u ? u.account : id}」的所有裝置嗎？對方需要重新登入。`)) return;
+  try {
+    const r = await api(`/users/${encodeURIComponent(id)}/revoke-sessions`, { method: "POST" });
+    alert(`已強制登出（關閉 ${r.closed} 個登入）。`);
+  } catch (err) { alert("強制登出失敗：" + err.message); }
+};

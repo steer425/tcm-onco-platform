@@ -51,6 +51,8 @@ class UserOut(BaseModel):
     notes: Optional[str]
     role_names: List[str] = []
     created_at: datetime
+    locked_until: Optional[datetime] = None        # v1.49.0：登入失敗鎖定到何時（UTC），None＝沒鎖
+    failed_login_count: Optional[int] = None
 
     class Config:
         from_attributes = True

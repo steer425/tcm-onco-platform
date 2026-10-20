@@ -55,6 +55,7 @@
       <p class="hint-msg" style="margin-top:0;">
         新密碼至少 8 個字元，需同時包含英文字母與數字，不可包含帳號名稱，也不可使用 0000、12345678 這類常見密碼。
       </p>
+      <p class="hint-msg" style="margin-top:0;">變更密碼後，所有裝置（包含這一個）都會登出，請用新密碼重新登入。</p>
       <form class="pw-form" id="pwForm" autocomplete="off">
         <label for="pwCurrent">目前密碼</label>
         <input id="pwCurrent" type="password" autocomplete="current-password" required />
@@ -74,6 +75,8 @@
       <div class="log-wrap"><table id="loginTable"></table></div>
       <button class="secondary" id="loginMore" style="display:none; margin-top:10px;">顯示更多</button>
       <p class="hint-msg">看到不認得的登入時間或 IP，請立即變更密碼並通知管理者。</p>
+      <button class="secondary" id="logoutAllBtn" type="button">登出所有裝置</button>
+      <span class="hint-msg" id="logoutAllMsg"></span>
     </div>
 
     <div class="card">

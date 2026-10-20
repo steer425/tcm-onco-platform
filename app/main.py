@@ -15,11 +15,15 @@ from app.routers import (
 from app.seed import seed_default_data
 
 Base.metadata.create_all(bind=engine)
+# v1.49.0：users 的帳號安全欄位每個請求都會讀，少了整站 500、連登入都進不去；
+# 而手動跑 migrate_schema 要在本機輸入正式資料庫密碼（電腦未清乾淨時不該這麼做），所以啟動時自己補
+from app.account_security import ensure_auth_columns  # noqa: E402
+ensure_auth_columns(engine)
 
 app = FastAPI(
     title="TCM 中藥腫瘤篩選平台 - 後台系統 API（目標零）",
     description="帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄 / 每日重點新聞（含多語系簡短摘要）",
-    version="1.48.5",
+    version="1.49.1",
 )
 
 ALLOWED_ORIGINS = [
@@ -66,12 +70,18 @@ _READ_ONLY_EXEMPT_PATHS = {
     "/system-settings/backup-database",
     # 密碼外洩時要能立刻換，不能因為系統剛好在唯讀就卡住（v1.44.0）
     "/me/password",
+    # 同理：發現帳號被盜用時要能立刻讓所有登入失效、解除鎖定（v1.49.0）
+    "/me/logout-all",
 }
+# 管理者的「強制登出／解鎖」帶使用者 id，用前綴＋結尾比對（v1.49.0）
+_READ_ONLY_EXEMPT_SUFFIXES = ("/revoke-sessions", "/unlock")
 
 
 @app.middleware("http")
 async def enforce_read_only_mode(request, call_next):
-    if request.method in ("POST", "PUT", "PATCH", "DELETE") and request.url.path not in _READ_ONLY_EXEMPT_PATHS:
+    path = request.url.path
+    exempt = path in _READ_ONLY_EXEMPT_PATHS or (path.startswith("/users/") and path.endswith(_READ_ONLY_EXEMPT_SUFFIXES))
+    if request.method in ("POST", "PUT", "PATCH", "DELETE") and not exempt:
         db = SessionLocal()
         try:
             from app.routers.system_settings import _get_setting_value

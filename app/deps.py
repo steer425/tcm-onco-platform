@@ -31,6 +31,11 @@ def get_current_user(
         raise credentials_exception
     if user.status != models.UserStatus.active:
         raise HTTPException(status_code=403, detail="帳號未啟用或已被停用")
+    # v1.49.0：token 撤銷（改密碼／停用／登出所有裝置 → token_version；單一登出 → 登入紀錄）
+    from app.account_security import token_problem
+    problem = token_problem(payload, user, db)
+    if problem:
+        raise HTTPException(status_code=401, detail=problem, headers={"WWW-Authenticate": "Bearer"})
     return user
 
 

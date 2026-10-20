@@ -27,18 +27,13 @@ from app.security import hash_password, verify_password
 
 router = APIRouter(prefix="/me", tags=["個人資訊（只限本人）"])
 
-PASSWORD_MIN = 8
-# bcrypt 只看前 72 個位元組，超過的部分等於沒設；中文一個字 3 位元組，所以用位元組數判斷
-PASSWORD_MAX_BYTES = 72
+# 密碼規則與常見密碼清單移到 app/account_security.py（v1.49.0），所有設定密碼的地方共用一份
+from app.account_security import PASSWORD_MAX_BYTES, PASSWORD_MIN, password_problem, revoke_all_sessions  # noqa: E402,F401
 CHANGE_PASSWORD_ACTION = "change_own_password"
 # 登入／登出在「登入紀錄」那一塊已經有了，異動紀錄預設不重複列
 LOGIN_ACTIONS = ("login", "logout", "login_google", "login_facebook")
 
 # 一眼就會被猜到的密碼。不求完整，只擋最常見的幾個，**尤其是種子帳號的預設值 0000**
-COMMON_PASSWORDS = {
-    "0000", "00000000", "12345678", "123456789", "1234567890", "password", "password1",
-    "qwerty123", "11111111", "abc12345", "admin123", "admin1234", "iloveyou",
-}
 
 
 def _iso(dt):
@@ -46,20 +41,7 @@ def _iso(dt):
 
 
 def _password_problem(new: str, account: str, current: str) -> str | None:
-    """回傳不合格的原因；合格回 None。規則刻意簡單、可以寫在畫面上讓人照著做。"""
-    if len(new) < PASSWORD_MIN:
-        return f"新密碼至少要 {PASSWORD_MIN} 個字元"
-    if len(new.encode("utf-8")) > PASSWORD_MAX_BYTES:
-        return f"新密碼太長（超過 {PASSWORD_MAX_BYTES} 個位元組的部分不會生效）"
-    if not any(c.isalpha() for c in new) or not any(c.isdigit() for c in new):
-        return "新密碼要同時包含英文字母與數字"
-    if new == current:
-        return "新密碼不能與目前密碼相同"
-    if account and account.lower() in new.lower():
-        return "新密碼不能包含帳號名稱"
-    if new.lower() in COMMON_PASSWORDS:
-        return "這個密碼太常見，請換一個"
-    return None
+    return password_problem(new, account, current)
 
 
 @router.get("/profile", summary="（本人）個人資訊摘要")
@@ -157,11 +139,21 @@ def change_my_password(payload: PasswordChangeIn,
 
     current_user.password_hash = hash_password(payload.new_password)
     current_user.updated_at = datetime.utcnow()
+    # v1.49.0：改密碼 = 所有裝置（含這一個）的登入全部失效。密碼外洩時，改完密碼對方手上的 token 也不能再用
+    n = revoke_all_sessions(db, current_user)
     db.commit()
     # detail 只記事實，**絕不記任何密碼內容**
     write_audit_log(db, current_user, CHANGE_PASSWORD_ACTION, "user", current_user.id,
-                    f"{current_user.account} 自行變更密碼")
-    return {"ok": True,
-            "message": "密碼已更新。下次登入請使用新密碼。",
-            # JWT 無法撤銷（既有限制，rules.md 有記）：其他裝置上已登入的工作階段不會因此登出
-            "note": "其他裝置上已登入的工作階段會在原本的有效期限（最長 8 小時）到期後才失效。"}
+                    f"{current_user.account} 自行變更密碼（所有裝置登出，關閉 {n} 個登入）")
+    return {"ok": True, "relogin": True,
+            "message": "密碼已更新，所有裝置（包含這一個）都已登出，請用新密碼重新登入。"}
+
+
+@router.post("/logout-all", summary="（本人）登出所有裝置：已發出的登入憑證全部失效")
+def logout_all(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    n = revoke_all_sessions(db, current_user)
+    db.commit()
+    write_audit_log(db, current_user, "logout_all", "user", current_user.id,
+                    f"{current_user.account} 登出所有裝置（關閉 {n} 個登入）")
+    return {"ok": True, "relogin": True, "closed": n,
+            "message": f"已登出所有裝置（{n} 個登入），請重新登入。"}

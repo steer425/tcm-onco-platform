@@ -212,6 +212,8 @@
   if (!capable) return;
   // 第三方登入失敗轉回來時帶著錯誤訊息，登入框要直接打開，訊息才看得到（只在進頁時判斷一次，之後可以點熔爐收起）
   if (/[?&]google_error=/.test(location.search)) loginOpen = true;
+  // v1.49.0：被登出時登入頁要顯示原因，原因寫在登入框裡，所以直接把登入框打開
+  try { if (sessionStorage.getItem("tcm_logout_reason")) loginOpen = true; } catch (e) { /* 私密視窗 */ }
   let timer = null;
   window.addEventListener("resize", () => { clearTimeout(timer); timer = setTimeout(apply, 150); });
   // 等登入框與平面背景先畫好，再開始抓 3D

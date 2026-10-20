@@ -43,13 +43,17 @@ async function api(path, options = {}) {
   // 401 只有在「帶著登入憑證卻被拒」時才代表登入過期，這時才清掉並導回登入頁。
   // 登入本身帳密錯誤也是 401——如果照樣導回登入頁，頁面會立刻重新載入，
   // 錯誤訊息一閃而過、使用者根本看不到（v1.46.2 實際回報）。
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* no body */ }
   if (res.status === 401 && token && !path.startsWith("/auth/login")) {
+    // v1.49.0：登入可能是被撤銷（改密碼、登出所有裝置、被管理者強制登出），把原因帶到登入頁顯示
+    try {
+      if (data && typeof data.detail === "string") sessionStorage.setItem("tcm_logout_reason", data.detail);
+    } catch (e) { /* 私密視窗可能不給用 */ }
     clearSession();
     window.location.href = "index.html";
     throw new Error("未登入或登入已過期");
   }
-  let data = null;
-  try { data = await res.json(); } catch (e) { /* no body */ }
   if (!res.ok) {
     const msg = (data && data.detail) ? data.detail : `發生錯誤 (${res.status})`;
     throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
