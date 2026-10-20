@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.49.4"
-set "DEFAULT_MSG=v1.49.4 Read-only mode: pathway pages no longer 500 (pathways tables added to local cache), enrich allowed; automatic audit test of all 35 cached endpoints"
+set "EXPECTED_VER=1.50.0"
+set "DEFAULT_MSG=v1.50.0 i18n: paragraph-level translation for long explanatory text (bold, numbers); English/Korean for herb ingredients, pathway enrichment and tumour cell line pages"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

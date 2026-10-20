@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
 <script src="js/zh-match.js"></script>
 <script src="js/i18n-dict.js"></script>
+<script src="js/i18n-blocks.js"></script>
 <script src="js/site-lang.js"></script>
 <style>
 :root{--bg:#0f1115;--panel:#171a20;--line:#2a2d34;--muted:#8a8f98;--herb:#c99a3d;--mol:#3b82c4;--tgt:#3a9d63;--warn:#c99a3d;--bad:#c0533e;}
@@ -126,7 +127,7 @@ a.line{color:#8fc3ea;text-decoration:none;cursor:pointer;border-bottom:1px dotte
 
 <div id="header">
   <h1>腫瘤細胞株依賴查詢站</h1>
-  <p>
+  <p data-i18n-block>
     藥材的活性成分 → 靶點 → <b>哪些靶點是特定腫瘤細胞株的選擇性依賴</b>（DepMap CRISPR 篩選）。
     先排除<b>泛必需基因</b>（命中它們是細胞毒性，不是抗腫瘤機轉），再以<b>選擇性當門檻、效應量當排序</b>。
     每一列都是一個可以被否證的驗證方案起點：具體基因、具體細胞株、具體癌別。
@@ -153,12 +154,12 @@ a.line{color:#8fc3ea;text-decoration:none;cursor:pointer;border-bottom:1px dotte
           <option value="0.1">≤ 10% 的細胞株</option>
           <option value="0.2" selected>≤ 20% 的細胞株（預設）</option>
         </select>
-        <span class="small" id="paramNote"></span>
+        <span class="small" id="paramNote" data-i18n-block></span>
       </div>
       <div class="tabs" id="tabs">
-        <button data-tab="gated" class="on">選擇性靶點</button>
-        <button data-tab="dropped">被門檻刷掉</button>
-        <button data-tab="essential">泛必需（已排除）</button>
+        <button data-tab="gated" class="on" data-i18n-block>選擇性靶點</button>
+        <button data-tab="dropped" data-i18n-block>被門檻刷掉</button>
+        <button data-tab="essential" data-i18n-block>泛必需（已排除）</button>
       </div>
       <div id="tableWrap"><div id="tabBody"></div></div>
       <div class="disclaimer" id="disclaimer"></div>

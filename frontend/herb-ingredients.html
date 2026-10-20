@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
 <script src="js/zh-match.js"></script>
 <script src="js/i18n-dict.js"></script>
+<script src="js/i18n-blocks.js"></script>
 <script src="js/site-lang.js"></script>
 <style>
 :root{--bg:#0f1115;--panel:#171a20;--line:#2a2d34;--muted:#8a8f98;--herb:#c99a3d;--mol:#3b82c4;--tgt:#3a9d63;--warn:#c99a3d;--bad:#c0533e;}
@@ -110,7 +111,7 @@ select{background:#1c1f26;color:#eee;border:1px solid #3a3d44;border-radius:6px;
 
 <div id="header">
   <h1>藥材活性成分與結構標準化</h1>
-  <p>
+  <p data-i18n-block>
     先用 <b>OB（口服生物利用度）</b> 與 <b>DL（類藥性）</b> 兩道門檻篩出這味藥材的活性成分，
     再逐一顯示每個成分有沒有成功對應到 PubChem 的化學結構。
     後續的靶點、通路與細胞株分析<b>都只使用這些活性成分</b>，不是全部成分。
@@ -147,8 +148,8 @@ select{background:#1c1f26;color:#eee;border:1px solid #3a3d44;border-radius:6px;
 
 <div id="termInfoModal">
   <div id="termInfoBox">
-    <h3 id="termInfoTitle"></h3>
-    <p id="termInfoBody"></p>
+    <h3 id="termInfoTitle" data-i18n-block></h3>
+    <p id="termInfoBody" data-i18n-block></p>
     <button onclick="closeTermInfo()">關閉</button>
   </div>
 </div>

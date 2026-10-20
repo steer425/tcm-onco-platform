@@ -136,17 +136,19 @@ function renderDetail() {
   renderTab();
 
   const recep = d.gated.filter(r => r.receptor_warning).length;
+  // 每一段各自一個 data-i18n-block（v1.50.0，見 site-lang.js 檔頭「段落翻譯」）；
+  // 受體那句帶數字而且可有可無，拆成獨立的 span，前後兩句才能維持完全比對
   $('disclaimer').innerHTML = `
-    <b>這張表不是「這味藥能治這些癌」。</b>它說的是：這味藥材的活性成分在 TCMSP 被註記為作用於這些靶點，
+    <div data-i18n-block><b>這張表不是「這味藥能治這些癌」。</b>它說的是：這味藥材的活性成分在 TCMSP 被註記為作用於這些靶點，
     而這些靶點在那些細胞株是選擇性依賴。兩件事之間還缺實際的結合與活性驗證——
-    <b>TCMSP 的成分–靶點關係有相當比例是對接預測，不是實測結合</b>，目前尚未分層。<br>
-    <b>⚠️ 方向性：</b>CRISPR 依賴量的是「<b>移除</b>這個基因，細胞會不會死」，要轉成治療假說，前提是化合物<b>抑制</b>該靶點；
-    TCMSP 不記錄作用方向。${recep ? `本表有 <b>${recep}</b> 個標為「受體」——核受體與配體門控受體的天然配體通常是活化劑，方向反了效果可能相反。` : ''}
-    受體標記是啟發式的，只用來提醒；沒被標記也不代表方向沒問題。<br>
-    <b>強依賴株數為「—」的列請當成雜訊看待：</b>只在少數細胞、效應剛越過門檻的配對，在這個規模的矩陣裡本來就會隨機出現。<br>
-    <b>CRISPR 敲除 ≠ 化合物抑制</b>；DepMap 只有腫瘤細胞株，這裡的「選擇性」是腫瘤株之間的比較，不是腫瘤 vs 正常細胞。<br>
-    本頁不提供 lineage（癌別）富集：以人參為例，該富集經對照基因集檢定後落在隨機範圍內，不能解讀為這味藥材的特性。<br>
-    本平台為科研輔助工具，所有結果為公開資料庫的統計關聯，<b>不作為醫療診斷或治療建議</b>。`;
+    <b>TCMSP 的成分–靶點關係有相當比例是對接預測，不是實測結合</b>，目前尚未分層。</div>
+    <div><span data-i18n-block><b>⚠️ 方向性：</b>CRISPR 依賴量的是「<b>移除</b>這個基因，細胞會不會死」，要轉成治療假說，前提是化合物<b>抑制</b>該靶點；
+    TCMSP 不記錄作用方向。</span>${recep ? ` <span data-i18n-block>本表有 <b>${recep}</b> 個標為「受體」——核受體與配體門控受體的天然配體通常是活化劑，方向反了效果可能相反。</span>` : ''}
+    <span data-i18n-block>受體標記是啟發式的，只用來提醒；沒被標記也不代表方向沒問題。</span></div>
+    <div data-i18n-block><b>強依賴株數為「—」的列請當成雜訊看待：</b>只在少數細胞、效應剛越過門檻的配對，在這個規模的矩陣裡本來就會隨機出現。</div>
+    <div data-i18n-block><b>CRISPR 敲除 ≠ 化合物抑制</b>；DepMap 只有腫瘤細胞株，這裡的「選擇性」是腫瘤株之間的比較，不是腫瘤 vs 正常細胞。</div>
+    <div data-i18n-block>本頁不提供 lineage（癌別）富集：以人參為例，該富集經對照基因集檢定後落在隨機範圍內，不能解讀為這味藥材的特性。</div>
+    <div data-i18n-block>本平台為科研輔助工具，所有結果為公開資料庫的統計關聯，<b>不作為醫療診斷或治療建議</b>。</div>`;
   $('attrib').textContent = `資料來源：${d.attribution}`;
 }
 
@@ -158,7 +160,7 @@ function renderTab() {
   if (currentTab === 'essential') {
     const list = d.excluded_essential;
     $('tabBody').innerHTML = list.length
-      ? `<p class="small">這些基因在幾乎每一株細胞都是存活必需。任何有細胞毒性的物質都會「命中」它們，
+      ? `<p class="small" data-i18n-block>這些基因在幾乎每一株細胞都是存活必需。任何有細胞毒性的物質都會「命中」它們，
            所以<b>不能</b>拿來當抗腫瘤機轉的證據。</p>
          <p>${list.map(s => `<a class="gene" data-gene="${esc(s)}">${esc(s)}</a>`).join('、')}</p>`
       : '<p class="na">沒有命中泛必需基因。</p>';
@@ -199,8 +201,8 @@ function renderTab() {
     </tr>`;
   }).join('');
   const note = currentTab === 'dropped'
-    ? `<p class="small">這些不是沒有訊號，而是<b>訊號不具選擇性</b>——在很多細胞株都依賴的基因，抑制它比較像細胞毒性而不是機轉。要看它們可以放寬上方的門檻。</p>`
-    : `<p class="small">排序：通過選擇性門檻後，依<b>最強效應</b>由強到弱（不是依株數——株數多代表廣度，不是選擇性）。</p>`;
+    ? `<p class="small" data-i18n-block>這些不是沒有訊號，而是<b>訊號不具選擇性</b>——在很多細胞株都依賴的基因，抑制它比較像細胞毒性而不是機轉。要看它們可以放寬上方的門檻。</p>`
+    : `<p class="small" data-i18n-block>排序：通過選擇性門檻後，依<b>最強效應</b>由強到弱（不是依株數——株數多代表廣度，不是選擇性）。</p>`;
   $('tabBody').innerHTML = `${note}<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 
@@ -257,7 +259,7 @@ async function showLine(depmapId) {
     $('detailBody').innerHTML = `
       <p class="small">${esc(L.primary_disease || '')}${L.subtype ? '／' + esc(L.subtype) : ''}　·　Lineage：${esc(L.lineage || '—')}　·
         <a class="code" href="${esc(L.depmap_url)}" target="_blank" rel="noopener">在 DepMap 開啟 ↗</a></p>
-      <p class="small">這株細胞依賴、而且是「${esc(herbName)}」選擇性靶點的基因（${r.total} 個），依這株的效應由強到弱：</p>
+      <p class="small" data-i18n-block>這株細胞依賴、而且是「${esc(herbName)}」選擇性靶點的基因（${r.total} 個），依這株的效應由強到弱：</p>
       ${rows ? `<table><thead><tr><th>基因</th><th>這株的 gene effect</th><th>全母體依賴範圍</th><th>打到它的成分</th></tr></thead><tbody>${rows}</tbody></table>`
              : '<p class="na">這株細胞不依賴本藥材的任何選擇性靶點。</p>'}
       <p class="attrib">資料來源：${esc(r.attribution)}</p>`;

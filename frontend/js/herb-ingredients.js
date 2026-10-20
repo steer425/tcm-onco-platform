@@ -201,7 +201,7 @@ function renderDetail() {
   $('herbHeader').innerHTML = `
     <h2>${esc(h.herb_cn_name || h.herb_en_name)}　<span class="small">herb_id ${h.herb_id}</span></h2>
     <div class="meta">${esc(h.herb_pinyin || '')}　${esc(h.herb_en_name || '')}　·
-      篩選門檻 OB ≥ ${d.thresholds.ob_min}%、DL ≥ ${d.thresholds.dl_min}　·
+      <span>篩選門檻 OB ≥ ${d.thresholds.ob_min}%、DL ≥ ${d.thresholds.dl_min}</span>　·
       <a class="code" href="tcmsp_query.html?herb=${h.herb_id}">在關聯查詢站開啟 →</a>
     </div>`;
 
@@ -219,17 +219,19 @@ function renderDetail() {
   renderTable();
 
   const todo = d.items.filter(i => !ACCEPTED.includes(i.status)).length;
+  // 每一段各自一個 data-i18n-block（v1.50.0）：英韓翻譯以「整段」比對，
+  // 分段後靜態的段落可以完全比對，只有帶數字的那一段需要用 {0} 佔位的範本。
   $('disclaimer').innerHTML = `
-    <b>怎麼讀這一頁：</b>「已標準化」只算<b>自動採用</b>與<b>已確認</b>兩種狀態——待確認是還沒審過的候選，
+    <div data-i18n-block><b>怎麼讀這一頁：</b>「已標準化」只算<b>自動採用</b>與<b>已確認</b>兩種狀態——待確認是還沒審過的候選，
     拿它當成果會高估。分子量差欄位若標示「疑似苷元誤配」，代表名稱雖然對上、但查到的很可能是
-    <b>帶糖基的另一個分子</b>，這種一律要人工判斷，不可直接採用。<br>
-    <b>名稱來源：</b>成分名稱為 TCMSP 的英文原名；「IUPAC 系統名稱」來自 PubChem，只有已對應到 CID 的成分才有。
+    <b>帶糖基的另一個分子</b>，這種一律要人工判斷，不可直接採用。</div>
+    <div data-i18n-block><b>名稱來源：</b>成分名稱為 TCMSP 的英文原名；「IUPAC 系統名稱」來自 PubChem，只有已對應到 CID 的成分才有。
     化合物沒有拉丁文名稱（拉丁學名是給藥材物種用的），化合物的國際標準命名就是 IUPAC 系統名稱。
-    資料庫<b>沒有中文名稱與化學分類欄位</b>，本頁因此不提供。<br>
-    <b>非活性成分：</b>上方的「已標準化、有 SMILES」等數字<b>只算活性成分</b>；非活性成分另列在「非活性成分」分頁，
-    不進入後續的靶點、通路與細胞株分析。<br>
-    ${todo ? `目前這味藥材還有 <b>${todo}</b> 個活性成分尚未完成標準化。` : '這味藥材的活性成分已全部完成標準化。'}<br>
-    本平台為科研輔助工具，所有結果為公開資料庫的統計關聯，<b>不作為醫療診斷或治療建議</b>。`;
+    資料庫<b>沒有中文名稱與化學分類欄位</b>，本頁因此不提供。</div>
+    <div data-i18n-block><b>非活性成分：</b>上方的「已標準化、有 SMILES」等數字<b>只算活性成分</b>；非活性成分另列在「非活性成分」分頁，
+    不進入後續的靶點、通路與細胞株分析。</div>
+    <div data-i18n-block>${todo ? `目前這味藥材還有 <b>${todo}</b> 個活性成分尚未完成標準化。` : '這味藥材的活性成分已全部完成標準化。'}</div>
+    <div data-i18n-block>本平台為科研輔助工具，所有結果為公開資料庫的統計關聯，<b>不作為醫療診斷或治療建議</b>。</div>`;
 }
 
 function renderTable() {

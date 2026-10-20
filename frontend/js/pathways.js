@@ -187,7 +187,7 @@ function fillHelpNumbers(html) {
 function openHelp(key) {
   const body = document.getElementById("helpBody");
   body.innerHTML = HELP_ORDER.map(k => `
-    <div class="help-sec" id="help-${k}">
+    <div class="help-sec" id="help-${k}" data-i18n-block>
       <h4>${esc(HELP[k].title)}</h4>
       ${fillHelpNumbers(HELP[k].html)}
     </div>`).join("");
@@ -477,10 +477,13 @@ async function runEnrichment() {
     const indepText = (indep != null && sig > 0)
       ? `其中 <b>${indep}</b> 條是獨立的基因組合（其餘與更高名次重疊 ≥80%，
          並列在報告裡會高估證據強度）；` : "";
-    hint.innerHTML = `${esc(r.herb.herb_cn_name || r.herb.herb_en_name)}：` +
-      `共檢定 ${r.total_tested} 條通路${esc(dropped)}，<b>${sig}</b> 條達 FDR q&lt;0.05，` +
-      indepText + `以下依${r.sort === "fold" ? "富集倍率" : "統計顯著性"}排序，` +
-      `顯示前 ${r.items.length} 條。`;
+    // 拆成幾個 data-i18n-block（v1.50.0）：可有可無的子句各自一段，英韓翻譯才不必為每種組合各寫一份範本
+    const blk = (html) => `<span data-i18n-block>${html}</span>`;
+    hint.innerHTML = blk(`${esc(r.herb.herb_cn_name || r.herb.herb_en_name)}：共檢定 ${r.total_tested} 條通路`) +
+      (dropped ? blk(esc(dropped)) : "") +
+      blk(`，<b>${sig}</b> 條達 FDR q&lt;0.05，`) +
+      (indepText ? blk(indepText) : "") +
+      blk(`以下依${r.sort === "fold" ? "富集倍率" : "統計顯著性"}排序，顯示前 ${r.items.length} 條。`);
 
     body.innerHTML = r.items.map((i, idx) => {
       const isSig = i.q_value != null && i.q_value < 0.05;
