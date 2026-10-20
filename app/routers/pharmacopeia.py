@@ -42,18 +42,21 @@ def _herb_brief(h) -> dict:
             "herb_en_name": h.herb_en_name}
 
 
-def _map_out(r, herb) -> dict:
+def _map_out(r, herb, mono=None) -> dict:
     return {"map_id": r.id, "status": r.status, "method": r.method,
             "flags": json.loads(r.flags) if r.flags else [], "note": r.note,
             "reviewed_at": r.reviewed_at.isoformat() if r.reviewed_at else None,
+            # v1.51.2：英文名稱、拉丁生藥名稱各自的比對結果，畫面註記用哪一個比對（飲片沒有自己的英文／拉丁名，不比）
+            "name_compare": T.name_compare(mono, herb) if (herb and mono and mono.kind == "herb") else None,
             **(_herb_brief(herb) if herb else {"herb_id": r.herb_id})}
 
 
 def _maps_by_seq(db):
     herbs = {h.id: h for h in db.query(models.TcmspHerb).all()}
+    monos = {m.seq: m for m in db.query(models.ThpMonograph).all()}
     out = {}
     for r in db.query(models.ThpTcmspMap).all():
-        out.setdefault(r.thp_seq, []).append(_map_out(r, herbs.get(r.herb_id)))
+        out.setdefault(r.thp_seq, []).append(_map_out(r, herbs.get(r.herb_id), monos.get(r.thp_seq)))
     order = {"confirmed": 0, "auto": 1, "pending": 2, "rejected": 3}
     for v in out.values():
         v.sort(key=lambda x: (order.get(x["status"], 9), x.get("herb_id") or 0))
@@ -65,7 +68,8 @@ def list_thp(current_user: models.User = Depends(get_current_user), db: Session 
              main_db: Session = Depends(get_db)):
     maps = _maps_by_seq(db)
     items = []
-    for m in db.query(models.ThpMonograph).order_by(models.ThpMonograph.seq).all():
+    # 依資訊網項次排（v1.51.1）：001～355 原藥材、356～385 飲片、386～394 濃縮製劑，與資訊網「品項查詢」一致
+    for m in db.query(models.ThpMonograph).order_by(models.ThpMonograph.site_no, models.ThpMonograph.seq).all():
         items.append({
             "seq": m.seq, "site_no": m.site_no, "kind": m.kind, "parent_seq": m.parent_seq,
             "name_zh": m.name_zh, "latin_name": m.latin_name, "en_name": m.en_name,

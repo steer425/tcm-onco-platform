@@ -22,7 +22,17 @@ const CLINICAL = new Set(['functions', 'usage_dosage', 'precautions']);
 const EXTRA_LABELS = { '出典': '出典', '處方': '處方', '效能': '效能', '適應症': '適應症' };
 const KIND_CN = { herb: '藥材', processed: '飲片', preparation: '濃縮製劑' };
 const STATUS_CN = { auto: '自動採用', confirmed: '已確認', pending: '待確認', rejected: '已否決' };
-const METHOD_CN = { name: '中文名', species: '基原學名', latin: '拉丁生藥名', manual: '人工指定' };
+const METHOD_CN = { name: '中文名', species: '基原學名', english: '英文名稱', latin: '拉丁生藥名稱', manual: '人工指定' };
+// v1.51.2：名稱比對結果（後端 app/thp.py name_compare）。中文名相同時先比英文名稱，不同再比拉丁生藥名稱，皆不分大小寫
+const CMP_CN = { same: '相同（不分大小寫）', same_words: '字詞相同（順序不同）', partial: '部分字詞相同', different: '不同', na: '無資料' };
+function nameCompare(c) {
+  if (!c) return '';
+  // 標籤、結果各自一個文字節點（英韓逐詞字典才翻得到）；名稱本身是資料，translate=no
+  const row = (label, key, thp, res) => `<div class="nc${c.used === key ? ' used' : ''}">
+      <span class="nl">${label}</span><span translate="no">${esc(thp || '—')}</span> ↔ <span translate="no">${esc(c.tcmsp_en || '—')}</span>
+      <span class="res r-${esc(res)}">${esc(CMP_CN[res] || res)}</span>${c.used === key ? ' <span class="pill k-used">以此比對</span>' : ''}</div>`;
+  return `<div class="ncmp">${row('英文名稱', 'english', c.thp_en, c.english)}${row('拉丁生藥名稱', 'latin', c.thp_latin, c.latin)}</div>`;
+}
 const FLAG_CN = {
   same_name_diff_species: '同名異物', diff_name_same_species: '異名同物', processed: '飲片',
 };
@@ -146,6 +156,7 @@ function matchCard(m) {
     <div><span class="hn" translate="no">TCMSP #${esc(m.herb_id)}　${esc(m.herb_cn_name || '')}</span>
       <span class="pill st-${esc(m.status)}">${esc(STATUS_CN[m.status] || m.status)}</span> ${flags}</div>
     <div class="en">${esc(m.herb_en_name || '')}</div>
+    ${nameCompare(m.name_compare)}
     <div class="small"><span>比對依據：</span>${method}${m.note ? `　·　<span>備註：</span>${esc(m.note)}` : ''}</div>
     <div class="acts">
       <button data-mol="${esc(m.herb_id)}">展開成分（MOL）</button>

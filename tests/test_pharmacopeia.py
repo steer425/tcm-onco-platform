@@ -3,7 +3,7 @@
 python -m tests.test_pharmacopeia（或 python -m tests.run_all）
 
 涵蓋：
-  1. 臺灣中藥典第四版 JSON 的完整性：394 筆（資訊網 385＋濃縮製劑 9）、項次 001～385 連續、飲片接在所屬藥材後面、
+  1. 臺灣中藥典第四版 JSON 的完整性：394 筆（資訊網中藥材 385＋濃縮製劑 9）、項次 001～394 連續且與資訊網畫面一致（v1.51.1：飲片排在原藥材之後、不插在所屬藥材後面）、
      8 味修正公告都在、啟動自動載入且不重複寫入
   2. 比對規則：中文名＋學名 → auto；只有中文名且學名不同 → 同名異物；只有學名 → 異名同物；
      第三版舊學名、芪／耆、生藥名寫法（Radix Bupleuri）、飲片
@@ -59,14 +59,30 @@ def main():
         print("\n【臺灣中藥典第四版資料】")
         data = T.load_json()
         items = data["items"]
-        site = [i["site_no"] for i in items if i["site_no"]]
-        check("394 筆＝資訊網 385＋濃縮製劑 9", len(items) == 394 and len(site) == 385
-              and sum(1 for i in items if i["kind"] == "preparation") == 9, (len(items), len(site)))
-        check("項次 001～385 連續不重複", site == [f"{n:03d}" for n in range(1, 386)])
-        check("001 丁香、002 人參、003 白參（飲片）、004 紅參（飲片）",
-              [(i["site_no"], i["name_zh"], i["kind"]) for i in items[:4]]
-              == [("001", "丁香", "herb"), ("002", "人參", "herb"), ("003", "白參", "processed"), ("004", "紅參", "processed")],
-              [(i["site_no"], i["name_zh"]) for i in items[:4]])
+        by_site = {i["site_no"]: i for i in items}
+        check("394 筆＝資訊網中藥材 385＋濃縮製劑 9，項次 001～394 連續不重複",
+              len(items) == 394 and sorted(by_site) == [f"{n:03d}" for n in range(1, 395)]
+              and sum(1 for i in items if i["kind"] == "preparation") == 9, len(items))
+        # v1.51.1：使用者提供的資訊網「品項查詢」畫面——飲片不插在所屬藥材後面
+        SITE_SCREEN = [("001", "丁香"), ("002", "人參"), ("003", "八角茴香"), ("004", "三七"),
+                       ("005", "三稜"), ("006", "千年健"), ("007", "土茯苓")]
+        check("**項次與資訊網畫面一致：001 丁香…004 三七…007 土茯苓**",
+              [(n, by_site[n]["name_zh"]) for n, _ in SITE_SCREEN] == SITE_SCREEN,
+              [(n, by_site[n]["name_zh"]) for n, _ in SITE_SCREEN])
+        check("001～355 原藥材、356～385 飲片、386～394 濃縮製劑",
+              all(by_site[f"{n:03d}"]["kind"] == "herb" for n in range(1, 356))
+              and all(by_site[f"{n:03d}"]["kind"] == "processed" for n in range(356, 386))
+              and all(by_site[f"{n:03d}"]["kind"] == "preparation" for n in range(386, 395)))
+        # 使用者提供的資訊網 351-385、386-394 頁（2026-10-21）。352 原書作「鶴蝨」、資訊網作「鶴虱」，同字異體，兩者都算對
+        SITE_TAIL = ("續斷 鶴蝨 蠶砂 鼈甲 鬱金 白參 紅參 三七 大黃 川牛膝 川芎 丹參 天麻 牛膝 甘草 白朮 白芍 白芷 西洋參 何首烏 "
+                     "牡丹皮 延胡索 桑寄生 桔梗 茯苓 黃芩 黃耆 黃連 黃蘖 當歸 葛根 蒼朮 獨活 乾薑 黨參 "
+                     "大黃濃縮製劑 小青龍湯濃縮製劑 加味逍遙散濃縮製劑 半夏瀉心湯濃縮製劑 甘草濃縮製劑 延胡索濃縮製劑 "
+                     "黃芩濃縮製劑 葛根湯濃縮製劑 葛根濃縮製劑").split()
+        import unicodedata
+        got_tail = [unicodedata.normalize("NFC", by_site[f"{n:03d}"]["name_zh"]).replace("（顆粒、散）", "")
+                    for n in range(351, 395)]
+        check("**351～394 共 44 項與資訊網畫面逐筆一致**", got_tail == SITE_TAIL,
+              [(351 + i, g, w) for i, (g, w) in enumerate(zip(got_tail, SITE_TAIL)) if g != w])
         check("30 個飲片都有所屬藥材", sum(1 for i in items if i["kind"] == "processed" and i["parent"]) == 30)
         check("沒有「薑」這個空的總標題，生薑、乾薑各自成項",
               not any(i["name_zh"] == "薑" for i in items)
@@ -128,6 +144,30 @@ def main():
         check("柴胡 ↔ 柴胡（Radix Bupleuri）：中文名＋生藥名字詞 → auto",
               m_ch.get(105) and m_ch[105].status == "auto" and m_ch[105].method == "name+latin",
               m_ch.get(105) and (m_ch[105].method, m_ch[105].status))
+        print("\n【名稱比對：中文名相同時先比英文名稱，不同再比拉丁生藥名稱（v1.51.2）】")
+        from types import SimpleNamespace as NS
+        dx = by_name(db, "丁香")              # 臺灣：英文名稱 Clove、拉丁生藥名稱 CARYOPHYLLI FLOS
+        syn = T.species_index()
+
+        def one(en):
+            h = NS(id=9999, herb_cn_name="丁香", child_cn_name=None, herb_en_name=en, child_en_name=None)
+            return T.name_compare(dx, h), T.candidates(dx, [h], syn).get(9999)
+        c, k = one("clove")
+        check("英文名稱相同（不分大小寫）→ 以英文名稱比對、name+english、auto",
+              c["english"] == "same" and c["used"] == "english" and k["method"] == "name+english" and k["status"] == "auto", (c, k))
+        c, k = one("Caryophylli Flos")
+        check("**英文名稱不同 → 改用拉丁生藥名稱，大小寫視為相同 → name+latin、auto**",
+              c["english"] == "different" and c["latin"] == "same" and c["used"] == "latin"
+              and k["method"] == "name+latin" and k["status"] == "auto", (c, k))
+        c, k = one("Flos Caryophylli")
+        check("拉丁生藥名稱字詞相同、順序不同 → same_words、以拉丁生藥名稱比對",
+              c["latin"] == "same_words" and c["used"] == "latin" and k["method"] == "name+latin", (c, k))
+        c, k = one("Myristica fragrans Houtt.")
+        check("英文名稱、拉丁生藥名稱都不同 → 只有中文名、待確認、沒有「以此比對」",
+              c["english"] == "different" and c["latin"] == "different" and c["used"] is None
+              and k["method"] == "name" and k["status"] == "pending", (c, k))
+        check("比對規則有版本號（規則改了，部署後自動重新比對）", T.data_version().endswith("-r" + T.MATCH_RULES))
+
         same = [m.seq for m in db.query(models.ThpMonograph).filter(models.ThpMonograph.kind == "processed").all()
                 if m.parent_seq and db.get(models.ThpMonograph, m.parent_seq).name_zh == m.name_zh]
         check("與所屬藥材同名的飲片（大黃、黃耆…）不重複比對",
@@ -181,11 +221,15 @@ def main():
         check("飲片沿用所屬藥材的基原並標示", dw["origin_inherited"] and dw["fields"]["origin"].startswith("本品為五加科")
               and dw["parent"]["name_zh"] == "人參" and dw["latin_name"] == ren.latin_name)
         dc = client.get(f"/pharmacopeia/thp/{by_name(db, '柴胡').seq}", headers=U).json()
+        nc = next((x["name_compare"] for x in dc["matches"] if x["herb_id"] == 105), None)
+        check("**API 註記名稱比對：柴胡以「拉丁生藥名稱」比對，並列出英文名稱**",
+              nc and nc["used"] == "latin" and nc["thp_latin"] == "BUPLEURI RADIX" and nc["thp_en"]
+              and nc["english"] == "different" and nc["latin"] == "same_words", nc)
         check("柴胡帶出 114 年修正公告（藥用部位改為根及根莖）",
               dc["amendment"] and "乾燥根及根莖" in dc["amendment"]["content"] and "藥用部位" in dc["amendment"]["note"])
         prep = db.query(models.ThpMonograph).filter(models.ThpMonograph.kind == "preparation").first()
         dp = client.get(f"/pharmacopeia/thp/{prep.seq}", headers=U).json()
-        check("濃縮製劑沒有資訊網連結", dp["official_url"] is None and dp["site_no"] is None)
+        check("濃縮製劑也有資訊網連結（386 起）", dp["site_no"] >= "386" and dp["official_url"].endswith(f"p={dp['site_no']}"), dp["official_url"])
         check("不存在的品項 → 404", client.get("/pharmacopeia/thp/99999", headers=U).status_code == 404)
 
         ing = client.get("/pharmacopeia/tcmsp-herbs/101/ingredients", headers=U).json()

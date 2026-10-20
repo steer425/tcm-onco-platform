@@ -485,7 +485,7 @@
    "extra": null,
    "name_s": "白参",
    "seq": 3,
-   "site_no": "003",
+   "site_no": "356",
    "amendment": null
   },
   {
@@ -513,7 +513,7 @@
    "extra": null,
    "name_s": "红参",
    "seq": 4,
-   "site_no": "004",
+   "site_no": "357",
    "amendment": null
   },
   {
@@ -541,7 +541,7 @@
    "extra": null,
    "name_s": "八角茴香",
    "seq": 5,
-   "site_no": "005",
+   "site_no": "003",
    "amendment": null
   },
   {
@@ -569,7 +569,7 @@
    "extra": null,
    "name_s": "三七",
    "seq": 6,
-   "site_no": "006",
+   "site_no": "004",
    "amendment": null
   },
   {
@@ -597,7 +597,7 @@
    "extra": null,
    "name_s": "三七",
    "seq": 7,
-   "site_no": "007",
+   "site_no": "358",
    "amendment": null
   },
   {
@@ -625,7 +625,7 @@
    "extra": null,
    "name_s": "三棱",
    "seq": 8,
-   "site_no": "008",
+   "site_no": "005",
    "amendment": null
   },
   {
@@ -653,7 +653,7 @@
    "extra": null,
    "name_s": "千年健",
    "seq": 9,
-   "site_no": "009",
+   "site_no": "006",
    "amendment": null
   },
   {
@@ -681,7 +681,7 @@
    "extra": null,
    "name_s": "土茯苓",
    "seq": 10,
-   "site_no": "010",
+   "site_no": "007",
    "amendment": null
   },
   {
@@ -710,7 +710,7 @@
    "extra": null,
    "name_s": "大青叶",
    "seq": 11,
-   "site_no": "011",
+   "site_no": "008",
    "amendment": null
   },
   {
@@ -738,7 +738,7 @@
    "extra": null,
    "name_s": "大枣",
    "seq": 12,
-   "site_no": "012",
+   "site_no": "009",
    "amendment": null
   },
   {
@@ -768,7 +768,7 @@
    "extra": null,
    "name_s": "大黄",
    "seq": 13,
-   "site_no": "013",
+   "site_no": "010",
    "amendment": {
     "date": "2025-07-30",
     "content": "雜質檢查及其它規定：\n1. 酸不溶性灰分――本品之酸不溶性灰分不得超過1.5%。（通則6007）\n2. 夾雜物――本品之夾雜物不得超過1.0%。（通則6005）\n3. 異種大黃（含土大黃苷）――取本品粉末50 mg，加甲醇5 mL，超音波振盪10 分鐘，過濾，取濾液作為檢品溶液。取土大黃苷對照標準品，加甲醇製成每1 mL 含0.25 mg 的溶液，作為對照標準品溶液。取檢品溶液1 μL、對照標準品溶液3 μL，按薄層層析法（通則1621.3），點注於含有螢光劑之矽膠薄層板上，以乙酸乙酯：甲醇：水(10：2：1)為展開溶劑，層析之。俟溶劑頂端上升至距原點約5~10 cm 時，取出層析板風乾後，置於主波長365 nm 之紫外燈照射下檢視之。檢品溶液不得顯現與對照標準品溶液所呈現主斑點一致之色調及Rf 值。",
@@ -802,7 +802,7 @@
    "extra": null,
    "name_s": "大黄",
    "seq": 14,
-   "site_no": "014",
+   "site_no": "359",
    "amendment": null
   },
   {
@@ -830,7 +830,7 @@
    "extra": null,
    "name_s": "大腹皮",
    "seq": 15,
-   "site_no": "015",
+   "site_no": "011",
    "amendment": null
   },
   {
@@ -858,7 +858,7 @@
    "extra": null,
    "name_s": "大蓟",
    "seq": 16,
-   "site_no": "016",
+   "site_no": "012",
    "amendment": null
   },
   {
@@ -886,7 +886,7 @@
    "extra": null,
    "name_s": "女贞子",
    "seq": 17,
-   "site_no": "017",
+   "site_no": "013",
    "amendment": null
   },
   {
@@ -914,7 +914,7 @@
    "extra": null,
    "name_s": "小茴香",
    "seq": 18,
-   "site_no": "018",
+   "site_no": "014",
    "amendment": null
   },
   {
@@ -943,7 +943,7 @@
    "extra": null,
    "name_s": "小蓟",
    "seq": 19,
-   "site_no": "019",
+   "site_no": "015",
    "amendment": null
   },
   {
@@ -971,7 +971,7 @@
    "extra": null,
    "name_s": "山豆根",
    "seq": 20,
-   "site_no": "020",
+   "site_no": "016",
    "amendment": null
   },
   {
@@ -999,7 +999,7 @@
    "extra": null,
    "name_s": "山柰",
    "seq": 21,
-   "site_no": "021",
+   "site_no": "017",
    "amendment": null
   },
   {
@@ -1027,7 +1027,7 @@
    "extra": null,
    "name_s": "山茱萸",
    "seq": 22,
-   "site_no": "022",
+   "site_no": "018",
    "amendment": null
   },
   {
@@ -1055,7 +1055,7 @@
    "extra": null,
    "name_s": "山楂",
    "seq": 23,
-   "site_no": "023",
+   "site_no": "019",
    "amendment": null
   },
   {
@@ -1084,7 +1084,7 @@
    "extra": null,
    "name_s": "山银花",
    "seq": 24,
-   "site_no": "024",
+   "site_no": "020",
    "amendment": null
   },
   {
@@ -1115,7 +1115,7 @@
    "extra": null,
    "name_s": "山药",
    "seq": 25,
-   "site_no": "025",
+   "site_no": "021",
    "amendment": null
   },
   {
@@ -1143,7 +1143,7 @@
    "extra": null,
    "name_s": "川木香",
    "seq": 26,
-   "site_no": "026",
+   "site_no": "022",
    "amendment": null
   },
   {
@@ -1172,7 +1172,7 @@
    "extra": null,
    "name_s": "川木通",
    "seq": 27,
-   "site_no": "027",
+   "site_no": "023",
    "amendment": null
   },
   {
@@ -1200,7 +1200,7 @@
    "extra": null,
    "name_s": "川牛膝",
    "seq": 28,
-   "site_no": "028",
+   "site_no": "024",
    "amendment": null
   },
   {
@@ -1228,7 +1228,7 @@
    "extra": null,
    "name_s": "川牛膝",
    "seq": 29,
-   "site_no": "029",
+   "site_no": "360",
    "amendment": null
   },
   {
@@ -1256,7 +1256,7 @@
    "extra": null,
    "name_s": "川芎",
    "seq": 30,
-   "site_no": "030",
+   "site_no": "025",
    "amendment": {
     "date": "2025-07-30",
     "content": "含量測定：\n1. 阿魏酸――\n移動相溶劑――甲醇：0.1%乙酸溶液(25：75)之混液。必要時其配合比例可予調整。\n對照標準品溶液――取阿魏酸對照標準品適量，精確稱定，加甲醇製成每1 mL 含30 μg 的溶液，即得。\n檢品溶液――取本品粉末約0.5 g，精確稱定，加70%甲醇50 mL，加熱迴流30 分鐘，過濾，取濾液，轉移至50 mL 之容量瓶中，加入70%甲醇至刻度，搖勻，過濾，取濾液，供做檢品溶液。\n層析裝置――液相層析裝置，具波長320 nm 檢測器，充填L1 之層析管，層析管溫度維持約35℃；移動相溶劑流速1 mL/min；理論板數按阿魏酸波峰計算應不低於8000。\n測定法――分別精確吸取對照標準品溶液及檢品溶液各10 μL，注入層析裝置層析之，測定，即得。\n阿魏酸（%）＝0.005 (rU/rS) (CS) / (W)\nrU：檢品溶液測得阿魏酸之波峰值\nrS：對照標準品溶液測得阿魏酸之波峰值\nCS：阿魏酸對照標準品溶液之濃度(μg/mL)\nW：檢品量(g) 以乾品計之\n2. 水抽提物――取本品按照生藥水抽提物測定法（通則6011）測定之。\n3. 稀乙醇抽提物――取本品按照生藥稀乙醇抽提物測定法（通則6011）測定之。",
@@ -1288,7 +1288,7 @@
    "extra": null,
    "name_s": "川芎",
    "seq": 31,
-   "site_no": "031",
+   "site_no": "361",
    "amendment": null
   },
   {
@@ -1320,7 +1320,7 @@
    "extra": null,
    "name_s": "川贝母",
    "seq": 32,
-   "site_no": "032",
+   "site_no": "026",
    "amendment": null
   },
   {
@@ -1348,7 +1348,7 @@
    "extra": null,
    "name_s": "川乌",
    "seq": 33,
-   "site_no": "033",
+   "site_no": "027",
    "amendment": null
   },
   {
@@ -1377,7 +1377,7 @@
    "extra": null,
    "name_s": "川楝子",
    "seq": 34,
-   "site_no": "034",
+   "site_no": "028",
    "amendment": null
   },
   {
@@ -1405,7 +1405,7 @@
    "extra": null,
    "name_s": "丹参",
    "seq": 35,
-   "site_no": "035",
+   "site_no": "029",
    "amendment": null
   },
   {
@@ -1433,7 +1433,7 @@
    "extra": null,
    "name_s": "丹参",
    "seq": 36,
-   "site_no": "036",
+   "site_no": "362",
    "amendment": null
   },
   {
@@ -1461,7 +1461,7 @@
    "extra": null,
    "name_s": "五加皮",
    "seq": 37,
-   "site_no": "037",
+   "site_no": "030",
    "amendment": {
     "date": "2025-07-30",
     "content": "鑑別：\n1. 取本品粉末1.0 g，加甲醇10 mL，超音波振盪30 分鐘，過濾，取濾液作為檢品溶液。取五加皮對照藥材1.0 g，同法製成對照藥材溶液。另取異貝殼杉烯酸(Kaurenoic acid)對照標準品，加甲醇製成每1 mL 含2.0 mg 的溶液，作為對照標準品溶液。取檢品溶液、對照藥材溶液及對照標準品溶液各1 μL，按薄層層析法（通則1621.3），分別點注於含有螢光劑之矽膠薄層板上，以石油醚(60~80℃)：乙酸乙酯：甲酸(17：3：0.1)為展開溶劑，層析之。俟溶劑頂端上升至距原點約8 cm 時，取出層析板風乾後，再以同一展開溶劑重複上述步驟1 次，以10%硫酸/乙醇試液(H2SO4/EtOH TS)噴霧，105℃加熱約3 分鐘，置於主波長365 nm 之紫外燈照射下檢視之。檢品溶液、對照藥材溶液及對照標準品溶液所呈現斑點之Rf 值及色調均一致。",
@@ -1493,7 +1493,7 @@
    "extra": null,
    "name_s": "五味子",
    "seq": 38,
-   "site_no": "038",
+   "site_no": "031",
    "amendment": null
   },
   {
@@ -1524,7 +1524,7 @@
    "extra": null,
    "name_s": "五倍子",
    "seq": 39,
-   "site_no": "039",
+   "site_no": "032",
    "amendment": null
   },
   {
@@ -1553,7 +1553,7 @@
    "extra": null,
    "name_s": "化橘红",
    "seq": 40,
-   "site_no": "040",
+   "site_no": "033",
    "amendment": null
   },
   {
@@ -1583,7 +1583,7 @@
    "extra": null,
    "name_s": "升麻",
    "seq": 41,
-   "site_no": "041",
+   "site_no": "034",
    "amendment": null
   },
   {
@@ -1612,7 +1612,7 @@
    "extra": null,
    "name_s": "天竺黄",
    "seq": 42,
-   "site_no": "042",
+   "site_no": "035",
    "amendment": null
   },
   {
@@ -1640,7 +1640,7 @@
    "extra": null,
    "name_s": "天门冬",
    "seq": 43,
-   "site_no": "043",
+   "site_no": "036",
    "amendment": null
   },
   {
@@ -1670,7 +1670,7 @@
    "extra": null,
    "name_s": "天南星",
    "seq": 44,
-   "site_no": "044",
+   "site_no": "037",
    "amendment": null
   },
   {
@@ -1698,7 +1698,7 @@
    "extra": null,
    "name_s": "天麻",
    "seq": 45,
-   "site_no": "045",
+   "site_no": "038",
    "amendment": null
   },
   {
@@ -1726,7 +1726,7 @@
    "extra": null,
    "name_s": "天麻",
    "seq": 46,
-   "site_no": "046",
+   "site_no": "363",
    "amendment": null
   },
   {
@@ -1754,7 +1754,7 @@
    "extra": null,
    "name_s": "天葵子",
    "seq": 47,
-   "site_no": "047",
+   "site_no": "039",
    "amendment": null
   },
   {
@@ -1782,7 +1782,7 @@
    "extra": null,
    "name_s": "太子参",
    "seq": 48,
-   "site_no": "048",
+   "site_no": "040",
    "amendment": null
   },
   {
@@ -1810,7 +1810,7 @@
    "extra": null,
    "name_s": "巴豆",
    "seq": 49,
-   "site_no": "049",
+   "site_no": "041",
    "amendment": null
   },
   {
@@ -1838,7 +1838,7 @@
    "extra": null,
    "name_s": "巴戟天",
    "seq": 50,
-   "site_no": "050",
+   "site_no": "042",
    "amendment": null
   },
   {
@@ -1866,7 +1866,7 @@
    "extra": null,
    "name_s": "木瓜",
    "seq": 51,
-   "site_no": "051",
+   "site_no": "043",
    "amendment": null
   },
   {
@@ -1894,7 +1894,7 @@
    "extra": null,
    "name_s": "木香",
    "seq": 52,
-   "site_no": "052",
+   "site_no": "044",
    "amendment": null
   },
   {
@@ -1923,7 +1923,7 @@
    "extra": null,
    "name_s": "木通",
    "seq": 53,
-   "site_no": "053",
+   "site_no": "045",
    "amendment": null
   },
   {
@@ -1951,7 +1951,7 @@
    "extra": null,
    "name_s": "木贼",
    "seq": 54,
-   "site_no": "054",
+   "site_no": "046",
    "amendment": null
   },
   {
@@ -1979,7 +1979,7 @@
    "extra": null,
    "name_s": "木蝴蝶",
    "seq": 55,
-   "site_no": "055",
+   "site_no": "047",
    "amendment": null
   },
   {
@@ -2007,7 +2007,7 @@
    "extra": null,
    "name_s": "木鼈子",
    "seq": 56,
-   "site_no": "056",
+   "site_no": "048",
    "amendment": null
   },
   {
@@ -2035,7 +2035,7 @@
    "extra": null,
    "name_s": "毛冬青",
    "seq": 57,
-   "site_no": "057",
+   "site_no": "049",
    "amendment": null
   },
   {
@@ -2065,7 +2065,7 @@
    "extra": null,
    "name_s": "水蛭",
    "seq": 58,
-   "site_no": "058",
+   "site_no": "050",
    "amendment": null
   },
   {
@@ -2093,7 +2093,7 @@
    "extra": null,
    "name_s": "火麻仁",
    "seq": 59,
-   "site_no": "059",
+   "site_no": "051",
    "amendment": null
   },
   {
@@ -2121,7 +2121,7 @@
    "extra": null,
    "name_s": "牛至",
    "seq": 60,
-   "site_no": "060",
+   "site_no": "052",
    "amendment": null
   },
   {
@@ -2149,7 +2149,7 @@
    "extra": null,
    "name_s": "牛黄",
    "seq": 61,
-   "site_no": "061",
+   "site_no": "053",
    "amendment": null
   },
   {
@@ -2177,7 +2177,7 @@
    "extra": null,
    "name_s": "牛蒡子",
    "seq": 62,
-   "site_no": "062",
+   "site_no": "054",
    "amendment": null
   },
   {
@@ -2205,7 +2205,7 @@
    "extra": null,
    "name_s": "牛膝",
    "seq": 63,
-   "site_no": "063",
+   "site_no": "055",
    "amendment": null
   },
   {
@@ -2233,7 +2233,7 @@
    "extra": null,
    "name_s": "牛膝",
    "seq": 64,
-   "site_no": "064",
+   "site_no": "364",
    "amendment": null
   },
   {
@@ -2261,7 +2261,7 @@
    "extra": null,
    "name_s": "王不留行",
    "seq": 65,
-   "site_no": "065",
+   "site_no": "056",
    "amendment": null
   },
   {
@@ -2289,7 +2289,7 @@
    "extra": null,
    "name_s": "仙茅",
    "seq": 66,
-   "site_no": "066",
+   "site_no": "057",
    "amendment": null
   },
   {
@@ -2317,7 +2317,7 @@
    "extra": null,
    "name_s": "仙鹤草",
    "seq": 67,
-   "site_no": "067",
+   "site_no": "058",
    "amendment": null
   },
   {
@@ -2343,7 +2343,7 @@
    "extra": null,
    "name_s": "代赭石",
    "seq": 68,
-   "site_no": "068",
+   "site_no": "059",
    "amendment": null
   },
   {
@@ -2371,7 +2371,7 @@
    "extra": null,
    "name_s": "冬瓜子",
    "seq": 69,
-   "site_no": "069",
+   "site_no": "060",
    "amendment": null
   },
   {
@@ -2399,7 +2399,7 @@
    "extra": null,
    "name_s": "冬虫夏草",
    "seq": 70,
-   "site_no": "070",
+   "site_no": "061",
    "amendment": null
   },
   {
@@ -2427,7 +2427,7 @@
    "extra": null,
    "name_s": "北沙参",
    "seq": 71,
-   "site_no": "071",
+   "site_no": "062",
    "amendment": null
   },
   {
@@ -2456,7 +2456,7 @@
    "extra": null,
    "name_s": "北板蓝根",
    "seq": 72,
-   "site_no": "072",
+   "site_no": "063",
    "amendment": null
   },
   {
@@ -2484,7 +2484,7 @@
    "extra": null,
    "name_s": "北刘寄奴",
    "seq": 73,
-   "site_no": "073",
+   "site_no": "064",
    "amendment": null
   },
   {
@@ -2512,7 +2512,7 @@
    "extra": null,
    "name_s": "半枝莲",
    "seq": 74,
-   "site_no": "074",
+   "site_no": "065",
    "amendment": null
   },
   {
@@ -2540,7 +2540,7 @@
    "extra": null,
    "name_s": "半夏",
    "seq": 75,
-   "site_no": "075",
+   "site_no": "066",
    "amendment": null
   },
   {
@@ -2568,7 +2568,7 @@
    "extra": null,
    "name_s": "玄参",
    "seq": 76,
-   "site_no": "076",
+   "site_no": "067",
    "amendment": null
   },
   {
@@ -2596,7 +2596,7 @@
    "extra": null,
    "name_s": "玉竹",
    "seq": 77,
-   "site_no": "077",
+   "site_no": "068",
    "amendment": null
   },
   {
@@ -2624,7 +2624,7 @@
    "extra": null,
    "name_s": "玉米须",
    "seq": 78,
-   "site_no": "078",
+   "site_no": "069",
    "amendment": null
   },
   {
@@ -2654,7 +2654,7 @@
    "extra": null,
    "name_s": "甘草",
    "seq": 79,
-   "site_no": "079",
+   "site_no": "070",
    "amendment": null
   },
   {
@@ -2684,7 +2684,7 @@
    "extra": null,
    "name_s": "甘草",
    "seq": 80,
-   "site_no": "080",
+   "site_no": "365",
    "amendment": null
   },
   {
@@ -2712,7 +2712,7 @@
    "extra": null,
    "name_s": "甘遂",
    "seq": 81,
-   "site_no": "081",
+   "site_no": "071",
    "amendment": null
   },
   {
@@ -2741,7 +2741,7 @@
    "extra": null,
    "name_s": "白及",
    "seq": 82,
-   "site_no": "082",
+   "site_no": "072",
    "amendment": null
   },
   {
@@ -2769,7 +2769,7 @@
    "extra": null,
    "name_s": "白术",
    "seq": 83,
-   "site_no": "083",
+   "site_no": "073",
    "amendment": null
   },
   {
@@ -2797,7 +2797,7 @@
    "extra": null,
    "name_s": "白术",
    "seq": 84,
-   "site_no": "084",
+   "site_no": "366",
    "amendment": null
   },
   {
@@ -2825,7 +2825,7 @@
    "extra": null,
    "name_s": "白芍",
    "seq": 85,
-   "site_no": "085",
+   "site_no": "074",
    "amendment": null
   },
   {
@@ -2853,7 +2853,7 @@
    "extra": null,
    "name_s": "白芍",
    "seq": 86,
-   "site_no": "086",
+   "site_no": "367",
    "amendment": null
   },
   {
@@ -2881,7 +2881,7 @@
    "extra": null,
    "name_s": "白果",
    "seq": 87,
-   "site_no": "087",
+   "site_no": "075",
    "amendment": null
   },
   {
@@ -2909,7 +2909,7 @@
    "extra": null,
    "name_s": "白芥子",
    "seq": 88,
-   "site_no": "088",
+   "site_no": "076",
    "amendment": null
   },
   {
@@ -2937,7 +2937,7 @@
    "extra": null,
    "name_s": "白花蛇舌草",
    "seq": 89,
-   "site_no": "089",
+   "site_no": "077",
    "amendment": null
   },
   {
@@ -2965,7 +2965,7 @@
    "extra": null,
    "name_s": "白芷",
    "seq": 90,
-   "site_no": "090",
+   "site_no": "078",
    "amendment": null
   },
   {
@@ -2993,7 +2993,7 @@
    "extra": null,
    "name_s": "白芷",
    "seq": 91,
-   "site_no": "091",
+   "site_no": "368",
    "amendment": null
   },
   {
@@ -3022,7 +3022,7 @@
    "extra": null,
    "name_s": "白前",
    "seq": 92,
-   "site_no": "092",
+   "site_no": "079",
    "amendment": null
   },
   {
@@ -3051,7 +3051,7 @@
    "extra": null,
    "name_s": "白扁豆",
    "seq": 93,
-   "site_no": "093",
+   "site_no": "080",
    "amendment": null
   },
   {
@@ -3079,7 +3079,7 @@
    "extra": null,
    "name_s": "白茅根",
    "seq": 94,
-   "site_no": "094",
+   "site_no": "081",
    "amendment": null
   },
   {
@@ -3107,7 +3107,7 @@
    "extra": null,
    "name_s": "白头翁",
    "seq": 95,
-   "site_no": "095",
+   "site_no": "082",
    "amendment": null
   },
   {
@@ -3136,7 +3136,7 @@
    "extra": null,
    "name_s": "白僵蚕",
    "seq": 96,
-   "site_no": "096",
+   "site_no": "083",
    "amendment": null
   },
   {
@@ -3165,7 +3165,7 @@
    "extra": null,
    "name_s": "白薇",
    "seq": 97,
-   "site_no": "097",
+   "site_no": "084",
    "amendment": null
   },
   {
@@ -3193,7 +3193,7 @@
    "extra": null,
    "name_s": "白鲜皮",
    "seq": 98,
-   "site_no": "098",
+   "site_no": "085",
    "amendment": null
   },
   {
@@ -3221,7 +3221,7 @@
    "extra": null,
    "name_s": "白蔹",
    "seq": 99,
-   "site_no": "099",
+   "site_no": "086",
    "amendment": null
   },
   {
@@ -3254,7 +3254,7 @@
    "extra": null,
    "name_s": "石决明",
    "seq": 100,
-   "site_no": "100",
+   "site_no": "087",
    "amendment": null
   },
   {
@@ -3284,7 +3284,7 @@
    "extra": null,
    "name_s": "石韦",
    "seq": 101,
-   "site_no": "101",
+   "site_no": "088",
    "amendment": null
   },
   {
@@ -3318,7 +3318,7 @@
    "extra": null,
    "name_s": "石斛",
    "seq": 102,
-   "site_no": "102",
+   "site_no": "089",
    "amendment": null
   },
   {
@@ -3346,7 +3346,7 @@
    "extra": null,
    "name_s": "石菖蒲",
    "seq": 103,
-   "site_no": "103",
+   "site_no": "090",
    "amendment": null
   },
   {
@@ -3374,7 +3374,7 @@
    "extra": null,
    "name_s": "石榴皮",
    "seq": 104,
-   "site_no": "104",
+   "site_no": "091",
    "amendment": null
   },
   {
@@ -3400,7 +3400,7 @@
    "extra": null,
    "name_s": "石膏",
    "seq": 105,
-   "site_no": "105",
+   "site_no": "092",
    "amendment": null
   },
   {
@@ -3428,7 +3428,7 @@
    "extra": null,
    "name_s": "全蝎",
    "seq": 106,
-   "site_no": "106",
+   "site_no": "093",
    "amendment": null
   },
   {
@@ -3457,7 +3457,7 @@
    "extra": null,
    "name_s": "冰片",
    "seq": 107,
-   "site_no": "107",
+   "site_no": "094",
    "amendment": null
   },
   {
@@ -3485,7 +3485,7 @@
    "extra": null,
    "name_s": "合欢皮",
    "seq": 108,
-   "site_no": "108",
+   "site_no": "095",
    "amendment": null
   },
   {
@@ -3514,7 +3514,7 @@
    "extra": null,
    "name_s": "地骨皮",
    "seq": 109,
-   "site_no": "109",
+   "site_no": "096",
    "amendment": null
   },
   {
@@ -3542,7 +3542,7 @@
    "extra": null,
    "name_s": "地黄",
    "seq": 110,
-   "site_no": "110",
+   "site_no": "097",
    "amendment": null
   },
   {
@@ -3570,7 +3570,7 @@
    "extra": null,
    "name_s": "地榆",
    "seq": 111,
-   "site_no": "111",
+   "site_no": "098",
    "amendment": null
   },
   {
@@ -3598,7 +3598,7 @@
    "extra": null,
    "name_s": "地肤子",
    "seq": 112,
-   "site_no": "112",
+   "site_no": "099",
    "amendment": null
   },
   {
@@ -3629,7 +3629,7 @@
    "extra": null,
    "name_s": "地龙",
    "seq": 113,
-   "site_no": "113",
+   "site_no": "100",
    "amendment": null
   },
   {
@@ -3659,7 +3659,7 @@
    "extra": null,
    "name_s": "百合",
    "seq": 114,
-   "site_no": "114",
+   "site_no": "101",
    "amendment": null
   },
   {
@@ -3689,7 +3689,7 @@
    "extra": null,
    "name_s": "百部",
    "seq": 115,
-   "site_no": "115",
+   "site_no": "102",
    "amendment": null
   },
   {
@@ -3720,7 +3720,7 @@
    "extra": null,
    "name_s": "竹茹",
    "seq": 116,
-   "site_no": "116",
+   "site_no": "103",
    "amendment": null
   },
   {
@@ -3748,7 +3748,7 @@
    "extra": null,
    "name_s": "肉豆蔻",
    "seq": 117,
-   "site_no": "117",
+   "site_no": "104",
    "amendment": null
   },
   {
@@ -3776,7 +3776,7 @@
    "extra": null,
    "name_s": "肉桂",
    "seq": 118,
-   "site_no": "118",
+   "site_no": "105",
    "amendment": null
   },
   {
@@ -3804,7 +3804,7 @@
    "extra": null,
    "name_s": "桂心",
    "seq": 119,
-   "site_no": "119",
+   "site_no": "106",
    "amendment": null
   },
   {
@@ -3833,7 +3833,7 @@
    "extra": null,
    "name_s": "肉苁蓉",
    "seq": 120,
-   "site_no": "120",
+   "site_no": "107",
    "amendment": null
   },
   {
@@ -3861,7 +3861,7 @@
    "extra": null,
    "name_s": "艾叶",
    "seq": 121,
-   "site_no": "121",
+   "site_no": "108",
    "amendment": null
   },
   {
@@ -3889,7 +3889,7 @@
    "extra": null,
    "name_s": "血竭",
    "seq": 122,
-   "site_no": "122",
+   "site_no": "109",
    "amendment": null
   },
   {
@@ -3917,7 +3917,7 @@
    "extra": null,
    "name_s": "西洋参",
    "seq": 123,
-   "site_no": "123",
+   "site_no": "110",
    "amendment": null
   },
   {
@@ -3945,7 +3945,7 @@
    "extra": null,
    "name_s": "西洋参",
    "seq": 124,
-   "site_no": "124",
+   "site_no": "369",
    "amendment": null
   },
   {
@@ -3973,7 +3973,7 @@
    "extra": null,
    "name_s": "伸筋草",
    "seq": 125,
-   "site_no": "125",
+   "site_no": "111",
    "amendment": null
   },
   {
@@ -4002,7 +4002,7 @@
    "extra": null,
    "name_s": "何首乌",
    "seq": 126,
-   "site_no": "126",
+   "site_no": "112",
    "amendment": null
   },
   {
@@ -4031,7 +4031,7 @@
    "extra": null,
    "name_s": "何首乌",
    "seq": 127,
-   "site_no": "127",
+   "site_no": "370",
    "amendment": null
   },
   {
@@ -4059,7 +4059,7 @@
    "extra": null,
    "name_s": "佛手柑",
    "seq": 128,
-   "site_no": "128",
+   "site_no": "113",
    "amendment": null
   },
   {
@@ -4087,7 +4087,7 @@
    "extra": null,
    "name_s": "吴茱萸",
    "seq": 129,
-   "site_no": "129",
+   "site_no": "114",
    "amendment": null
   },
   {
@@ -4115,7 +4115,7 @@
    "extra": null,
    "name_s": "忍冬藤",
    "seq": 130,
-   "site_no": "130",
+   "site_no": "115",
    "amendment": null
   },
   {
@@ -4143,7 +4143,7 @@
    "extra": null,
    "name_s": "杜仲",
    "seq": 131,
-   "site_no": "131",
+   "site_no": "116",
    "amendment": null
   },
   {
@@ -4174,7 +4174,7 @@
    "extra": null,
    "name_s": "决明子",
    "seq": 132,
-   "site_no": "132",
+   "site_no": "117",
    "amendment": null
   },
   {
@@ -4202,7 +4202,7 @@
    "extra": null,
    "name_s": "沉香",
    "seq": 133,
-   "site_no": "133",
+   "site_no": "118",
    "amendment": null
   },
   {
@@ -4231,7 +4231,7 @@
    "extra": null,
    "name_s": "没药",
    "seq": 134,
-   "site_no": "134",
+   "site_no": "119",
    "amendment": null
   },
   {
@@ -4259,7 +4259,7 @@
    "extra": null,
    "name_s": "沙苑蒺藜",
    "seq": 135,
-   "site_no": "135",
+   "site_no": "120",
    "amendment": null
   },
   {
@@ -4287,7 +4287,7 @@
    "extra": null,
    "name_s": "牡丹皮",
    "seq": 136,
-   "site_no": "136",
+   "site_no": "121",
    "amendment": null
   },
   {
@@ -4315,7 +4315,7 @@
    "extra": null,
    "name_s": "牡丹皮",
    "seq": 137,
-   "site_no": "137",
+   "site_no": "371",
    "amendment": null
   },
   {
@@ -4344,7 +4344,7 @@
    "extra": null,
    "name_s": "牡蛎",
    "seq": 138,
-   "site_no": "138",
+   "site_no": "122",
    "amendment": null
   },
   {
@@ -4372,7 +4372,7 @@
    "extra": null,
    "name_s": "皂角刺",
    "seq": 139,
-   "site_no": "139",
+   "site_no": "123",
    "amendment": null
   },
   {
@@ -4400,7 +4400,7 @@
    "extra": null,
    "name_s": "皂荚",
    "seq": 140,
-   "site_no": "140",
+   "site_no": "124",
    "amendment": null
   },
   {
@@ -4426,7 +4426,7 @@
    "extra": null,
    "name_s": "芒硝",
    "seq": 141,
-   "site_no": "141",
+   "site_no": "125",
    "amendment": null
   },
   {
@@ -4455,7 +4455,7 @@
    "extra": null,
    "name_s": "豆蔻",
    "seq": 142,
-   "site_no": "142",
+   "site_no": "126",
    "amendment": null
   },
   {
@@ -4483,7 +4483,7 @@
    "extra": null,
    "name_s": "赤小豆",
    "seq": 143,
-   "site_no": "143",
+   "site_no": "127",
    "amendment": null
   },
   {
@@ -4512,7 +4512,7 @@
    "extra": null,
    "name_s": "赤芍",
    "seq": 144,
-   "site_no": "144",
+   "site_no": "128",
    "amendment": null
   },
   {
@@ -4541,7 +4541,7 @@
    "extra": null,
    "name_s": "车前子",
    "seq": 145,
-   "site_no": "145",
+   "site_no": "129",
    "amendment": null
   },
   {
@@ -4570,7 +4570,7 @@
    "extra": null,
    "name_s": "车前草",
    "seq": 146,
-   "site_no": "146",
+   "site_no": "130",
    "amendment": null
   },
   {
@@ -4600,7 +4600,7 @@
    "extra": null,
    "name_s": "辛夷",
    "seq": 147,
-   "site_no": "147",
+   "site_no": "131",
    "amendment": {
     "date": "2025-07-30",
     "content": "本品之稀乙醇抽提物不得少於10.0%，水抽提物不得少於11.0%，所含揮發油不得少於1.0% (v/w)，含木蘭脂素(Magnolin)不得少於3.0%。\n鑑別：\n1. 取本品粉末1.0 g，加甲醇10 mL，超音波振盪30 分鐘，過濾，作為檢品溶液。取辛夷對照藥材1.0 g，同法製成對照藥材溶液。另取木蘭脂素對照標準品，加甲醇製成每1 mL 含1.0 mg 的溶液，作為對照標準品溶液。取檢品溶液、對照藥材溶液各2 μL、對照標準品溶液5 μL，按薄層層析法（通則1621.3），分別點注於含有螢光劑之矽膠薄層板上，以甲苯：乙醚(1：1)為展開溶劑，層析之。俟溶劑頂端上升至距原點約5~10 cm 時，取出層析板風乾後，以10%硫酸/乙醇試液(H2SO4/EtOH TS)噴霧，105℃加熱至斑點顯色清晰，置於可見光下檢視之。檢品溶液、對照藥材溶液及對照標準品溶液所呈現斑點之Rf值及色調均一致。\n含量測定：\n1. 木蘭脂素――\n移動相溶劑――以乙腈：水(40：60)之混液。必要時其配合可予調整。\n對照標準品溶液――取木蘭脂素對照標準品適量，精確稱定，加甲醇製成每1 mL 含0.1 mg 的溶液，即得。\n檢品溶液――取本品粉末約0.25 g，精確稱定，置50 mL 離心管中，加甲醇25 mL，超音波振盪30 分鐘，離心5 分鐘，取上清液轉移於50 mL 容量瓶中。殘渣部分重複提取1 次，合併上清液，加甲醇至刻度，混勻，過濾，取濾液，供做檢品溶液。\n層析裝置――液相層析裝置，具波長278 nm 檢測器，充填L1 之層析管，層析管溫度維持約30℃；移動相溶劑流速1 mL/min；理論板數按木蘭脂素峰計算應不低於8000。\n測定法――分別精確吸取對照標準品溶液及檢品溶液各10 μL，注入層析裝置層析之，測定，即得。\n木蘭脂素（%）＝5 (rU/rS) (CS) / (W)\nrU：檢品溶液測得木蘭脂素之波峰值\nrS：對照標準品溶液測得木蘭脂素之波峰值\nCS：木蘭脂素對照標準品溶液之濃度(mg/mL)\nW：檢品量(g) 以乾品計之\n2. 水抽提物――取本品按照生藥水抽提物測定法（通則6011）測定之。\n3. 稀乙醇抽提物――取本品按照生藥稀乙醇測定法（通則6011）測定之。\n4. 揮發油――本品按照生藥揮發油測定法（通則6013）測定之。",
@@ -4632,7 +4632,7 @@
    "extra": null,
    "name_s": "防己",
    "seq": 148,
-   "site_no": "148",
+   "site_no": "132",
    "amendment": null
   },
   {
@@ -4660,7 +4660,7 @@
    "extra": null,
    "name_s": "防风",
    "seq": 149,
-   "site_no": "149",
+   "site_no": "133",
    "amendment": null
   },
   {
@@ -4688,7 +4688,7 @@
    "extra": null,
    "name_s": "乳香",
    "seq": 150,
-   "site_no": "150",
+   "site_no": "134",
    "amendment": null
   },
   {
@@ -4716,7 +4716,7 @@
    "extra": null,
    "name_s": "佩兰",
    "seq": 151,
-   "site_no": "151",
+   "site_no": "135",
    "amendment": null
   },
   {
@@ -4744,7 +4744,7 @@
    "extra": null,
    "name_s": "使君子",
    "seq": 152,
-   "site_no": "152",
+   "site_no": "136",
    "amendment": null
   },
   {
@@ -4773,7 +4773,7 @@
    "extra": null,
    "name_s": "儿茶",
    "seq": 153,
-   "site_no": "153",
+   "site_no": "137",
    "amendment": {
     "date": "2025-07-30",
     "content": "鑑別：\n1. 取本品粉末0.5 g，加乙酸乙酯30 mL，超音波振盪10 分鐘，過濾，濾液濃縮至乾，殘渣加甲醇5 mL 使之溶解，作為檢品溶液。取兒茶對照藥材0.5 g，同法製成對照藥材溶液。另取兒茶素對照標準品，加甲醇製成每1 mL 含1.0 mg 的溶液，作為對照標準品溶液。取檢品溶液及對照藥材溶液各5 μL、對照標準品溶液2 μL，按薄層層析法（通則1621.3），分別點注於含有螢光劑之矽膠薄層板上，以甲苯：乙酸乙酯：甲酸(4：4：1)為展開溶劑，層析之。俟溶劑頂端上升至距原點約5~10 cm 時，取出層析板風乾後，以10%硫酸/乙醇試液(H2SO4/EtOH TS)噴霧，105℃加熱至斑點顯色清晰，置於可見光下檢視之。檢品溶液、對照藥材溶液及對照標準品溶液所呈現斑點之Rf 值及色調均一致。\n含量測定：\n1. 兒茶素、表兒茶素――\n移動相溶劑――甲醇：0.1%乙酸(25：75)之混液。必要時其配合比例可予調整。\n標準品溶液――取兒茶素、表兒茶素對照標準品適量，精確稱定，加甲醇：水(1：1)製成每1 mL 各含0.15 mg、0.1 mg 的混合溶液，即得。\n檢品溶液――取本品粉末約20 mg，精確稱定，置50 mL 離心管中，加入50%甲醇40 mL，超音波振盪20 分鐘，離心過濾，取濾液轉移至50 mL 之容量瓶中，加50%甲醇至刻度，搖勻過濾，取濾液，供做檢品溶液。\n層析裝置――液相層析裝置，具波長280 nm 檢測器、充填L1 之層析管，層析管溫維持約35℃；移動相溶劑流速1 mL/min；理論板數按兒茶素及表兒茶素峰計算應不低於4000。\n測定法――分別精確吸取對照標準品溶液及檢品溶液各10 μL，注入層析裝置層析之，測定，即得。\n兒茶素、表兒茶素（%）＝5000 (rU/rS) (CS) / (W)\nrU：檢品溶液測得兒茶素、表兒茶素之波峰值\nrS：對照標準品溶液測得兒茶素、表兒茶素之波峰值\nCS：兒茶素、表兒茶素對照標準品溶液之濃度(mg/mL)\nW：檢品量(mg) 以乾品計之\n2. 水抽提物――取本品按照生藥水抽提物測定法（通則6011）測定之。\n3. 稀乙醇抽提物――取本品按照生藥稀乙醇抽提物測定法（通則6011）測定之。",
@@ -4806,7 +4806,7 @@
    "extra": null,
    "name_s": "卷柏",
    "seq": 154,
-   "site_no": "154",
+   "site_no": "138",
    "amendment": null
   },
   {
@@ -4834,7 +4834,7 @@
    "extra": null,
    "name_s": "延胡索",
    "seq": 155,
-   "site_no": "155",
+   "site_no": "139",
    "amendment": null
   },
   {
@@ -4862,7 +4862,7 @@
    "extra": null,
    "name_s": "延胡索",
    "seq": 156,
-   "site_no": "156",
+   "site_no": "372",
    "amendment": null
   },
   {
@@ -4891,7 +4891,7 @@
    "extra": null,
    "name_s": "昆布",
    "seq": 157,
-   "site_no": "157",
+   "site_no": "140",
    "amendment": null
   },
   {
@@ -4919,7 +4919,7 @@
    "extra": null,
    "name_s": "枇杷叶",
    "seq": 158,
-   "site_no": "158",
+   "site_no": "141",
    "amendment": null
   },
   {
@@ -4947,7 +4947,7 @@
    "extra": null,
    "name_s": "狗脊",
    "seq": 159,
-   "site_no": "159",
+   "site_no": "142",
    "amendment": null
   },
   {
@@ -4975,7 +4975,7 @@
    "extra": null,
    "name_s": "知母",
    "seq": 160,
-   "site_no": "160",
+   "site_no": "143",
    "amendment": null
   },
   {
@@ -5004,7 +5004,7 @@
    "extra": null,
    "name_s": "羌活",
    "seq": 161,
-   "site_no": "161",
+   "site_no": "144",
    "amendment": null
   },
   {
@@ -5032,7 +5032,7 @@
    "extra": null,
    "name_s": "芡实",
    "seq": 162,
-   "site_no": "162",
+   "site_no": "145",
    "amendment": null
   },
   {
@@ -5061,7 +5061,7 @@
    "extra": null,
    "name_s": "花椒",
    "seq": 163,
-   "site_no": "163",
+   "site_no": "146",
    "amendment": null
   },
   {
@@ -5090,7 +5090,7 @@
    "extra": null,
    "name_s": "虎杖",
    "seq": 164,
-   "site_no": "164",
+   "site_no": "147",
    "amendment": null
   },
   {
@@ -5118,7 +5118,7 @@
    "extra": null,
    "name_s": "金银花",
    "seq": 165,
-   "site_no": "165",
+   "site_no": "148",
    "amendment": null
   },
   {
@@ -5146,7 +5146,7 @@
    "extra": null,
    "name_s": "金钱草",
    "seq": 166,
-   "site_no": "166",
+   "site_no": "149",
    "amendment": null
   },
   {
@@ -5174,7 +5174,7 @@
    "extra": null,
    "name_s": "金樱子",
    "seq": 167,
-   "site_no": "167",
+   "site_no": "150",
    "amendment": null
   },
   {
@@ -5202,7 +5202,7 @@
    "extra": null,
    "name_s": "附子",
    "seq": 168,
-   "site_no": "168",
+   "site_no": "151",
    "amendment": null
   },
   {
@@ -5230,7 +5230,7 @@
    "extra": null,
    "name_s": "青皮",
    "seq": 169,
-   "site_no": "169",
+   "site_no": "152",
    "amendment": null
   },
   {
@@ -5258,7 +5258,7 @@
    "extra": null,
    "name_s": "青葙子",
    "seq": 170,
-   "site_no": "170",
+   "site_no": "153",
    "amendment": null
   },
   {
@@ -5286,7 +5286,7 @@
    "extra": null,
    "name_s": "青蒿",
    "seq": 171,
-   "site_no": "171",
+   "site_no": "154",
    "amendment": null
   },
   {
@@ -5317,7 +5317,7 @@
    "extra": null,
    "name_s": "青黛",
    "seq": 172,
-   "site_no": "172",
+   "site_no": "155",
    "amendment": null
   },
   {
@@ -5345,7 +5345,7 @@
    "extra": null,
    "name_s": "前胡",
    "seq": 173,
-   "site_no": "173",
+   "site_no": "156",
    "amendment": null
   },
   {
@@ -5373,7 +5373,7 @@
    "extra": null,
    "name_s": "南五味子",
    "seq": 174,
-   "site_no": "174",
+   "site_no": "157",
    "amendment": null
   },
   {
@@ -5403,7 +5403,7 @@
    "extra": null,
    "name_s": "南沙参",
    "seq": 175,
-   "site_no": "175",
+   "site_no": "158",
    "amendment": null
   },
   {
@@ -5431,7 +5431,7 @@
    "extra": null,
    "name_s": "南板蓝根",
    "seq": 176,
-   "site_no": "176",
+   "site_no": "159",
    "amendment": null
   },
   {
@@ -5459,7 +5459,7 @@
    "extra": null,
    "name_s": "厚朴",
    "seq": 177,
-   "site_no": "177",
+   "site_no": "160",
    "amendment": null
   },
   {
@@ -5490,7 +5490,7 @@
    "extra": null,
    "name_s": "威灵仙",
    "seq": 178,
-   "site_no": "178",
+   "site_no": "161",
    "amendment": null
   },
   {
@@ -5520,7 +5520,7 @@
    "extra": null,
    "name_s": "枳椇子",
    "seq": 179,
-   "site_no": "179",
+   "site_no": "162",
    "amendment": null
   },
   {
@@ -5548,7 +5548,7 @@
    "extra": null,
    "name_s": "枳壳",
    "seq": 180,
-   "site_no": "180",
+   "site_no": "163",
    "amendment": null
   },
   {
@@ -5577,7 +5577,7 @@
    "extra": null,
    "name_s": "枳实",
    "seq": 181,
-   "site_no": "181",
+   "site_no": "164",
    "amendment": null
   },
   {
@@ -5606,7 +5606,7 @@
    "extra": null,
    "name_s": "枸杞子",
    "seq": 182,
-   "site_no": "182",
+   "site_no": "165",
    "amendment": null
   },
   {
@@ -5634,7 +5634,7 @@
    "extra": null,
    "name_s": "柏子仁",
    "seq": 183,
-   "site_no": "183",
+   "site_no": "166",
    "amendment": null
   },
   {
@@ -5662,7 +5662,7 @@
    "extra": null,
    "name_s": "柿蒂",
    "seq": 184,
-   "site_no": "184",
+   "site_no": "167",
    "amendment": null
   },
   {
@@ -5691,7 +5691,7 @@
    "extra": null,
    "name_s": "砂仁",
    "seq": 185,
-   "site_no": "185",
+   "site_no": "168",
    "amendment": {
     "date": "2025-07-30",
     "content": "鑑別：\n1. 取本品粉末適量，用水蒸餾，萃取出揮發油，揮發油加乙醇製成每1 mL 含20 μL 的溶液，作為檢品溶液。取砂仁對照藥材適量，同法製成對照藥材溶液。另取乙酸龍腦酯(Bornyl Acetate)對照標準品，加乙醇製成1 mL 含10 μL 的溶液，作為對照標準品溶液。取檢品溶液、對照藥材溶液及對照標準品溶液各1 μL，按薄層層析法（通則1621.3），分別點注於含有螢光劑之矽膠薄層板上，以正己烷：乙酸乙酯(22：1)為展開溶劑，層析之。俟溶劑頂端上升至距原點約5~10 cm 時，取出層析板風乾後，以5%香莢蘭醛－硫酸試液(Vanillin-H2SO4 TS)噴霧，105℃加熱至斑點顯色清晰，置於可見光下檢視之。檢品溶液、對照藥材溶液及對照標準品溶液所呈現紫紅色斑點之色調及Rf 值均一致。\n2. 取本品粉末2.0 g，加甲醇15 mL，超音波振盪30 分鐘，過濾，作為檢品溶液。取砂仁對照藥材2.0 g，同法製成對照藥材溶液。另取乙酸龍腦酯對照標準品，加甲醇製成1 mL 含1.0 mg 的溶液，作為對照標準品溶液。取檢品溶液、對照藥材溶液各10 μL、對照標準品溶液5 μL，按薄層層析法（通則1621.3），分別點注於含有螢光劑之矽膠薄層板上，以正己烷：乙酸乙酯(22：1)為展開溶劑，層析之。俟溶劑頂端上升至距原點約5~10 cm 時，取出層析板風乾後，以5%香莢蘭醛－硫酸試液(Vanillin-H2SO4 TS)噴霧，105℃加熱至斑點顯色清晰，置於可見光下檢視之。檢品溶液、對照藥材溶液及對照標準品溶液所呈現紫紅色斑點之色調及Rf 值均一致。",
@@ -5723,7 +5723,7 @@
    "extra": null,
    "name_s": "穿心莲",
    "seq": 186,
-   "site_no": "186",
+   "site_no": "169",
    "amendment": null
   },
   {
@@ -5751,7 +5751,7 @@
    "extra": null,
    "name_s": "红花",
    "seq": 187,
-   "site_no": "187",
+   "site_no": "170",
    "amendment": null
   },
   {
@@ -5779,7 +5779,7 @@
    "extra": null,
    "name_s": "红耆",
    "seq": 188,
-   "site_no": "188",
+   "site_no": "171",
    "amendment": null
   },
   {
@@ -5807,7 +5807,7 @@
    "extra": null,
    "name_s": "红景天",
    "seq": 189,
-   "site_no": "189",
+   "site_no": "172",
    "amendment": null
   },
   {
@@ -5836,7 +5836,7 @@
    "extra": null,
    "name_s": "胖大海",
    "seq": 190,
-   "site_no": "190",
+   "site_no": "173",
    "amendment": null
   },
   {
@@ -5864,7 +5864,7 @@
    "extra": null,
    "name_s": "胡麻仁",
    "seq": 191,
-   "site_no": "191",
+   "site_no": "174",
    "amendment": null
   },
   {
@@ -5892,7 +5892,7 @@
    "extra": null,
    "name_s": "胡椒",
    "seq": 192,
-   "site_no": "192",
+   "site_no": "175",
    "amendment": null
   },
   {
@@ -5920,7 +5920,7 @@
    "extra": null,
    "name_s": "胡黄连",
    "seq": 193,
-   "site_no": "193",
+   "site_no": "176",
    "amendment": null
   },
   {
@@ -5948,7 +5948,7 @@
    "extra": null,
    "name_s": "胡芦巴",
    "seq": 194,
-   "site_no": "194",
+   "site_no": "177",
    "amendment": null
   },
   {
@@ -5976,7 +5976,7 @@
    "extra": null,
    "name_s": "苘麻子",
    "seq": 195,
-   "site_no": "195",
+   "site_no": "178",
    "amendment": null
   },
   {
@@ -6006,7 +6006,7 @@
    "extra": null,
    "name_s": "苦杏仁",
    "seq": 196,
-   "site_no": "196",
+   "site_no": "179",
    "amendment": null
   },
   {
@@ -6034,7 +6034,7 @@
    "extra": null,
    "name_s": "苦参",
    "seq": 197,
-   "site_no": "197",
+   "site_no": "180",
    "amendment": null
   },
   {
@@ -6062,7 +6062,7 @@
    "extra": null,
    "name_s": "茺蔚子",
    "seq": 198,
-   "site_no": "198",
+   "site_no": "181",
    "amendment": null
   },
   {
@@ -6092,7 +6092,7 @@
    "extra": null,
    "name_s": "郁李仁",
    "seq": 199,
-   "site_no": "199",
+   "site_no": "182",
    "amendment": null
   },
   {
@@ -6120,7 +6120,7 @@
    "extra": null,
    "name_s": "韭菜子",
    "seq": 200,
-   "site_no": "200",
+   "site_no": "183",
    "amendment": null
   },
   {
@@ -6149,7 +6149,7 @@
    "extra": null,
    "name_s": "首乌藤",
    "seq": 201,
-   "site_no": "201",
+   "site_no": "184",
    "amendment": null
   },
   {
@@ -6177,7 +6177,7 @@
    "extra": null,
    "name_s": "香附",
    "seq": 202,
-   "site_no": "202",
+   "site_no": "185",
    "amendment": null
   },
   {
@@ -6205,7 +6205,7 @@
    "extra": null,
    "name_s": "香薷",
    "seq": 203,
-   "site_no": "203",
+   "site_no": "186",
    "amendment": null
   },
   {
@@ -6233,7 +6233,7 @@
    "extra": null,
    "name_s": "倒地蜈蚣",
    "seq": 204,
-   "site_no": "204",
+   "site_no": "187",
    "amendment": null
   },
   {
@@ -6261,7 +6261,7 @@
    "extra": null,
    "name_s": "夏枯草",
    "seq": 205,
-   "site_no": "205",
+   "site_no": "188",
    "amendment": null
   },
   {
@@ -6290,7 +6290,7 @@
    "extra": null,
    "name_s": "射干",
    "seq": 206,
-   "site_no": "206",
+   "site_no": "189",
    "amendment": null
   },
   {
@@ -6319,7 +6319,7 @@
    "extra": null,
    "name_s": "柴胡",
    "seq": 207,
-   "site_no": "207",
+   "site_no": "190",
    "amendment": {
     "date": "2025-07-30",
     "content": "本品為繖形科 Umbelliferae 植物柴胡 Bupleurum chinense DC.或狹葉柴胡 Bupleurum scorzonerifolium Willd.之乾燥根及根莖。分別習稱「北柴胡」及「南柴胡」。\n雜質檢查及其它規定：\n1. 乾燥減重――本品以105℃乾燥5 小時，其減重不得超過13.0%。（通則6015）\n2. 總灰分――本品之總灰分不得超過10.0%。（通則6007）\n3. 酸不溶性灰分――本品之酸不溶性灰分不得超過3.0%。（通則6007）\n4. 二氧化硫――本品之二氧化硫殘留量不得超過150 ppm。（通則2525、6303）\n5. 砷(As)――本品之砷限量5.0 ppm。（通則2211、6301）\n6. 鎘(Cd)――本品之鎘限量1.0 ppm。（通則6301）\n7. 汞(Hg)――本品之汞限量0.2 ppm。（通則6301）\n8. 鉛(Pb)――本品之鉛限量5.0 ppm。（通則2251、6301）",
@@ -6352,7 +6352,7 @@
    "extra": null,
    "name_s": "栝楼仁",
    "seq": 208,
-   "site_no": "208",
+   "site_no": "191",
    "amendment": null
   },
   {
@@ -6381,7 +6381,7 @@
    "extra": null,
    "name_s": "栝楼根",
    "seq": 209,
-   "site_no": "209",
+   "site_no": "192",
    "amendment": null
   },
   {
@@ -6409,7 +6409,7 @@
    "extra": null,
    "name_s": "桂枝",
    "seq": 210,
-   "site_no": "210",
+   "site_no": "193",
    "amendment": null
   },
   {
@@ -6438,7 +6438,7 @@
    "extra": null,
    "name_s": "桃仁",
    "seq": 211,
-   "site_no": "211",
+   "site_no": "194",
    "amendment": null
   },
   {
@@ -6466,7 +6466,7 @@
    "extra": null,
    "name_s": "桑白皮",
    "seq": 212,
-   "site_no": "212",
+   "site_no": "195",
    "amendment": null
   },
   {
@@ -6494,7 +6494,7 @@
    "extra": null,
    "name_s": "桑枝",
    "seq": 213,
-   "site_no": "213",
+   "site_no": "196",
    "amendment": null
   },
   {
@@ -6522,7 +6522,7 @@
    "extra": null,
    "name_s": "桑寄生",
    "seq": 214,
-   "site_no": "214",
+   "site_no": "197",
    "amendment": null
   },
   {
@@ -6550,7 +6550,7 @@
    "extra": null,
    "name_s": "桑寄生",
    "seq": 215,
-   "site_no": "215",
+   "site_no": "373",
    "amendment": null
   },
   {
@@ -6578,7 +6578,7 @@
    "extra": null,
    "name_s": "桑叶",
    "seq": 216,
-   "site_no": "216",
+   "site_no": "198",
    "amendment": null
   },
   {
@@ -6608,7 +6608,7 @@
    "extra": null,
    "name_s": "桑螵蛸",
    "seq": 217,
-   "site_no": "217",
+   "site_no": "199",
    "amendment": null
   },
   {
@@ -6636,7 +6636,7 @@
    "extra": null,
    "name_s": "桔梗",
    "seq": 218,
-   "site_no": "218",
+   "site_no": "200",
    "amendment": null
   },
   {
@@ -6664,7 +6664,7 @@
    "extra": null,
    "name_s": "桔梗",
    "seq": 219,
-   "site_no": "219",
+   "site_no": "374",
    "amendment": null
   },
   {
@@ -6692,7 +6692,7 @@
    "extra": null,
    "name_s": "浙贝母",
    "seq": 220,
-   "site_no": "220",
+   "site_no": "201",
    "amendment": null
   },
   {
@@ -6720,7 +6720,7 @@
    "extra": null,
    "name_s": "浮小麦",
    "seq": 221,
-   "site_no": "221",
+   "site_no": "202",
    "amendment": null
   },
   {
@@ -6748,7 +6748,7 @@
    "extra": null,
    "name_s": "浮萍",
    "seq": 222,
-   "site_no": "222",
+   "site_no": "203",
    "amendment": null
   },
   {
@@ -6776,7 +6776,7 @@
    "extra": null,
    "name_s": "海金沙",
    "seq": 223,
-   "site_no": "223",
+   "site_no": "204",
    "amendment": null
   },
   {
@@ -6805,7 +6805,7 @@
    "extra": null,
    "name_s": "海螵蛸",
    "seq": 224,
-   "site_no": "224",
+   "site_no": "205",
    "amendment": null
   },
   {
@@ -6833,7 +6833,7 @@
    "extra": null,
    "name_s": "乌梅",
    "seq": 225,
-   "site_no": "225",
+   "site_no": "206",
    "amendment": null
   },
   {
@@ -6861,7 +6861,7 @@
    "extra": null,
    "name_s": "乌药",
    "seq": 226,
-   "site_no": "226",
+   "site_no": "207",
    "amendment": null
   },
   {
@@ -6889,7 +6889,7 @@
    "extra": null,
    "name_s": "益母草",
    "seq": 227,
-   "site_no": "227",
+   "site_no": "208",
    "amendment": null
   },
   {
@@ -6917,7 +6917,7 @@
    "extra": null,
    "name_s": "益智",
    "seq": 228,
-   "site_no": "228",
+   "site_no": "209",
    "amendment": null
   },
   {
@@ -6948,7 +6948,7 @@
    "extra": null,
    "name_s": "秦皮",
    "seq": 229,
-   "site_no": "229",
+   "site_no": "210",
    "amendment": null
   },
   {
@@ -6979,7 +6979,7 @@
    "extra": null,
    "name_s": "秦艽",
    "seq": 230,
-   "site_no": "230",
+   "site_no": "211",
    "amendment": null
   },
   {
@@ -7008,7 +7008,7 @@
    "extra": null,
    "name_s": "粉萆薢",
    "seq": 231,
-   "site_no": "231",
+   "site_no": "212",
    "amendment": null
   },
   {
@@ -7037,7 +7037,7 @@
    "extra": null,
    "name_s": "粉葛",
    "seq": 232,
-   "site_no": "232",
+   "site_no": "213",
    "amendment": null
   },
   {
@@ -7065,7 +7065,7 @@
    "extra": null,
    "name_s": "臭椿皮",
    "seq": 233,
-   "site_no": "233",
+   "site_no": "214",
    "amendment": null
   },
   {
@@ -7093,7 +7093,7 @@
    "extra": null,
    "name_s": "茜草",
    "seq": 234,
-   "site_no": "234",
+   "site_no": "215",
    "amendment": null
   },
   {
@@ -7122,7 +7122,7 @@
    "extra": null,
    "name_s": "茯苓",
    "seq": 235,
-   "site_no": "235",
+   "site_no": "216",
    "amendment": null
   },
   {
@@ -7151,7 +7151,7 @@
    "extra": null,
    "name_s": "茯苓",
    "seq": 236,
-   "site_no": "236",
+   "site_no": "375",
    "amendment": null
   },
   {
@@ -7180,7 +7180,7 @@
    "extra": null,
    "name_s": "赤茯苓",
    "seq": 237,
-   "site_no": "237",
+   "site_no": "217",
    "amendment": null
   },
   {
@@ -7209,7 +7209,7 @@
    "extra": null,
    "name_s": "茯苓皮",
    "seq": 238,
-   "site_no": "238",
+   "site_no": "218",
    "amendment": null
   },
   {
@@ -7238,7 +7238,7 @@
    "extra": null,
    "name_s": "茯神",
    "seq": 239,
-   "site_no": "239",
+   "site_no": "219",
    "amendment": {
     "date": "2025-07-30",
     "content": "雜質檢查及其它規定：\n1. 乾燥減重――本品以105℃乾燥5 小時，其減重不得超過19.0%。（通則6015）\n2. 總灰分――本品之總灰分不得超過3.0%。（通則6007）\n3. 酸不溶性灰分――本品之酸不溶性灰分不得超過2.0%。（通則6007）\n4. 二氧化硫――本品之二氧化硫殘留量不得超過150 ppm。（通則2525、6303）\n5. 砷(As)――本品之砷限量3.0 ppm。（通則2211、6301）\n6. 鎘(Cd)――本品之鎘限量1.0 ppm。（通則6301）\n7. 汞(Hg)――本品之汞限量0.2 ppm。（通則6301）\n8. 鉛(Pb)――本品之鉛限量5.0 ppm。（通則2251、6301）",
@@ -7271,7 +7271,7 @@
    "extra": null,
    "name_s": "茵陈",
    "seq": 240,
-   "site_no": "240",
+   "site_no": "220",
    "amendment": null
   },
   {
@@ -7300,7 +7300,7 @@
    "extra": null,
    "name_s": "草豆蔻",
    "seq": 241,
-   "site_no": "241",
+   "site_no": "221",
    "amendment": null
   },
   {
@@ -7328,7 +7328,7 @@
    "extra": null,
    "name_s": "草果",
    "seq": 242,
-   "site_no": "242",
+   "site_no": "222",
    "amendment": null
   },
   {
@@ -7356,7 +7356,7 @@
    "extra": null,
    "name_s": "草乌",
    "seq": 243,
-   "site_no": "243",
+   "site_no": "223",
    "amendment": null
   },
   {
@@ -7384,7 +7384,7 @@
    "extra": null,
    "name_s": "荆芥",
    "seq": 244,
-   "site_no": "244",
+   "site_no": "224",
    "amendment": null
   },
   {
@@ -7412,7 +7412,7 @@
    "extra": null,
    "name_s": "荆芥穗",
    "seq": 245,
-   "site_no": "245",
+   "site_no": "225",
    "amendment": null
   },
   {
@@ -7440,7 +7440,7 @@
    "extra": null,
    "name_s": "荔枝核",
    "seq": 246,
-   "site_no": "246",
+   "site_no": "226",
    "amendment": null
   },
   {
@@ -7468,7 +7468,7 @@
    "extra": null,
    "name_s": "马齿苋",
    "seq": 247,
-   "site_no": "247",
+   "site_no": "227",
    "amendment": null
   },
   {
@@ -7496,7 +7496,7 @@
    "extra": null,
    "name_s": "马钱子",
    "seq": 248,
-   "site_no": "248",
+   "site_no": "228",
    "amendment": null
   },
   {
@@ -7524,7 +7524,7 @@
    "extra": null,
    "name_s": "马鞭草",
    "seq": 249,
-   "site_no": "249",
+   "site_no": "229",
    "amendment": null
   },
   {
@@ -7552,7 +7552,7 @@
    "extra": null,
    "name_s": "骨碎补",
    "seq": 250,
-   "site_no": "250",
+   "site_no": "230",
    "amendment": null
   },
   {
@@ -7580,7 +7580,7 @@
    "extra": null,
    "name_s": "高良姜",
    "seq": 251,
-   "site_no": "251",
+   "site_no": "231",
    "amendment": null
   },
   {
@@ -7608,7 +7608,7 @@
    "extra": null,
    "name_s": "侧柏叶",
    "seq": 252,
-   "site_no": "252",
+   "site_no": "232",
    "amendment": null
   },
   {
@@ -7637,7 +7637,7 @@
    "extra": null,
    "name_s": "商陆",
    "seq": 253,
-   "site_no": "253",
+   "site_no": "233",
    "amendment": null
   },
   {
@@ -7665,7 +7665,7 @@
    "extra": null,
    "name_s": "密蒙花",
    "seq": 254,
-   "site_no": "254",
+   "site_no": "234",
    "amendment": null
   },
   {
@@ -7693,7 +7693,7 @@
    "extra": null,
    "name_s": "常山",
    "seq": 255,
-   "site_no": "255",
+   "site_no": "235",
    "amendment": null
   },
   {
@@ -7721,7 +7721,7 @@
    "extra": null,
    "name_s": "败酱",
    "seq": 256,
-   "site_no": "256",
+   "site_no": "236",
    "amendment": null
   },
   {
@@ -7750,7 +7750,7 @@
    "extra": null,
    "name_s": "旋覆花",
    "seq": 257,
-   "site_no": "257",
+   "site_no": "237",
    "amendment": null
   },
   {
@@ -7778,7 +7778,7 @@
    "extra": null,
    "name_s": "栀子",
    "seq": 258,
-   "site_no": "258",
+   "site_no": "238",
    "amendment": null
   },
   {
@@ -7806,7 +7806,7 @@
    "extra": null,
    "name_s": "淡竹叶",
    "seq": 259,
-   "site_no": "259",
+   "site_no": "239",
    "amendment": null
   },
   {
@@ -7834,7 +7834,7 @@
    "extra": null,
    "name_s": "淡豆豉",
    "seq": 260,
-   "site_no": "260",
+   "site_no": "240",
    "amendment": null
   },
   {
@@ -7865,7 +7865,7 @@
    "extra": null,
    "name_s": "淫羊藿",
    "seq": 261,
-   "site_no": "261",
+   "site_no": "241",
    "amendment": null
   },
   {
@@ -7894,7 +7894,7 @@
    "extra": null,
    "name_s": "牵牛子",
    "seq": 262,
-   "site_no": "262",
+   "site_no": "242",
    "amendment": null
   },
   {
@@ -7923,7 +7923,7 @@
    "extra": null,
    "name_s": "细辛",
    "seq": 263,
-   "site_no": "263",
+   "site_no": "243",
    "amendment": null
   },
   {
@@ -7951,7 +7951,7 @@
    "extra": null,
    "name_s": "荷叶",
    "seq": 264,
-   "site_no": "264",
+   "site_no": "244",
    "amendment": null
   },
   {
@@ -7981,7 +7981,7 @@
    "extra": null,
    "name_s": "莪术",
    "seq": 265,
-   "site_no": "265",
+   "site_no": "245",
    "amendment": null
   },
   {
@@ -8009,7 +8009,7 @@
    "extra": null,
    "name_s": "蛇床子",
    "seq": 266,
-   "site_no": "266",
+   "site_no": "246",
    "amendment": null
   },
   {
@@ -8037,7 +8037,7 @@
    "extra": null,
    "name_s": "贯众",
    "seq": 267,
-   "site_no": "267",
+   "site_no": "247",
    "amendment": null
   },
   {
@@ -8065,7 +8065,7 @@
    "extra": null,
    "name_s": "通草",
    "seq": 268,
-   "site_no": "268",
+   "site_no": "248",
    "amendment": null
   },
   {
@@ -8093,7 +8093,7 @@
    "extra": null,
    "name_s": "连翘",
    "seq": 269,
-   "site_no": "269",
+   "site_no": "249",
    "amendment": null
   },
   {
@@ -8121,7 +8121,7 @@
    "extra": null,
    "name_s": "陈皮",
    "seq": 270,
-   "site_no": "270",
+   "site_no": "250",
    "amendment": null
   },
   {
@@ -8149,7 +8149,7 @@
    "extra": null,
    "name_s": "橘皮",
    "seq": 271,
-   "site_no": "271",
+   "site_no": "251",
    "amendment": null
   },
   {
@@ -8177,7 +8177,7 @@
    "extra": null,
    "name_s": "鱼腥草",
    "seq": 272,
-   "site_no": "272",
+   "site_no": "252",
    "amendment": null
   },
   {
@@ -8206,7 +8206,7 @@
    "extra": null,
    "name_s": "鹿衔草",
    "seq": 273,
-   "site_no": "273",
+   "site_no": "253",
    "amendment": null
   },
   {
@@ -8234,7 +8234,7 @@
    "extra": null,
    "name_s": "麦芽",
    "seq": 274,
-   "site_no": "274",
+   "site_no": "254",
    "amendment": null
   },
   {
@@ -8262,7 +8262,7 @@
    "extra": null,
    "name_s": "麦门冬",
    "seq": 275,
-   "site_no": "275",
+   "site_no": "255",
    "amendment": null
   },
   {
@@ -8292,7 +8292,7 @@
    "extra": null,
    "name_s": "麻黄",
    "seq": 276,
-   "site_no": "276",
+   "site_no": "256",
    "amendment": null
   },
   {
@@ -8320,7 +8320,7 @@
    "extra": null,
    "name_s": "楮实子",
    "seq": 277,
-   "site_no": "277",
+   "site_no": "257",
    "amendment": null
   },
   {
@@ -8348,7 +8348,7 @@
    "extra": null,
    "name_s": "款冬花",
    "seq": 278,
-   "site_no": "278",
+   "site_no": "258",
    "amendment": null
   },
   {
@@ -8376,7 +8376,7 @@
    "extra": null,
    "name_s": "番红花",
    "seq": 279,
-   "site_no": "279",
+   "site_no": "259",
    "amendment": null
   },
   {
@@ -8406,7 +8406,7 @@
    "extra": null,
    "name_s": "番泻叶",
    "seq": 280,
-   "site_no": "280",
+   "site_no": "260",
    "amendment": null
   },
   {
@@ -8434,7 +8434,7 @@
    "extra": null,
    "name_s": "笔仔草",
    "seq": 281,
-   "site_no": "281",
+   "site_no": "261",
    "amendment": null
   },
   {
@@ -8462,7 +8462,7 @@
    "extra": null,
    "name_s": "紫花地丁",
    "seq": 282,
-   "site_no": "282",
+   "site_no": "262",
    "amendment": null
   },
   {
@@ -8491,7 +8491,7 @@
    "extra": null,
    "name_s": "紫草",
    "seq": 283,
-   "site_no": "283",
+   "site_no": "263",
    "amendment": null
   },
   {
@@ -8519,7 +8519,7 @@
    "extra": null,
    "name_s": "紫菀",
    "seq": 284,
-   "site_no": "284",
+   "site_no": "264",
    "amendment": null
   },
   {
@@ -8547,7 +8547,7 @@
    "extra": null,
    "name_s": "紫苏子",
    "seq": 285,
-   "site_no": "285",
+   "site_no": "265",
    "amendment": null
   },
   {
@@ -8575,7 +8575,7 @@
    "extra": null,
    "name_s": "紫苏梗",
    "seq": 286,
-   "site_no": "286",
+   "site_no": "266",
    "amendment": null
   },
   {
@@ -8603,7 +8603,7 @@
    "extra": null,
    "name_s": "紫苏叶",
    "seq": 287,
-   "site_no": "287",
+   "site_no": "267",
    "amendment": null
   },
   {
@@ -8631,7 +8631,7 @@
    "extra": null,
    "name_s": "络石藤",
    "seq": 288,
-   "site_no": "288",
+   "site_no": "268",
    "amendment": null
   },
   {
@@ -8659,7 +8659,7 @@
    "extra": null,
    "name_s": "菊花",
    "seq": 289,
-   "site_no": "289",
+   "site_no": "269",
    "amendment": null
   },
   {
@@ -8688,7 +8688,7 @@
    "extra": null,
    "name_s": "菟丝子",
    "seq": 290,
-   "site_no": "290",
+   "site_no": "270",
    "amendment": null
   },
   {
@@ -8716,7 +8716,7 @@
    "extra": null,
    "name_s": "菥蓂",
    "seq": 291,
-   "site_no": "291",
+   "site_no": "271",
    "amendment": null
   },
   {
@@ -8744,7 +8744,7 @@
    "extra": null,
    "name_s": "莱菔子",
    "seq": 292,
-   "site_no": "292",
+   "site_no": "272",
    "amendment": null
   },
   {
@@ -8772,7 +8772,7 @@
    "extra": null,
    "name_s": "蛤蚧",
    "seq": 293,
-   "site_no": "293",
+   "site_no": "273",
    "amendment": null
   },
   {
@@ -8801,7 +8801,7 @@
    "extra": null,
    "name_s": "蛤壳",
    "seq": 294,
-   "site_no": "294",
+   "site_no": "274",
    "amendment": null
   },
   {
@@ -8829,7 +8829,7 @@
    "extra": null,
    "name_s": "诃子",
    "seq": 295,
-   "site_no": "295",
+   "site_no": "275",
    "amendment": null
   },
   {
@@ -8857,7 +8857,7 @@
    "extra": null,
    "name_s": "黄芩",
    "seq": 296,
-   "site_no": "296",
+   "site_no": "276",
    "amendment": null
   },
   {
@@ -8885,7 +8885,7 @@
    "extra": null,
    "name_s": "黄芩",
    "seq": 297,
-   "site_no": "297",
+   "site_no": "376",
    "amendment": null
   },
   {
@@ -8914,7 +8914,7 @@
    "extra": null,
    "name_s": "黄耆",
    "seq": 298,
-   "site_no": "298",
+   "site_no": "277",
    "amendment": null
   },
   {
@@ -8943,7 +8943,7 @@
    "extra": null,
    "name_s": "黄耆",
    "seq": 299,
-   "site_no": "299",
+   "site_no": "377",
    "amendment": null
   },
   {
@@ -8973,7 +8973,7 @@
    "extra": null,
    "name_s": "黄连",
    "seq": 300,
-   "site_no": "300",
+   "site_no": "278",
    "amendment": null
   },
   {
@@ -9003,7 +9003,7 @@
    "extra": null,
    "name_s": "黄连",
    "seq": 301,
-   "site_no": "301",
+   "site_no": "378",
    "amendment": null
   },
   {
@@ -9033,7 +9033,7 @@
    "extra": null,
    "name_s": "黄精",
    "seq": 302,
-   "site_no": "302",
+   "site_no": "279",
    "amendment": null
   },
   {
@@ -9062,7 +9062,7 @@
    "extra": null,
    "name_s": "黄蘗",
    "seq": 303,
-   "site_no": "303",
+   "site_no": "280",
    "amendment": null
   },
   {
@@ -9091,7 +9091,7 @@
    "extra": null,
    "name_s": "黄蘖",
    "seq": 304,
-   "site_no": "304",
+   "site_no": "379",
    "amendment": null
   },
   {
@@ -9117,7 +9117,7 @@
    "extra": null,
    "name_s": "滑石",
    "seq": 305,
-   "site_no": "305",
+   "site_no": "281",
    "amendment": null
   },
   {
@@ -9145,7 +9145,7 @@
    "extra": null,
    "name_s": "当归",
    "seq": 306,
-   "site_no": "306",
+   "site_no": "282",
    "amendment": null
   },
   {
@@ -9173,7 +9173,7 @@
    "extra": null,
    "name_s": "当归",
    "seq": 307,
-   "site_no": "307",
+   "site_no": "380",
    "amendment": null
   },
   {
@@ -9201,7 +9201,7 @@
    "extra": null,
    "name_s": "萹蓄",
    "seq": 308,
-   "site_no": "308",
+   "site_no": "283",
    "amendment": null
   },
   {
@@ -9231,7 +9231,7 @@
    "extra": null,
    "name_s": "葛花",
    "seq": 309,
-   "site_no": "309",
+   "site_no": "284",
    "amendment": null
   },
   {
@@ -9260,7 +9260,7 @@
    "extra": null,
    "name_s": "葛根",
    "seq": 310,
-   "site_no": "310",
+   "site_no": "285",
    "amendment": null
   },
   {
@@ -9289,7 +9289,7 @@
    "extra": null,
    "name_s": "葛根",
    "seq": 311,
-   "site_no": "311",
+   "site_no": "381",
    "amendment": null
   },
   {
@@ -9318,7 +9318,7 @@
    "extra": null,
    "name_s": "葶苈子",
    "seq": 312,
-   "site_no": "312",
+   "site_no": "286",
    "amendment": null
   },
   {
@@ -9347,7 +9347,7 @@
    "extra": null,
    "name_s": "补骨脂",
    "seq": 313,
-   "site_no": "313",
+   "site_no": "287",
    "amendment": null
   },
   {
@@ -9375,7 +9375,7 @@
    "extra": null,
    "name_s": "路路通",
    "seq": 314,
-   "site_no": "314",
+   "site_no": "288",
    "amendment": null
   },
   {
@@ -9407,7 +9407,7 @@
    "extra": null,
    "name_s": "钩藤",
    "seq": 315,
-   "site_no": "315",
+   "site_no": "289",
    "amendment": null
   },
   {
@@ -9436,7 +9436,7 @@
    "extra": null,
    "name_s": "槐角",
    "seq": 316,
-   "site_no": "316",
+   "site_no": "290",
    "amendment": null
   },
   {
@@ -9465,7 +9465,7 @@
    "extra": null,
    "name_s": "槐花",
    "seq": 317,
-   "site_no": "317",
+   "site_no": "291",
    "amendment": null
   },
   {
@@ -9494,7 +9494,7 @@
    "extra": null,
    "name_s": "槐米",
    "seq": 318,
-   "site_no": "318",
+   "site_no": "292",
    "amendment": null
   },
   {
@@ -9522,7 +9522,7 @@
    "extra": null,
    "name_s": "漏芦",
    "seq": 319,
-   "site_no": "319",
+   "site_no": "293",
    "amendment": null
   },
   {
@@ -9551,7 +9551,7 @@
    "extra": null,
    "name_s": "蒲公英",
    "seq": 320,
-   "site_no": "320",
+   "site_no": "294",
    "amendment": null
   },
   {
@@ -9580,7 +9580,7 @@
    "extra": null,
    "name_s": "蒲黄",
    "seq": 321,
-   "site_no": "321",
+   "site_no": "295",
    "amendment": null
   },
   {
@@ -9608,7 +9608,7 @@
    "extra": null,
    "name_s": "蒺藜",
    "seq": 322,
-   "site_no": "322",
+   "site_no": "296",
    "amendment": null
   },
   {
@@ -9637,7 +9637,7 @@
    "extra": null,
    "name_s": "苍术",
    "seq": 323,
-   "site_no": "323",
+   "site_no": "297",
    "amendment": null
   },
   {
@@ -9666,7 +9666,7 @@
    "extra": null,
    "name_s": "苍术",
    "seq": 324,
-   "site_no": "324",
+   "site_no": "382",
    "amendment": null
   },
   {
@@ -9694,7 +9694,7 @@
    "extra": null,
    "name_s": "苍耳子",
    "seq": 325,
-   "site_no": "325",
+   "site_no": "298",
    "amendment": null
   },
   {
@@ -9724,7 +9724,7 @@
    "extra": null,
    "name_s": "豨莶草",
    "seq": 326,
-   "site_no": "326",
+   "site_no": "299",
    "amendment": null
   },
   {
@@ -9753,7 +9753,7 @@
    "extra": null,
    "name_s": "远志",
    "seq": 327,
-   "site_no": "327",
+   "site_no": "300",
    "amendment": null
   },
   {
@@ -9781,7 +9781,7 @@
    "extra": null,
    "name_s": "酸枣仁",
    "seq": 328,
-   "site_no": "328",
+   "site_no": "301",
    "amendment": null
   },
   {
@@ -9809,7 +9809,7 @@
    "extra": null,
    "name_s": "凤尾草",
    "seq": 329,
-   "site_no": "329",
+   "site_no": "302",
    "amendment": null
   },
   {
@@ -9837,7 +9837,7 @@
    "extra": null,
    "name_s": "刘寄奴",
    "seq": 330,
-   "site_no": "330",
+   "site_no": "303",
    "amendment": null
   },
   {
@@ -9865,7 +9865,7 @@
    "extra": null,
    "name_s": "墨旱莲",
    "seq": 331,
-   "site_no": "331",
+   "site_no": "304",
    "amendment": null
   },
   {
@@ -9893,7 +9893,7 @@
    "extra": null,
    "name_s": "广金钱草",
    "seq": 332,
-   "site_no": "332",
+   "site_no": "305",
    "amendment": null
   },
   {
@@ -9921,7 +9921,7 @@
    "extra": null,
    "name_s": "广藿香",
    "seq": 333,
-   "site_no": "333",
+   "site_no": "306",
    "amendment": null
   },
   {
@@ -9949,7 +9949,7 @@
    "extra": null,
    "name_s": "槲寄生",
    "seq": 334,
-   "site_no": "334",
+   "site_no": "307",
    "amendment": null
   },
   {
@@ -9977,7 +9977,7 @@
    "extra": null,
    "name_s": "谷芽",
    "seq": 335,
-   "site_no": "335",
+   "site_no": "308",
    "amendment": null
   },
   {
@@ -10005,7 +10005,7 @@
    "extra": null,
    "name_s": "谷精草",
    "seq": 336,
-   "site_no": "336",
+   "site_no": "309",
    "amendment": null
   },
   {
@@ -10033,7 +10033,7 @@
    "extra": null,
    "name_s": "莲子",
    "seq": 337,
-   "site_no": "337",
+   "site_no": "310",
    "amendment": null
   },
   {
@@ -10061,7 +10061,7 @@
    "extra": null,
    "name_s": "莲子心",
    "seq": 338,
-   "site_no": "338",
+   "site_no": "311",
    "amendment": null
   },
   {
@@ -10089,7 +10089,7 @@
    "extra": null,
    "name_s": "莲须",
    "seq": 339,
-   "site_no": "339",
+   "site_no": "312",
    "amendment": null
   },
   {
@@ -10117,7 +10117,7 @@
    "extra": null,
    "name_s": "荜澄茄",
    "seq": 340,
-   "site_no": "340",
+   "site_no": "313",
    "amendment": null
   },
   {
@@ -10145,7 +10145,7 @@
    "extra": null,
    "name_s": "蔓荆子",
    "seq": 341,
-   "site_no": "341",
+   "site_no": "314",
    "amendment": null
   },
   {
@@ -10173,7 +10173,7 @@
    "extra": null,
    "name_s": "猪牙皂",
    "seq": 342,
-   "site_no": "342",
+   "site_no": "315",
    "amendment": null
   },
   {
@@ -10201,7 +10201,7 @@
    "extra": null,
    "name_s": "猪苓",
    "seq": 343,
-   "site_no": "343",
+   "site_no": "316",
    "amendment": null
   },
   {
@@ -10229,7 +10229,7 @@
    "extra": null,
    "name_s": "橘红",
    "seq": 344,
-   "site_no": "344",
+   "site_no": "317",
    "amendment": null
   },
   {
@@ -10257,7 +10257,7 @@
    "extra": null,
    "name_s": "泽泻",
    "seq": 345,
-   "site_no": "345",
+   "site_no": "318",
    "amendment": null
   },
   {
@@ -10285,7 +10285,7 @@
    "extra": null,
    "name_s": "泽兰",
    "seq": 346,
-   "site_no": "346",
+   "site_no": "319",
    "amendment": null
   },
   {
@@ -10313,7 +10313,7 @@
    "extra": null,
    "name_s": "灯心草",
    "seq": 347,
-   "site_no": "347",
+   "site_no": "320",
    "amendment": null
   },
   {
@@ -10341,7 +10341,7 @@
    "extra": null,
    "name_s": "独活",
    "seq": 348,
-   "site_no": "348",
+   "site_no": "321",
    "amendment": null
   },
   {
@@ -10369,7 +10369,7 @@
    "extra": null,
    "name_s": "独活",
    "seq": 349,
-   "site_no": "349",
+   "site_no": "383",
    "amendment": null
   },
   {
@@ -10397,7 +10397,7 @@
    "extra": null,
    "name_s": "积雪草",
    "seq": 350,
-   "site_no": "350",
+   "site_no": "322",
    "amendment": null
   },
   {
@@ -10425,7 +10425,7 @@
    "extra": null,
    "name_s": "荞麦",
    "seq": 351,
-   "site_no": "351",
+   "site_no": "323",
    "amendment": null
   },
   {
@@ -10453,7 +10453,7 @@
    "extra": null,
    "name_s": "蕤仁",
    "seq": 352,
-   "site_no": "352",
+   "site_no": "324",
    "amendment": null
   },
   {
@@ -10481,7 +10481,7 @@
    "extra": null,
    "name_s": "猫须草",
    "seq": 353,
-   "site_no": "353",
+   "site_no": "325",
    "amendment": null
   },
   {
@@ -10512,7 +10512,7 @@
    "extra": null,
    "name_s": "龙胆",
    "seq": 354,
-   "site_no": "354",
+   "site_no": "326",
    "amendment": null
   },
   {
@@ -10540,7 +10540,7 @@
    "extra": null,
    "name_s": "薄荷",
    "seq": 355,
-   "site_no": "355",
+   "site_no": "327",
    "amendment": null
   },
   {
@@ -10568,7 +10568,7 @@
    "extra": null,
    "name_s": "薏苡仁",
    "seq": 356,
-   "site_no": "356",
+   "site_no": "328",
    "amendment": null
   },
   {
@@ -10596,7 +10596,7 @@
    "extra": null,
    "name_s": "生姜",
    "seq": 357,
-   "site_no": "357",
+   "site_no": "329",
    "amendment": null
   },
   {
@@ -10624,7 +10624,7 @@
    "extra": null,
    "name_s": "干姜",
    "seq": 358,
-   "site_no": "358",
+   "site_no": "330",
    "amendment": null
   },
   {
@@ -10652,7 +10652,7 @@
    "extra": null,
    "name_s": "干姜",
    "seq": 359,
-   "site_no": "359",
+   "site_no": "384",
    "amendment": null
   },
   {
@@ -10680,7 +10680,7 @@
    "extra": null,
    "name_s": "姜黄",
    "seq": 360,
-   "site_no": "360",
+   "site_no": "331",
    "amendment": null
   },
   {
@@ -10709,7 +10709,7 @@
    "extra": null,
    "name_s": "薤白",
    "seq": 361,
-   "site_no": "361",
+   "site_no": "332",
    "amendment": null
   },
   {
@@ -10737,7 +10737,7 @@
    "extra": null,
    "name_s": "槟榔",
    "seq": 362,
-   "site_no": "362",
+   "site_no": "333",
    "amendment": null
   },
   {
@@ -10766,7 +10766,7 @@
    "extra": null,
    "name_s": "瞿麦",
    "seq": 363,
-   "site_no": "363",
+   "site_no": "334",
    "amendment": null
   },
   {
@@ -10795,7 +10795,7 @@
    "extra": null,
    "name_s": "藁本",
    "seq": 364,
-   "site_no": "364",
+   "site_no": "335",
    "amendment": null
   },
   {
@@ -10823,7 +10823,7 @@
    "extra": null,
    "name_s": "蝉蜕",
    "seq": 365,
-   "site_no": "365",
+   "site_no": "336",
    "amendment": null
   },
   {
@@ -10851,7 +10851,7 @@
    "extra": null,
    "name_s": "覆盆子",
    "seq": 366,
-   "site_no": "366",
+   "site_no": "337",
    "amendment": null
   },
   {
@@ -10880,7 +10880,7 @@
    "extra": null,
    "name_s": "锁阳",
    "seq": 367,
-   "site_no": "367",
+   "site_no": "338",
    "amendment": null
   },
   {
@@ -10908,7 +10908,7 @@
    "extra": null,
    "name_s": "鸡内金",
    "seq": 368,
-   "site_no": "368",
+   "site_no": "339",
    "amendment": null
   },
   {
@@ -10936,7 +10936,7 @@
    "extra": null,
    "name_s": "鸡血藤",
    "seq": 369,
-   "site_no": "369",
+   "site_no": "340",
    "amendment": null
   },
   {
@@ -10964,7 +10964,7 @@
    "extra": null,
    "name_s": "鸡冠花",
    "seq": 370,
-   "site_no": "370",
+   "site_no": "341",
    "amendment": null
   },
   {
@@ -10992,7 +10992,7 @@
    "extra": null,
    "name_s": "鸡骨草",
    "seq": 371,
-   "site_no": "371",
+   "site_no": "342",
    "amendment": null
   },
   {
@@ -11020,7 +11020,7 @@
    "extra": null,
    "name_s": "鹅不食草",
    "seq": 372,
-   "site_no": "372",
+   "site_no": "343",
    "amendment": null
   },
   {
@@ -11048,7 +11048,7 @@
    "extra": null,
    "name_s": "罗汉果",
    "seq": 373,
-   "site_no": "373",
+   "site_no": "344",
    "amendment": null
   },
   {
@@ -11076,7 +11076,7 @@
    "extra": null,
    "name_s": "藕节",
    "seq": 374,
-   "site_no": "374",
+   "site_no": "345",
    "amendment": null
   },
   {
@@ -11104,7 +11104,7 @@
    "extra": null,
    "name_s": "藿香",
    "seq": 375,
-   "site_no": "375",
+   "site_no": "346",
    "amendment": null
   },
   {
@@ -11132,7 +11132,7 @@
    "extra": null,
    "name_s": "芦根",
    "seq": 376,
-   "site_no": "376",
+   "site_no": "347",
    "amendment": null
   },
   {
@@ -11161,7 +11161,7 @@
    "extra": null,
    "name_s": "芦荟",
    "seq": 377,
-   "site_no": "377",
+   "site_no": "348",
    "amendment": null
   },
   {
@@ -11189,7 +11189,7 @@
    "extra": null,
    "name_s": "苏木",
    "seq": 378,
-   "site_no": "378",
+   "site_no": "349",
    "amendment": null
   },
   {
@@ -11218,7 +11218,7 @@
    "extra": null,
    "name_s": "党参",
    "seq": 379,
-   "site_no": "379",
+   "site_no": "350",
    "amendment": null
   },
   {
@@ -11247,7 +11247,7 @@
    "extra": null,
    "name_s": "党参",
    "seq": 380,
-   "site_no": "380",
+   "site_no": "385",
    "amendment": null
   },
   {
@@ -11275,7 +11275,7 @@
    "extra": null,
    "name_s": "续断",
    "seq": 381,
-   "site_no": "381",
+   "site_no": "351",
    "amendment": null
   },
   {
@@ -11303,7 +11303,7 @@
    "extra": null,
    "name_s": "鹤虱",
    "seq": 382,
-   "site_no": "382",
+   "site_no": "352",
    "amendment": null
   },
   {
@@ -11331,7 +11331,7 @@
    "extra": null,
    "name_s": "蚕砂",
    "seq": 383,
-   "site_no": "383",
+   "site_no": "353",
    "amendment": null
   },
   {
@@ -11359,7 +11359,7 @@
    "extra": null,
    "name_s": "鼈甲",
    "seq": 384,
-   "site_no": "384",
+   "site_no": "354",
    "amendment": null
   },
   {
@@ -11390,7 +11390,7 @@
    "extra": null,
    "name_s": "郁金",
    "seq": 385,
-   "site_no": "385",
+   "site_no": "355",
    "amendment": null
   },
   {
@@ -11416,7 +11416,7 @@
    "extra": null,
    "name_s": "大黄浓缩制剂（颗粒、散）",
    "seq": 386,
-   "site_no": null,
+   "site_no": "386",
    "amendment": null
   },
   {
@@ -11447,7 +11447,7 @@
    },
    "name_s": "小青龙汤浓缩制剂（颗粒、散）",
    "seq": 387,
-   "site_no": null,
+   "site_no": "387",
    "amendment": null
   },
   {
@@ -11476,7 +11476,7 @@
    },
    "name_s": "加味逍遥散浓缩制剂（颗粒、散）",
    "seq": 388,
-   "site_no": null,
+   "site_no": "388",
    "amendment": null
   },
   {
@@ -11507,7 +11507,7 @@
    },
    "name_s": "半夏泻心汤浓缩制剂（颗粒、散）",
    "seq": 389,
-   "site_no": null,
+   "site_no": "389",
    "amendment": null
   },
   {
@@ -11533,7 +11533,7 @@
    "extra": null,
    "name_s": "甘草浓缩制剂（颗粒、散）",
    "seq": 390,
-   "site_no": null,
+   "site_no": "390",
    "amendment": null
   },
   {
@@ -11559,7 +11559,7 @@
    "extra": null,
    "name_s": "延胡索浓缩制剂（颗粒、散）",
    "seq": 391,
-   "site_no": null,
+   "site_no": "391",
    "amendment": null
   },
   {
@@ -11587,7 +11587,7 @@
    },
    "name_s": "黄芩浓缩制剂（颗粒、散）",
    "seq": 392,
-   "site_no": null,
+   "site_no": "392",
    "amendment": null
   },
   {
@@ -11616,7 +11616,7 @@
    },
    "name_s": "葛根汤浓缩制剂（颗粒、散）",
    "seq": 393,
-   "site_no": null,
+   "site_no": "393",
    "amendment": null
   },
   {
@@ -11642,7 +11642,7 @@
    "extra": null,
    "name_s": "葛根浓缩制剂（颗粒、散）",
    "seq": 394,
-   "site_no": null,
+   "site_no": "394",
    "amendment": null
   }
  ]

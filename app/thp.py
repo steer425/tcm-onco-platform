@@ -55,8 +55,13 @@ def load_json() -> dict:
     return _data_cache
 
 
+# 比對規則的版本。規則改了要加一——版本字串變了，伺服器啟動時就會自動重新比對（人工判過的列不動）。
+#   2（v1.51.2）：中文名相同時先比「英文名稱」，不同再比「拉丁生藥名稱」（皆不分大小寫），並註記用哪一個比對
+MATCH_RULES = "2"
+
+
 def data_version() -> str:
-    return hashlib.sha1(DATA_PATH.read_bytes()).hexdigest()[:16]
+    return hashlib.sha1(DATA_PATH.read_bytes()).hexdigest()[:16] + "-r" + MATCH_RULES
 
 
 def site_url(site_no: str | None) -> str | None:
@@ -175,13 +180,52 @@ def thp_species(m, syn) -> set[str]:
     return out
 
 
+def _norm_en(s: str | None) -> str:
+    """不分大小寫、空白與標點：「Caryophylli  Flos.」→「caryophylli flos」"""
+    return " ".join(re.findall(r"[a-z0-9]+", (s or "").lower()))
+
+
+def name_compare(m, h) -> dict:
+    """臺灣中藥典的英文名稱、拉丁生藥名稱 ↔ TCMSP 的英文名（herb_en_name），各比一次（v1.51.2）。
+
+    使用者規則：中文名相同但英文名稱不同時，改用拉丁生藥名稱比對，大小寫視為相同；
+    畫面上要註記比對用的是「拉丁生藥名稱」，同時列出「英文名稱」。
+      english  same／different／na
+      latin    same（不分大小寫完全相同）／same_words（字詞相同、順序不同，例：Radix Bupleuri ↔ BUPLEURI RADIX）
+               ／partial（TCMSP 的字詞都在拉丁生藥名裡，例：Radix Ginseng ↔ GINSENG RADIX ET RHIZOMA）／different／na
+      used     english（英文名稱相同）／latin（英文名稱不同、改用拉丁生藥名稱且對上）／None
+    """
+    tc = h.herb_en_name or ""
+    out = {"thp_en": m.en_name, "thp_latin": m.latin_name, "tcmsp_en": tc,
+           "english": "na", "latin": "na", "used": None}
+    if not tc:
+        return out
+    if m.en_name:
+        out["english"] = "same" if _norm_en(m.en_name) == _norm_en(tc) else "different"
+    if m.latin_name:
+        a, b = _norm_en(m.latin_name), _norm_en(tc)
+        ta, tb = _latin_tokens(m.latin_name), _latin_tokens(tc)
+        if a == b:
+            out["latin"] = "same"
+        elif ta and ta == tb:
+            out["latin"] = "same_words"
+        elif not _species_of_tcmsp(tc) and len(tb) >= 2 and tb <= ta:
+            out["latin"] = "partial"
+        else:
+            out["latin"] = "different"
+    if out["english"] == "same":
+        out["used"] = "english"
+    elif out["latin"] in ("same", "same_words", "partial"):
+        out["used"] = "latin"
+    return out
+
+
 def candidates(m, herbs, syn) -> dict[int, dict]:
     """一個臺灣中藥典品項 → {herb_id: {method, status, flags}}。"""
     if m.kind == "preparation":
         return {}
     name = _norm_cn(m.name_s)
     sp = thp_species(m, syn)
-    lat = _latin_tokens(m.latin_name)
     out = {}
     for h in herbs:
         ev, flags = [], []
@@ -192,8 +236,11 @@ def candidates(m, herbs, syn) -> dict[int, dict]:
             hs = _species_of_tcmsp(h.herb_en_name) or _species_of_tcmsp(h.child_en_name)
             if hs and hs in sp:
                 ev.append("species")
-            ht = _latin_tokens(h.herb_en_name)
-            if not hs and len(ht) >= 2 and lat and ht <= lat:
+            # 名稱：先比英文名稱，不同再比拉丁生藥名稱（不分大小寫）——見 name_compare()
+            cmp = name_compare(m, h)
+            if cmp["used"] == "english":
+                ev.append("english")
+            elif cmp["used"] == "latin":
                 ev.append("latin")
         if not ev:
             continue

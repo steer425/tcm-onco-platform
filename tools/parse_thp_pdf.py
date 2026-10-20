@@ -437,14 +437,21 @@ def build(main_pdf, amend_pdf):
     for r in recs:
         r["name_s"] = t2s.convert(r["name_zh"])
     amend = {a["item"]: a for a in parse_amendment(amend_pdf)}
-    site_no = 0
+    # 資訊網項次（v1.51.1 依使用者提供的資訊網「品項查詢」畫面修正）：
+    #   001～385 中藥材項次、386～394 中藥濃縮製劑項次。
+    #   001 丁香、002 人參、003 八角茴香、004 三七、005 三稜、006 千年健、007 土茯苓
+    #   ——原藥材依書中順序連號，【飲片】**不插在所屬藥材後面**（v1.51.0 插在後面，害 003 以後全部錯位）。
+    # 書中原藥材 355 味，356～385 這 30 項是飲片，依書中順序排在原藥材之後（已用資訊網 351-385 頁逐筆核對，2026-10-21）；
+    # 濃縮製劑 386～394。seq 仍是書中順序（飲片緊跟所屬藥材），只給內部排序用。
     for i, r in enumerate(recs, 1):
         r["seq"] = i
-        if r["kind"] != "preparation":
-            site_no += 1
-            r["site_no"] = f"{site_no:03d}"
-        else:
-            r["site_no"] = None
+    order = ([r for r in recs if r["kind"] == "herb"] + [r for r in recs if r["kind"] == "processed"]
+             + [r for r in recs if r["kind"] == "preparation"])
+    for n, r in enumerate(order, 1):
+        r["site_no"] = f"{n:03d}"
+    if len(order) != 394 or sum(r["kind"] == "herb" for r in recs) != 355:
+        raise SystemExit(f"品項數與資訊網不符：{len(order)}（應為 394＝中藥材 385＋濃縮製劑 9）")
+    for r in recs:
         a = amend.get(r["name_zh"]) if r["kind"] == "herb" else None
         r["amendment"] = dict(date="2025-07-30", content=a["content"], note=a["note"]) if a else None
     apply_fixups(recs)
@@ -466,24 +473,24 @@ def build(main_pdf, amend_pdf):
 
 
 # 版面解析不了、逐一對照原書人工改正的地方（v1.51.0 交付前驗證時發現）。
-# 每一條：(資訊網項次, 欄位, 解析出來的錯誤文字, 原書的正確內容)。找不到原文就直接報錯——
+# 每一條：(藥材中文名, 欄位, 解析出來的錯誤文字, 原書的正確內容)。用品名不用項次——項次在 v1.51.1 改過一次編法。找不到原文就直接報錯——
 # 代表 PDF 換版或解析邏輯變了，要重新對照，不能默默略過。
 FIXUPS = [
     # 下標 B1 在 PDF 裡是另一行的小字，被歸到上一條的行尾
-    ("188", "impurity", "（通則6307）\nB1\n(2) 本品之黃麴毒素 限量", "（通則6307）\n(2) 本品之黃麴毒素 B1 限量"),
+    ("紅耆", "impurity", "（通則6307）\nB1\n(2) 本品之黃麴毒素 限量", "（通則6307）\n(2) 本品之黃麴毒素 B1 限量"),
     # 鞣質含量是上下兩行的分數式（分母 W 在下一行），攤平後順序亂掉
-    ("039", "assay", "(T1 − T2 + T0)×10 = ×100鞣質含量(%)\nW", "鞣質含量(%) = (T1 − T2 + T0) × 10 ÷ W × 100"),
-    ("104", "assay", "(T1 − T2 + T0)×10 = ×100鞣質含量(%)\nW", "鞣質含量(%) = (T1 − T2 + T0) × 10 ÷ W × 100"),
-    ("111", "assay", "(T1 − T2 + T0)×10 = ×100鞣質含量(%)\nW", "鞣質含量(%) = (T1 − T2 + T0) × 10 ÷ W × 100"),
+    ("五倍子", "assay", "(T1 − T2 + T0)×10 = ×100鞣質含量(%)\nW", "鞣質含量(%) = (T1 − T2 + T0) × 10 ÷ W × 100"),
+    ("石榴皮", "assay", "(T1 − T2 + T0)×10 = ×100鞣質含量(%)\nW", "鞣質含量(%) = (T1 − T2 + T0) × 10 ÷ W × 100"),
+    ("地榆", "assay", "(T1 − T2 + T0)×10 = ×100鞣質含量(%)\nW", "鞣質含量(%) = (T1 − T2 + T0) × 10 ÷ W × 100"),
 ]
 
 
 def apply_fixups(recs):
-    by_no = {r["site_no"]: r for r in recs if r.get("site_no")}
-    for no, field, wrong, right in FIXUPS:
-        r = by_no[no]
+    by_name = {r["name_zh"]: r for r in recs if r["kind"] == "herb"}
+    for name, field, wrong, right in FIXUPS:
+        r = by_name[name]
         if wrong not in (r.get(field) or ""):
-            raise SystemExit(f"FIXUPS 對不上：{no} {r['name_zh']} {field}（PDF 或解析邏輯變了，請重新對照原書）")
+            raise SystemExit(f"FIXUPS 對不上：{name} {field}（PDF 或解析邏輯變了，請重新對照原書）")
         r[field] = r[field].replace(wrong, right)
 
 
