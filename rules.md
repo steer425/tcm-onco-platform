@@ -1531,11 +1531,17 @@ python -m app.seed_gencc_translations
 ### 上版前的檢查
 
 - 四種語系全測（見第五之二章「上版前的強制檢查規則」）
-- `python -m tests.test_news_e2e`、`python -m tests.test_target_mapping`、
-  `python -m tests.test_pathways`、`python -m tests.test_ingredient_mapping`、`python -m tests.test_depmap_page` 與 `python -m tests.test_me` 全過（**不是** `python -m pytest tests/ -q`——`test_news_e2e.py`
-  是手寫的端對端驗證腳本，函式名稱不是 pytest 慣例的 `test_*`，`pytest` 指令會直接回報
-  「collected 0 items」、結束碼 5，**看起來像失敗，但其實根本沒有跑到任何一項驗證**，
-  這是這次開發中實際發現的認知陷阱，不是理論疑慮）
+- **`python -m tests.run_all` 全過**（v1.49.3 起；`python -m pytest tests/ -q` 跑的是同一份，兩個擇一）。
+  它會自動掃 `tests/test_*.py` 與 `tests/test_*.js`，每支放進獨立子程序執行，約 80 秒。
+  - 之前這裡是手列 6 支腳本，但 tests/ 底下已經有 15 支，**另外 9 支沒人記得跑**；`pytest` 則回報
+    「collected 0 items」——看起來像有跑，其實一項都沒驗。現在新增的腳本放進 tests/ 就會被跑到，不用再改這份清單。
+  - 子程序**一律拿掉 `DATABASE_URL`**：就算 PowerShell 視窗還留著 Neon 的連線字串，測試也只會碰各自的 SQLite 測試檔。
+  - 結束碼非零＝失敗；結束碼 0 但輸出有 ❌ 也算失敗（防新腳本忘了 `raise SystemExit(1)`）。
+  - **新增驗收腳本的規矩**：檔名 `test_*.py`、用 `python -m tests.xxx` 能單獨執行、預設資料庫是自己專屬的
+    `sqlite:///./test_xxx.db`、開頭保留「非 SQLite 拒絕執行」的檢查、有失敗就以非零結束碼結束。
+    不要寫 pytest 的 `def test_*`——`tests/conftest.py` 刻意不讓 pytest 直接收集這些腳本（它們 import 時就會改環境變數、建資料庫，
+    同一個程序裡依序 import 會互相污染）。
+  - 改到資料庫連線行為（串流、游標、交易、鎖）時，另外設 `TEST_PG_URL` 再跑一次 `-k backup`（見第 1156 行附近）。
 - 五個版本號一致（上表）
 - 這支端對端腳本**必須從空資料庫跑起**，否則第二次執行會沿用上一輪的每日精選、
   在依索引取文章的地方 `IndexError`。腳本開頭已經會自動刪掉預設的 `test.db`，

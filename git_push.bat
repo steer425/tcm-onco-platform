@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.49.2"
-set "DEFAULT_MSG=v1.49.2 F1-7 herb ingredients: inactive-ingredient list with exclusion reason, IUPAC systematic name column, SMILES help"
+set "EXPECTED_VER=1.49.3"
+set "DEFAULT_MSG=v1.49.3 Tests: one-command runner for all 15 acceptance scripts (python -m tests.run_all or pytest tests/), DATABASE_URL always stripped, silent-failure detection"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

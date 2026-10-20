@@ -1,5 +1,22 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.49.3 — 2026-10-20（測試：一個指令跑完全部 15 支驗收腳本）
+
+問題：rules.md 上版清單手列 6 支測試腳本，但 tests/ 底下已有 15 支，另外 9 支（帳號安全、備份還原、文獻分級、
+苷元第二層、疾病腫瘤分類…）沒有列進去；`python -m pytest tests/` 則回報 collected 0 items，看起來有跑、其實一項都沒驗。
+
+- 新增 `tests/run_all.py`：自動掃 `tests/test_*.py`／`test_*.js`，每支在獨立子程序執行，彙總通過／失敗／略過與秒數，
+  失敗時印最後 40 行（`-v` 印全部）。`-k` 篩選、`--list` 只列清單。
+  - **子程序一律拿掉 `DATABASE_URL`**：PowerShell 視窗殘留 Neon 連線字串也不會跑到正式庫（v1.43.0 事故的第二道防線）。
+  - 結束碼 0 但輸出有 ❌ 也判失敗；設 `PYTHONIOENCODING=utf-8`，Windows 繁中主控台（cp950）印 ✅ 不會出錯。
+  - 沒有 node 時 `test_zh_match.js` 標「略過」而非失敗。
+- 新增 `tests/test_all_scripts.py` 與 `tests/conftest.py`：`python -m pytest tests/` 現在是 15 個測試項目，
+  與 run_all 共用同一套探索與判定；conftest 不讓 pytest 直接 import 各腳本（它們 import 時就改環境變數、建資料庫）。
+- 驗證：15 支全過（77 秒）；故意放兩支壞腳本（結束碼 1、只印 ❌ 但結束碼 0）兩種都抓得到，pytest 也同樣判失敗；
+  設假的 Postgres `DATABASE_URL` 執行仍全部跑在 SQLite。
+- rules.md 第九章上版檢查改為 `python -m tests.run_all`，並寫下新增驗收腳本的規矩；CLAUDE.md 測試段落同步更新。
+
+
 ## v1.49.2 — 2026-10-20（藥材活性成分頁：非活性成分清單、IUPAC 系統名稱、SMILES 說明）
 
 使用者要求三項，逐項處理：
