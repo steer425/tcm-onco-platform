@@ -1,5 +1,27 @@
 # 版本更新紀錄（tcm_backend）
 
+## v1.49.2 — 2026-10-20（藥材活性成分頁：非活性成分清單、IUPAC 系統名稱、SMILES 說明）
+
+使用者要求三項，逐項處理：
+
+1. **SMILES 欄位說明**：欄名旁加 ❗ 說明視窗（沿用同頁 Mol ID／CID／CAS／InChIKey 那一套）：SMILES 是什麼、
+   怎麼讀（CCO＝乙醇）、用途，以及「跨資料庫比對請用 InChIKey，不要比 SMILES 字串」。
+2. **非活性成分清單**：表格上方新增「活性成分／非活性成分」分頁。非活性成分＝OB 或 DL 未達門檻、或 ADME 缺值的成分，
+   多一欄「未納入原因」（OB 未達／DL 未達／OB、DL 皆未達／ADME 缺值）。
+   - 原因在 `pathways.active_ingredients()` 判定一次（新增 `failed` 清單），端點只是轉出來，**不在端點或前端重比門檻**——
+     門檻一改兩份清單才不會對不起來（rules.md「母體共用同一支判定」）。
+   - 上方 KPI（已標準化、有 SMILES…）**仍只算活性成分**，非活性只多一張「非活性成分」數量卡片。
+   - 兩個分頁的「欄位」設定各自記住；活性分頁沿用舊鍵，原本隱藏的欄位不會掉。
+3. **「拉丁文名稱」→ IUPAC 系統名稱**：化合物沒有拉丁文名稱（拉丁學名是給物種用的，例如藥材 Panax ginseng），
+   化合物的國際標準命名是 IUPAC 系統名稱。新增此欄，資料來自 PubChem 標準化時已存下的 `iupac_name`
+   （只有對應到 CID 的成分才有）；天然物名稱很長，表格只顯示三行、滑鼠移上去看全文。欄名旁有說明視窗。
+
+- 端點 `GET /tcmsp/herbs/public/{id}/active-ingredients`：items 加 `iupac_name`；新增 `inactive_items`（含 `reason`）與 `totals.inactive`。
+- 測試 `tests/test_herb_ingredients.py`：活性＋非活性＝全部、原因與共用判定一致、非活性不計入 KPI、IUPAC 帶出（全數通過）；
+  `test_pathways`、`test_depmap_page` 回歸通過。
+- i18n：新字串補 en／ko。
+
+
 ## v1.49.1 — 2026-10-20（藥材關聯圖：中心的藥材名稱看得見了）
 
 - `frontend/tcmsp_query.html`：關聯圖中心的藥材節點（例：人參 Panax Ginseng C. A. Mey）文字原本是近黑色 `#111`，

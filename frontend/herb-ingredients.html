@@ -43,6 +43,12 @@ html,body{margin:0;padding:0;background:var(--bg);color:#eee;font-family:"Noto S
 button{background:#26292f;border:1px solid #3a3d44;color:#eee;padding:6px 11px;border-radius:6px;font-size:12px;cursor:pointer;}
 button:hover{background:#31353c;}
 button.on{background:#2f5c8a;border-color:#3d70a3;}
+button[data-tab].on{background:#5a4416;border-color:var(--herb);color:#fff;}
+.tb-sep{width:1px;align-self:stretch;background:var(--line);margin:0 4px;}
+td.iupac{max-width:260px;font-size:11px;color:#cfd6dd;word-break:break-word;}
+td.iupac .clip{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.rs{color:#e3bf6b;white-space:nowrap;}
+.rs-missing{color:#9aa3ad;}
 #tableWrap{flex:1;overflow:auto;padding:8px 16px 16px;}
 table{width:100%;border-collapse:collapse;font-size:12px;}
 th{position:sticky;top:0;background:#1c1f26;text-align:left;padding:7px 8px;color:#bcd;border-bottom:1px solid var(--line);white-space:nowrap;}
@@ -108,6 +114,7 @@ select{background:#1c1f26;color:#eee;border:1px solid #3a3d44;border-radius:6px;
     先用 <b>OB（口服生物利用度）</b> 與 <b>DL（類藥性）</b> 兩道門檻篩出這味藥材的活性成分，
     再逐一顯示每個成分有沒有成功對應到 PubChem 的化學結構。
     後續的靶點、通路與細胞株分析<b>都只使用這些活性成分</b>，不是全部成分。
+    沒通過門檻的成分可切換到「非活性成分」查看，並標示是哪一道門檻沒過。
   </p>
 </div>
 
@@ -124,6 +131,9 @@ select{background:#1c1f26;color:#eee;border:1px solid #3a3d44;border-radius:6px;
       <div id="herbHeader"></div>
       <div class="kpi" id="kpi"></div>
       <div id="toolbar">
+        <button data-tab="active" class="on" id="tabActive">活性成分</button>
+        <button data-tab="inactive" id="tabInactive">非活性成分</button>
+        <span class="tb-sep"></span>
         <button data-f="all" class="on">全部</button>
         <button data-f="done">已標準化</button>
         <button data-f="todo">未完成</button>

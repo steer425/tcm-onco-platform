@@ -68,6 +68,8 @@ def main():
         ("MOLH04", "delta-compound", "200.10", "38.0", "0.20"),    # 活性，尚未處理（無映射列）
         ("MOLH05", "epsilon-compound", "150.00", "12.0", "0.30"),  # 非活性（OB 不足）
         ("MOLH06", "zeta-compound", "180.00", "NA", "0.30"),       # ADME 缺值
+        ("MOLH07", "eta-compound", "160.00", "45.0", "0.05"),      # 非活性（DL 不足）
+        ("MOLH08", "theta-compound", "170.00", "5.0", "0.02"),     # 非活性（兩者都不足）
     ]
     for mol_id, name, mw, ob, dl in ING:
         if not db.query(models.TcmspIngredient).filter(
@@ -89,7 +91,10 @@ def main():
         db.add(models.TcmspIngredientPubchem(mol_id=mol_id, status=status, cid=cid, **kw))
 
     mapping("MOLH01", "auto", "111", canonical_smiles="CCO",
-            cas_number="117-39-5", inchikey="AAAAAAAAAA-BBBBBBBBBB-C", mw_delta=None)
+            cas_number="117-39-5", inchikey="AAAAAAAAAA-BBBBBBBBBB-C", mw_delta=None,
+            iupac_name="ethanol")
+    # 非活性成分也可能已經標準化過（F1-6 可設定不只跑活性成分）
+    mapping("MOLH05", "auto", "555", canonical_smiles="CCCC", iupac_name="butane")
     # 同一個成分兩筆映射：已採用的那筆必須勝出（best_mapping_by_mol）
     mapping("MOLH01", "pending", "999", canonical_smiles="CC", mw_delta="50.0")
     mapping("MOLH02", "pending", "222", canonical_smiles="CCC",
@@ -102,7 +107,7 @@ def main():
     db.commit()
     check("測試藥材與成分就緒",
           db.query(models.TcmspHerbIngredient).filter(
-              models.TcmspHerbIngredient.herb_id == HERB_ID).count() == 6)
+              models.TcmspHerbIngredient.herb_id == HERB_ID).count() == 8)
 
     r = client.post("/auth/login", json={"account": "hiuser", "password": "0000"})
     U = {"Authorization": f"Bearer {r.json()['access_token']}"}
@@ -132,7 +137,7 @@ def main():
           sorted(i["mol_id"] for i in data["items"]) == sorted(meta["passed"]),
           [i["mol_id"] for i in data["items"]])
     check("全部成分數與活性成分數分得開",
-          data["totals"]["all_ingredients"] == 6, data["totals"]["all_ingredients"])
+          data["totals"]["all_ingredients"] == 8, data["totals"]["all_ingredients"])
     check("ADME 缺值單獨計數，不混進「不達標」",
           data["totals"]["missing_adme"] == 1, data["totals"]["missing_adme"])
     check("門檻值有回傳，畫面才知道這份名單是用什麼條件篩的",
@@ -160,6 +165,35 @@ def main():
           by_mol["MOLH02"]["mw_delta"] == 162.1, by_mol["MOLH02"]["mw_delta"])
     check("by_status 加總等於活性成分數",
           sum(data["by_status"].values()) == data["totals"]["active"], data["by_status"])
+
+    # ---------- 非活性成分（v1.49.2） ----------
+    print("\n【非活性成分】")
+    inact = {i["mol_id"]: i for i in data.get("inactive_items", [])}
+    check("**活性＋非活性＝全部成分，沒有漏掉也沒有重複**",
+          len(data["items"]) + len(inact) == data["totals"]["all_ingredients"]
+          and not (set(inact) & set(by_mol)),
+          (len(data["items"]), len(inact)))
+    check("非活性名單＝pathways.active_ingredients() 的 failed（原因不在端點重判）",
+          {m: i["reason"] for m, i in inact.items()} == {f["mol_id"]: f["reason"] for f in meta["failed"]},
+          meta["failed"])
+    check("totals.inactive 與清單筆數一致", data["totals"]["inactive"] == len(inact))
+    check("未納入原因分得開：OB／DL／兩者／缺值",
+          (inact["MOLH05"]["reason"], inact["MOLH07"]["reason"],
+           inact["MOLH08"]["reason"], inact["MOLH06"]["reason"]) == ("ob", "dl", "both", "missing"),
+          {k: v["reason"] for k, v in inact.items()})
+    check("缺值筆數＝reason 為 missing 的筆數",
+          data["totals"]["missing_adme"] == sum(1 for i in inact.values() if i["reason"] == "missing"))
+    check("非活性成分也帶出標準化結果", inact["MOLH05"]["cid"] == "555" and inact["MOLH05"]["has_smiles"])
+    check("**非活性成分不計入已標準化／有 SMILES 等 KPI**",
+          data["totals"]["standardised"] == 1 and data["totals"]["with_smiles"] == 1,
+          (data["totals"]["standardised"], data["totals"]["with_smiles"]))
+    check("by_status 仍只算活性成分", sum(data["by_status"].values()) == data["totals"]["active"])
+
+    # ---------- IUPAC 系統名稱（v1.49.2） ----------
+    print("\n【IUPAC 系統名稱】")
+    check("已標準化的成分帶出 IUPAC 名稱", by_mol["MOLH01"]["iupac_name"] == "ethanol")
+    check("沒有映射的成分 IUPAC 為 None", by_mol["MOLH04"]["iupac_name"] is None)
+    check("非活性成分也帶 IUPAC 名稱", inact["MOLH05"]["iupac_name"] == "butane")
 
     # ---------- 共用判定本身 ----------
     print("\n【共用判定】")

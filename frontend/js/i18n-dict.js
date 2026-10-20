@@ -770,6 +770,15 @@ window.I18N_DICT = {
     "分子量差": "MW Difference",
     "未完成": "Not Completed",
     "在關聯查詢站開啟 →": "Open in Association Query Site →",
+    // ---- F1-7 非活性成分／IUPAC 名稱（v1.49.2） ----
+    "活性成分": "Active Ingredients",
+    "非活性成分": "Inactive Ingredients",
+    "IUPAC 系統名稱": "IUPAC Systematic Name",
+    "未納入原因": "Exclusion Reason",
+    "OB 未達": "OB Below Threshold",
+    "DL 未達": "DL Below Threshold",
+    "OB、DL 皆未達": "OB & DL Below Threshold",
+    "ADME 缺值": "ADME Missing",
     // ---- F1-9 文獻證據分級（v1.48.0） ----
     "文獻證據分級": "Literature Evidence Grading",
     "腫瘤細胞株依賴查詢站裡通過選擇性門檻的每一個靶點，向 PubMed 查詢「藥材或其活性成分 × 這個靶點 × 癌症」的文獻，依研究設計分級（統合分析 → 臨床試驗 → 人體觀察 → 動物 → 細胞 → 計算預測）。": "For every target that passes the selectivity threshold in the Tumour Cell Line Dependency Explorer, PubMed is searched for “herb or its active ingredients × this target × cancer”, and each paper is graded by study design (meta-analysis → clinical trial → human observational → animal → cell → computational).",
@@ -1795,6 +1804,15 @@ window.I18N_DICT = {
     "分子量差": "분자량 차이",
     "未完成": "미완료",
     "在關聯查詢站開啟 →": "연관 조회 사이트에서 열기 →",
+    // ---- F1-7 非活性成分／IUPAC 名稱（v1.49.2） ----
+    "活性成分": "활성 성분",
+    "非活性成分": "비활성 성분",
+    "IUPAC 系統名稱": "IUPAC 체계명",
+    "未納入原因": "제외 사유",
+    "OB 未達": "OB 기준 미달",
+    "DL 未達": "DL 기준 미달",
+    "OB、DL 皆未達": "OB·DL 모두 미달",
+    "ADME 缺值": "ADME 결측",
     // ---- F1-9 文獻證據分級（v1.48.0） ----
     "文獻證據分級": "문헌 근거 등급",
     "腫瘤細胞株依賴查詢站裡通過選擇性門檻的每一個靶點，向 PubMed 查詢「藥材或其活性成分 × 這個靶點 × 癌症」的文獻，依研究設計分級（統合分析 → 臨床試驗 → 人體觀察 → 動物 → 細胞 → 計算預測）。": "종양 세포주 의존성 탐색기에서 선택성 기준을 통과한 각 표적에 대해 PubMed에서 「약재 또는 활성 성분 × 해당 표적 × 암」 문헌을 검색하고, 연구 설계에 따라 등급을 매깁니다(메타분석 → 임상시험 → 인체 관찰 → 동물 → 세포 → 계산 예측).",

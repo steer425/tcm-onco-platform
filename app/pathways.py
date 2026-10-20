@@ -530,17 +530,27 @@ def active_ingredients(db: Session, herb_id, ob_min: float, dl_min: float) -> di
                   models.TcmspHerbIngredient.mol_id == models.TcmspIngredient.mol_id)
             .filter(models.TcmspHerbIngredient.herb_id == herb_id).all())
 
-    passed, missing = [], 0
+    # v1.49.2：沒通過的也回傳原因（F1-7「非活性成分」清單用）。原因只在這裡判定一次，
+    # 端點不要自己再比一次 OB／DL——否則門檻一改，兩份清單就會對不起來。
+    #   missing  ADME 缺值（ob 或 dl 是空的／NA）
+    #   ob       只有 OB 未達      dl  只有 DL 未達      both  兩者都未達
+    passed, failed, missing = [], [], 0
     for ing in rows:
         ob, dl = _num(ing.ob), _num(ing.dl)
         if ob is None or dl is None:
             missing += 1
+            failed.append({"mol_id": ing.mol_id, "reason": "missing"})
             continue
-        if ob >= ob_min and dl >= dl_min:
+        ob_ok, dl_ok = ob >= ob_min, dl >= dl_min
+        if ob_ok and dl_ok:
             passed.append(ing.mol_id)
+        else:
+            failed.append({"mol_id": ing.mol_id,
+                           "reason": "both" if not (ob_ok or dl_ok) else ("ob" if not ob_ok else "dl")})
 
     return {"total": len(rows), "passed": passed,
             "passed_count": len(passed), "missing_adme": missing,
+            "failed": failed,
             "ob_min": ob_min, "dl_min": dl_min}
 
 

@@ -148,22 +148,24 @@ def public_herb_active_ingredients(
     ob_min, dl_min = pathways.adme_thresholds(db)
     meta = pathways.active_ingredients(db, herb_id, ob_min, dl_min)
     mol_ids = meta["passed"]
+    # v1.49.2：非活性成分（OB／DL 未達或 ADME 缺值）也列出來，原因由 active_ingredients() 判定
+    failed = {f["mol_id"]: f["reason"] for f in meta.get("failed", [])}
+    all_ids = list(mol_ids) + list(failed)
 
     ings = {}
-    if mol_ids:
+    if all_ids:
         ings = {i.mol_id: i for i in
                 db.query(models.TcmspIngredient)
-                .filter(models.TcmspIngredient.mol_id.in_(mol_ids)).all()}
-    mapping = pc.best_mapping_by_mol(db, mol_ids)
+                .filter(models.TcmspIngredient.mol_id.in_(all_ids)).all()}
+    mapping = pc.best_mapping_by_mol(db, all_ids)
 
     def _has(v):
         return bool((v or "").strip())
 
-    items = []
-    for mol_id in sorted(mol_ids):
+    def _item(mol_id):
         ing = ings.get(mol_id)
         m = mapping.get(mol_id)
-        items.append({
+        return {
             "mol_id": mol_id,
             "molecule_name": ing.molecule_name if ing else None,
             "mw": _val(ing.mw) if ing else None,
@@ -178,8 +180,17 @@ def public_herb_active_ingredients(
             "has_cas": _has(m.cas_number) if m else False,
             "has_inchikey": _has(m.inchikey) if m else False,
             "mw_delta": _val(m.mw_delta) if m else None,
+            # IUPAC 系統名稱（PubChem 回傳）：化合物沒有拉丁文名稱，國際通用的標準命名是這個
+            "iupac_name": (m.iupac_name or None) if m else None,
             "note": m.note if m else None,
-        })
+        }
+
+    items = [_item(mol_id) for mol_id in sorted(mol_ids)]
+    inactive_items = []
+    for mol_id in sorted(failed):
+        it = _item(mol_id)
+        it["reason"] = failed[mol_id]
+        inactive_items.append(it)
 
     accepted = [i for i in items if i["status"] in pc.ACCEPTED_STATUS]
     by_status = {}
@@ -195,6 +206,7 @@ def public_herb_active_ingredients(
         "totals": {
             "all_ingredients": meta["total"],
             "active": meta["passed_count"],
+            "inactive": len(inactive_items),
             "missing_adme": meta["missing_adme"],
             "standardised": len(accepted),
             "with_smiles": sum(1 for i in accepted if i["has_smiles"]),
@@ -203,6 +215,8 @@ def public_herb_active_ingredients(
         },
         "by_status": by_status,
         "items": items,
+        # 不計入上面任何統計（已標準化、有 SMILES…都只算活性成分）
+        "inactive_items": inactive_items,
     }
 
 

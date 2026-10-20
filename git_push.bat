@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.49.1"
-set "DEFAULT_MSG=v1.49.1 TCMSP herb graph: herb name label readable; includes v1.49.0 account security (XSS fix on account review, login lockout, revocable tokens, password rules)"
+set "EXPECTED_VER=1.49.2"
+set "DEFAULT_MSG=v1.49.2 F1-7 herb ingredients: inactive-ingredient list with exclusion reason, IUPAC systematic name column, SMILES help"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"
