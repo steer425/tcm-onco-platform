@@ -23,7 +23,7 @@ ensure_auth_columns(engine)
 app = FastAPI(
     title="TCM 中藥腫瘤篩選平台 - 後台系統 API（目標零）",
     description="帳號 / 角色 / 權限矩陣 / 帳號審核 / 第三方登入 / 稽核紀錄 / 備份紀錄 / 登入紀錄 / 每日重點新聞（含多語系簡短摘要）",
-    version="1.49.3",
+    version="1.49.4",
 )
 
 ALLOWED_ORIGINS = [
@@ -72,6 +72,10 @@ _READ_ONLY_EXEMPT_PATHS = {
     "/me/password",
     # 同理：發現帳號被盜用時要能立刻讓所有登入失效、解除鎖定（v1.49.0）
     "/me/logout-all",
+    # 通路富集「自選靶點」是 POST（靶點清單可能上千個，放不進網址），但只計算、不寫入（v1.49.4）。
+    # tests/test_read_only_cache.py 會檢查所有查詢端點都沒有發出 INSERT／UPDATE／DELETE，
+    # 日後若有人在這支加了寫入，那支測試會紅——到時候要把它從這裡拿掉。
+    "/pathways/enrich",
 }
 # 管理者的「強制登出／解鎖」帶使用者 id，用前綴＋結尾比對（v1.49.0）
 _READ_ONLY_EXEMPT_SUFFIXES = ("/revoke-sessions", "/unlock")

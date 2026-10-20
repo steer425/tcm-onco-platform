@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.49.3"
-set "DEFAULT_MSG=v1.49.3 Tests: one-command runner for all 15 acceptance scripts (python -m tests.run_all or pytest tests/), DATABASE_URL always stripped, silent-failure detection"
+set "EXPECTED_VER=1.49.4"
+set "DEFAULT_MSG=v1.49.4 Read-only mode: pathway pages no longer 500 (pathways tables added to local cache), enrich allowed; automatic audit test of all 35 cached endpoints"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

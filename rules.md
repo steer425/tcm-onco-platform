@@ -717,6 +717,16 @@ F1-7 從 v1.42.0 起就用到 `system_settings`（OB／DL 門檻）、`tcmsp_tar
 `tcmsp_ingredient_pubchem`，都沒在清單裡；v1.43.0 連同 DepMap 四張表一起補上。
 `tests/test_depmap_page.py` 會用只含 `CACHED_TABLES` 的資料庫跑一次端點，新查詢站請照做。
 
+**v1.49.4 改成自動盤點，不再靠人記**：`tests/test_read_only_cache.py` 從路由表找出**所有**依賴
+`get_query_db` 的端點（當時 35 個），記錄每個端點實際查了哪些表、與 `CACHED_TABLES` 比對，
+再走一次真正的流程（建備份 → `rebuild_local_cache()` → 開唯讀模式）確認每個端點的狀態碼與回應內容都與關閉時相同。
+第一次跑就抓到 v1.38.x 起漏掉的 `pathways`／`target_pathways`——通路富集頁在唯讀模式下 4 個端點全部 500，
+上線一個多月沒人發現。另外三條：
+- 新端點的路徑參數名稱若測試不認得，測試直接列為失敗，請到 `build_requests()` 補值——**不要讓它默默沒被測到**
+- 查詢端點**不得寫入**：快取是備份副本，寫進去的不會回到正式庫。測試會檢查沒有 INSERT／UPDATE／DELETE
+- 純計算但必須用 POST 的查詢端點（例：`/pathways/enrich`，靶點清單放不進網址）要加進唯讀豁免清單，
+  否則唯讀模式下回 423；能放行的前提就是上一條「不寫入」有測試把關
+
 ### 分類統計要分層，合併算會被最大的那一桶帶偏（2026-09-10）
 
 同一份資料，全庫合併算方向得到「TCMSP 較重 1252 : PubChem 較重 266，假設不成立」，

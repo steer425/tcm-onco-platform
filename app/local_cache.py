@@ -47,6 +47,11 @@ CACHED_TABLES = [
     "depmap_gene_dependency",
     "depmap_gene_summary",
     "depmap_import_runs",
+    # v1.49.4：通路富集（F1-5）。v1.38.x 上線時漏列，唯讀模式一開通路頁 4 個端點全部 500
+    # （no such table: pathways）。由 tests/test_read_only_cache.py 自動盤點抓到；
+    # 之後新增查詢端點不用再靠人記，那支測試會比對「實際查到的表」與這份清單。
+    "pathways",
+    "target_pathways",
     # v1.48.0：Step 5 文獻證據（F1-9）。searched_by 只是使用者 id，API 不回傳。
     "literature_searches",
     "literature_evidence",
