@@ -64,6 +64,14 @@ for (const lang of ["en", "ko"]) {
   }
 }
 check("譯文沒有 <script>、事件屬性、javascript: 連結、iframe、img", unsafe.length === 0, unsafe);
+// 裸的「&」會被瀏覽器序列化成「&amp;」；v1.51.0 曾因此在英文模式無窮迴圈（site-lang.js 已改用 normHtml 比較，這裡再擋一層）
+const bareAmp = [];
+for (const lang of ["en", "ko"]) {
+  for (const [k, v] of Object.entries(BLOCKS[lang])) {
+    if (/&(?![a-zA-Z]+;|#\d+;)/.test(v)) bareAmp.push(`${lang}: ${k.slice(0, 30)}`);
+  }
+}
+check("含 HTML 的譯文沒有裸的「&」（要寫 &amp;）", bareAmp.length === 0, bareAmp);
 check("譯文的 <b>／<p>／<span>／<h4>／<code> 都成對", unbalanced.length === 0, unbalanced);
 
 console.log("\n【正規化後不重複】");

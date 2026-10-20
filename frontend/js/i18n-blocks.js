@@ -8,7 +8,7 @@
 // - en 與 ko 的 key 必須一模一樣、佔位編號也要一致——tests/test_i18n_blocks.js 會檢查。
 // - 原文改了一個字，這一段就會比對不到、退回顯示中文（不會壞掉，只是沒翻）。改原文時記得同步改這裡。
 //
-// 目前涵蓋：藥材活性成分（F1-7）、通路富集（F1-5）、腫瘤細胞株依賴（F1-8）。
+// 目前涵蓋：藥材活性成分（F1-7）、通路富集（F1-5）、腫瘤細胞株依賴（F1-8）、兩岸中藥典比較（F1-10）。
 
 (function () {
   // ---------------------------------------------------------------- 共用片段
@@ -49,7 +49,7 @@
       "The standard chemical name derived from the molecular structure by IUPAC (International Union of Pure and Applied Chemistry) rules. It is used worldwide, and the structure can be reconstructed from the name.\n\nAbout “Latin names”: Latin binomials are for biological species (e.g. ginseng is Panax ginseng C. A. Mey.); compounds themselves have no Latin name — their international standard name is this IUPAC systematic name.\n\nThe data come from PubChem and exist only for ingredients matched to a PubChem CID. Systematic names of natural products (saponins, polysaccharides) are often very long; the table shows the first three lines — hover to read the full name.",
     "未納入原因": "Exclusion Reason",
     "這個成分沒有被列為活性成分的原因：・OB未達：口服生物利用度低於門檻，吃下去大多吸收不到。・DL未達：類藥性低於門檻，結構不像一般藥物分子。・OB、DL皆未達：兩道門檻都沒過。・ADME缺值：TCMSP沒有這個成分的OB或DL數值，無法判定，一律排除（不是因為數值低）。門檻值顯示在頁面上方，由管理者在系統設定調整。非活性成分不進入後續的靶點、通路與細胞株分析，但其中有些可能經腸道菌代謝後才轉為活性形式，研究上仍可參考。":
-      "Why this ingredient is not counted as active:\n・OB below threshold: oral bioavailability is below the threshold — little of it is absorbed when taken orally.\n・DL below threshold: drug-likeness is below the threshold — the structure does not resemble typical drug molecules.\n・OB & DL below threshold: fails both thresholds.\n・ADME missing: TCMSP has no OB or DL value for this ingredient, so it cannot be assessed and is always excluded (not because the value is low).\n\nThe thresholds are shown at the top of the page and set by an administrator in System Settings. Inactive ingredients are not used in the downstream target, pathway and cell-line analyses, though some may become active only after gut-microbial metabolism and can still be of research interest.",
+      "Why this ingredient is not counted as active:\n・OB below threshold: oral bioavailability is below the threshold — little of it is absorbed when taken orally.\n・DL below threshold: drug-likeness is below the threshold — the structure does not resemble typical drug molecules.\n・OB and DL below threshold: fails both thresholds.\n・ADME missing: TCMSP has no OB or DL value for this ingredient, so it cannot be assessed and is always excluded (not because the value is low).\n\nThe thresholds are shown at the top of the page and set by an administrator in System Settings. Inactive ingredients are not used in the downstream target, pathway and cell-line analyses, though some may become active only after gut-microbial metabolism and can still be of research interest.",
     "CAS號— CAS Registry Number（化學文摘社登記號）": "CAS Registry Number",
     "美國化學文摘社（Chemical Abstracts Service，隸屬美國化學會）發給每一個已登錄物質的編號，格式是「數字-數字-檢查碼」（例如50-00-0）。化工、法規、安全資料表（SDS）與採購上最常用這個編號，要跟法規清單或試劑供應商對照時，CAS號通常比CID更通用。它是商業資料庫，並非所有化合物都有登錄號。":
       "The number assigned to every registered substance by the Chemical Abstracts Service (a division of the American Chemical Society), in the form “digits-digits-check digit” (e.g. 50-00-0). It is the identifier most used in the chemical industry, regulation, safety data sheets (SDS) and purchasing; when matching against regulatory lists or reagent suppliers, a CAS number is usually more widely accepted than a CID. CAS is a commercial registry, and not every compound has a number.",
@@ -150,6 +150,15 @@
     "KEGG：{0}條靶點↔通路關聯，背景基因{1}，最後同步{2}": "KEGG: {0} target↔pathway links, {1} background genes, last synced {2}",
     "Reactome：{0}條靶點↔通路關聯，背景基因{1}，最後同步{2}": "Reactome: {0} target↔pathway links, {1} background genes, last synced {2}",
     "KEGG：{0}條靶點↔通路關聯，背景基因{1}，最後同步{2} Reactome：{3}條靶點↔通路關聯，背景基因{4}，最後同步{5}": "KEGG: {0} target↔pathway links, {1} background genes, last synced {2}\nReactome: {3} target↔pathway links, {4} background genes, last synced {5}",
+
+    // ---- 兩岸中藥典比較（v1.51.0） ----
+    "臺灣中藥典第四版的每一個品項，以中文名與基原學名對照 TCMSP 藥材（TCMSP 依中國藥典 2010 年版收載品項建立）。 臺灣側附衛福部中藥典資訊網的官方連結與 15 個欄位全文；中國側列出 TCMSP 藥材編號，可展開該藥材的成分（MOL）清單。 同一個中文名在兩岸可能是不同物種（同名異物），比對結果請以基原為準。": "For every item in the Taiwan Herbal Pharmacopeia 4th edition, the <b>Chinese name</b> and <b>botanical origin</b> are compared with TCMSP herbs (TCMSP was built on the items listed in the <b>Chinese Pharmacopoeia 2010</b>). The Taiwan side links to the MOHW official monograph page and shows all 15 fields; the Chinese side lists the TCMSP herb ID, with its ingredient (MOL) list available on demand. The same Chinese name may refer to different species on the two sides (<b>same name, different species</b>) — rely on the botanical origin when reading a match.",
+    "臺灣中藥典內容摘錄自衛生福利部公告之臺灣中藥典第四版（110-09-24 公告、111-06-01 施行）與 114-07-30 修正公告，由 PDF 解析，排版複雜處（公式、梯度表）可能與原書略有差異，以衛福部官方頁面為準。功能、用法與用量、注意事項為藥典原文照錄，僅供查閱。「中國側」以 TCMSP 藥材編號代表中國藥典 2010 年版收載品項，並非中國藥典官方編號。本平台為科研輔助工具，不作為醫療診斷或治療建議。": "Taiwan Herbal Pharmacopeia content is excerpted from the 4th edition announced by the Ministry of Health and Welfare (announced 2021-09-24, effective 2022-06-01) and the amendment notice of 2025-07-30, parsed from the PDF; complex layouts (formulas, gradient tables) may differ slightly from the printed book — the MOHW official pages prevail. Actions, usage and dosage, and precautions are reproduced verbatim from the pharmacopoeia for reference only. The “Chinese side” uses TCMSP herb IDs to represent items listed in the Chinese Pharmacopoeia 2010; these are not official Chinese Pharmacopoeia identifiers. This platform is a research-support tool and <b>is not medical diagnosis or treatment advice</b>.",
+    "顯示{0} / {1}項": "Showing {0} / {1}",
+    "TCMSP 有、臺灣中藥典沒有對應：{0}味": "In TCMSP but not in the Taiwan Pharmacopoeia: {0} herbs",
+    "臺灣中藥典資訊網官方頁（項次{0}）↗": "Official Taiwan Pharmacopoeia page (item {0}) ↗",
+    "原書第{0}頁": "Book page {0}",
+    "共{0}個成分，其中{1}個為活性成分（OB ≥ {2}%、DL ≥ {3}）": "{0} ingredients, {1} of them active (OB ≥ {2}%, DL ≥ {3})",
   };
 
   const ko = {
@@ -285,6 +294,15 @@
     "KEGG：{0}條靶點↔通路關聯，背景基因{1}，最後同步{2}": "KEGG: 표적↔경로 연관 {0}개, 배경 유전자 {1}개, 마지막 동기화 {2}",
     "Reactome：{0}條靶點↔通路關聯，背景基因{1}，最後同步{2}": "Reactome: 표적↔경로 연관 {0}개, 배경 유전자 {1}개, 마지막 동기화 {2}",
     "KEGG：{0}條靶點↔通路關聯，背景基因{1}，最後同步{2} Reactome：{3}條靶點↔通路關聯，背景基因{4}，最後同步{5}": "KEGG: 표적↔경로 연관 {0}개, 배경 유전자 {1}개, 마지막 동기화 {2}\nReactome: 표적↔경로 연관 {3}개, 배경 유전자 {4}개, 마지막 동기화 {5}",
+
+    // ---- 兩岸中藥典比較（v1.51.0） ----
+    "臺灣中藥典第四版的每一個品項，以中文名與基原學名對照 TCMSP 藥材（TCMSP 依中國藥典 2010 年版收載品項建立）。 臺灣側附衛福部中藥典資訊網的官方連結與 15 個欄位全文；中國側列出 TCMSP 藥材編號，可展開該藥材的成分（MOL）清單。 同一個中文名在兩岸可能是不同物種（同名異物），比對結果請以基原為準。": "대만 중약전 제4판의 모든 품목을 <b>중국어 이름</b>과 <b>기원 학명</b>으로 TCMSP 약재와 대조합니다(TCMSP는 <b>중국 약전 2010년판</b> 수재 품목을 바탕으로 구축됨). 대만 측에는 위생복리부 공식 페이지 링크와 15개 항목 전문을, 중국 측에는 TCMSP 약재 번호를 표시하며 해당 약재의 성분(MOL) 목록을 펼쳐 볼 수 있습니다. 같은 중국어 이름이 양안에서 서로 다른 종을 가리킬 수 있으므로(<b>동명이물</b>), 매칭 결과는 기원을 기준으로 판단하세요.",
+    "臺灣中藥典內容摘錄自衛生福利部公告之臺灣中藥典第四版（110-09-24 公告、111-06-01 施行）與 114-07-30 修正公告，由 PDF 解析，排版複雜處（公式、梯度表）可能與原書略有差異，以衛福部官方頁面為準。功能、用法與用量、注意事項為藥典原文照錄，僅供查閱。「中國側」以 TCMSP 藥材編號代表中國藥典 2010 年版收載品項，並非中國藥典官方編號。本平台為科研輔助工具，不作為醫療診斷或治療建議。": "대만 중약전 내용은 위생복리부가 공고한 대만 중약전 제4판(2021-09-24 공고, 2022-06-01 시행)과 2025-07-30 개정 공고에서 발췌하여 PDF로부터 파싱한 것으로, 복잡한 배치(수식, 기울기 표)는 원서와 약간 다를 수 있으며 위생복리부 공식 페이지가 우선합니다. 효능, 용법과 용량, 주의 사항은 약전 원문을 그대로 수록한 것으로 열람용입니다. 「중국 측」은 TCMSP 약재 번호로 중국 약전 2010년판 수재 품목을 나타내며, 중국 약전의 공식 번호가 아닙니다. 본 플랫폼은 연구 보조 도구이며 <b>의학적 진단이나 치료 권고가 아닙니다</b>.",
+    "顯示{0} / {1}項": "{0} / {1}개 표시",
+    "TCMSP 有、臺灣中藥典沒有對應：{0}味": "TCMSP에만 있고 대만 중약전에 없음: 약재 {0}종",
+    "臺灣中藥典資訊網官方頁（項次{0}）↗": "대만 중약전 공식 페이지 (항목 {0}) ↗",
+    "原書第{0}頁": "원서 {0}쪽",
+    "共{0}個成分，其中{1}個為活性成分（OB ≥ {2}%、DL ≥ {3}）": "성분 {0}개, 그중 활성 성분 {1}개 (OB ≥ {2}%, DL ≥ {3})",
   };
 
   window.I18N_BLOCKS = { en, ko };

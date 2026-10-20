@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.50.0"
-set "DEFAULT_MSG=v1.50.0 i18n: paragraph-level translation for long explanatory text (bold, numbers); English/Korean for herb ingredients, pathway enrichment and tumour cell line pages"
+set "EXPECTED_VER=1.51.0"
+set "DEFAULT_MSG=v1.51.0 F1-10 cross-strait pharmacopoeia comparison: Taiwan Herbal Pharmacopeia 4th ed. (385 items, 15 fields, 2025 amendments) matched to TCMSP herbs; i18n infinite-loop fix"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"

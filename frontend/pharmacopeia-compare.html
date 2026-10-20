@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ccircle cx=%2750%27 cy=%2750%27 r=%2745%27 fill=%27%232f5c8a%27/%3E%3Ctext x=%2750%27 y=%2768%27 font-size=%2760%27 text-anchor=%27middle%27 fill=%27white%27%3E%E5%85%B8%3C/text%3E%3C/svg%3E" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>兩岸中藥典比較</title>
+<script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
+<script src="js/zh-match.js"></script>
+<script src="js/i18n-dict.js"></script>
+<script src="js/i18n-blocks.js"></script>
+<script src="js/site-lang.js"></script>
+<style>
+:root{--bg:#0f1115;--panel:#171a20;--line:#2a2d34;--muted:#8a8f98;--tw:#3a9d63;--cn:#c0533e;--warn:#c99a3d;--bad:#c0533e;}
+html,body{margin:0;padding:0;background:var(--bg);color:#eee;font-family:"Noto Sans TC","Helvetica Neue",Arial,sans-serif;}
+#platformNav{display:flex;align-items:center;gap:16px;padding:8px 22px;background:#20303f;border-bottom:1px solid var(--line);font-size:12.5px;flex-wrap:wrap;}
+#platformNav a{color:#8fc3ea;text-decoration:none;}
+#platformNav a:hover{text-decoration:underline;}
+#platformNav span{color:var(--muted);}
+#langBar{margin-left:auto;display:flex;align-items:center;gap:6px;}
+select,input[type=search],input[type=number]{background:#1c1f26;color:#eee;border:1px solid #3a3d44;border-radius:6px;padding:5px 8px;font-size:12.5px;}
+#header{padding:14px 22px 10px;border-bottom:1px solid var(--line);}
+#header h1{margin:0 0 4px;font-size:18px;font-weight:600;}
+#header p{margin:0;font-size:12px;color:var(--muted);line-height:1.6;max-width:110ch;}
+#kpi{display:flex;gap:10px;padding:10px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);}
+#kpi div{background:#1c1f26;border:1px solid #2a2d34;border-radius:10px;padding:8px 14px;min-width:96px;cursor:default;}
+#kpi div.clk{cursor:pointer;} #kpi div.clk:hover{border-color:#4d6b86;}
+#kpi b{display:block;font-size:18px;}
+#kpi span{font-size:11px;color:var(--muted);}
+#layout{display:flex;height:calc(100vh - 200px);min-height:560px;}
+#listPanel{width:330px;flex-shrink:0;border-right:1px solid var(--line);display:flex;flex-direction:column;}
+#search{margin:10px 10px 6px;}
+#filters{display:flex;flex-wrap:wrap;gap:5px;padding:0 10px 8px;}
+#filters button{font-size:11px;padding:3px 8px;}
+#listStats{padding:0 12px 6px;font-size:11.5px;color:var(--muted);}
+#list{flex:1;overflow-y:auto;border-top:1px solid var(--line);}
+.row{padding:7px 12px;border-bottom:1px solid #1e2128;cursor:pointer;font-size:12.5px;display:flex;gap:8px;align-items:baseline;}
+.row:hover{background:#1a1d23;} .row.active{background:#20303f;}
+.row .no{font-family:ui-monospace,Menlo,monospace;color:var(--muted);font-size:11px;min-width:30px;}
+.row .nm{font-weight:600;}
+.row .sub{color:var(--muted);font-size:10.5px;display:block;font-weight:400;}
+.row .badges{margin-left:auto;display:flex;gap:3px;flex-shrink:0;}
+#main{flex:1;overflow-y:auto;min-width:0;}
+#emptyState{padding:60px 20px;text-align:center;color:var(--muted);font-size:14px;}
+#detail{padding:14px 20px 30px;}
+button{background:#26292f;border:1px solid #3a3d44;color:#eee;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;}
+button:hover{background:#31353c;} button.on{background:#2f5c8a;border-color:#3d70a3;}
+button.ok{background:#173a27;border-color:#2e6b48;} button.no{background:#3d211c;border-color:#7a3a30;}
+.pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:600;white-space:nowrap;}
+.st-auto,.st-confirmed{background:#173a27;color:#7fd3a3;}
+.st-pending{background:#3a3016;color:#e3bf6b;}
+.st-rejected{background:#2c2f36;color:#9aa3ad;}
+.fl-warn{background:#3d211c;color:#e8968a;}
+.k-herb{background:#1f3347;color:#8fc3ea;} .k-processed{background:#2e2540;color:#c3a6ec;} .k-preparation{background:#33301c;color:#d9c77a;}
+.amd{background:#3a2a10;color:#f0c674;}
+h2{margin:0 0 4px;font-size:19px;} h2 .no{font-family:ui-monospace,Menlo,monospace;color:var(--muted);font-size:14px;margin-right:6px;}
+.latin{font-family:"Times New Roman",serif;letter-spacing:.04em;color:#cfd6dd;}
+.meta{color:var(--muted);font-size:12.5px;margin:2px 0 10px;}
+a.ext{color:#8fc3ea;text-decoration:none;border-bottom:1px dotted #4d6b86;}
+a.ext:hover{border-bottom-style:solid;}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0;}
+.card{background:#171a20;border:1px solid #2a2d34;border-radius:10px;padding:12px 14px;}
+.card h3{margin:0 0 8px;font-size:13px;}
+.card.tw h3{color:#7fd3a3;} .card.cn h3{color:#f0a493;}
+.card .small{font-size:11.5px;color:var(--muted);line-height:1.6;}
+.match{border-top:1px solid #23262c;padding:8px 0;}
+.match:first-of-type{border-top:0;}
+.match .hn{font-weight:600;} .match .en{font-family:"Times New Roman",serif;color:#cfd6dd;font-size:12.5px;}
+.match .acts{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;}
+.mol{margin-top:8px;max-height:280px;overflow:auto;border:1px solid #23262c;border-radius:6px;}
+.mol table{width:100%;border-collapse:collapse;font-size:11.5px;}
+.mol th{position:sticky;top:0;background:#1c1f26;text-align:left;padding:5px 7px;color:#bcd;}
+.mol td{padding:4px 7px;border-top:1px solid #23262c;} .mol td.num{text-align:right;font-variant-numeric:tabular-nums;}
+.mol .act{color:#7fd3a3;font-weight:700;}
+.amend{background:#2a2110;border:1px solid #6b5420;border-radius:10px;padding:10px 14px;margin:12px 0;}
+.amend h3{margin:0 0 6px;font-size:13px;color:#f0c674;}
+.amend .note{font-size:12px;color:#e8d3a0;margin-bottom:8px;line-height:1.6;}
+.pre{white-space:pre-wrap;font-size:12.5px;line-height:1.75;}
+table.f{width:100%;border-collapse:collapse;margin-top:6px;}
+table.f th{width:150px;text-align:left;vertical-align:top;padding:8px 10px;background:#171a20;border-bottom:1px solid #23262c;font-size:12.5px;color:#bcd;font-weight:600;}
+table.f td{padding:8px 12px;border-bottom:1px solid #23262c;vertical-align:top;}
+table.f tr.clinical th{color:#f0c674;}
+.na{color:#666;font-style:italic;}
+.disclaimer{background:#1c1f26;border:1px solid #3a3d44;border-radius:8px;padding:10px 14px;margin:16px 0 0;font-size:11.5px;color:var(--muted);line-height:1.7;}
+.disclaimer b{color:#cfd6dd;}
+.manual{display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);}
+.manual input{width:110px;}
+@media (max-width:900px){
+  #layout{flex-direction:column;height:auto;}
+  #listPanel{width:auto;border-right:0;border-bottom:1px solid var(--line);}
+  #list{max-height:260px;}
+  .cmp{grid-template-columns:1fr;}
+  table.f th{width:96px;}
+}
+</style>
+</head>
+<body>
+
+<div id="platformNav">
+  <a href="index.html">← 回首頁</a>
+  <span>|</span>
+  <a href="tcmsp_query.html">中藥關聯查詢站</a>
+  <a href="herb-ingredients.html">藥材活性成分</a>
+  <a href="pathways.html">通路富集分析</a>
+  <a href="tumor-cells.html">腫瘤細胞株依賴</a>
+  <a href="literature-evidence.html">文獻證據分級</a>
+  <div id="langBar">
+    <a href="personal-settings.html">個人化設定</a>
+    <a href="#" id="platformLogout">登出</a>
+    <span class="small">語言</span>
+    <select id="uiLangSelect">
+      <option value="tw">繁體中文</option>
+      <option value="cn">简体中文</option>
+      <option value="en">English</option>
+      <option value="ko">한국어</option>
+    </select>
+  </div>
+</div>
+
+<div id="header">
+  <h1>兩岸中藥典比較</h1>
+  <p data-i18n-block>
+    臺灣中藥典第四版的每一個品項，以<b>中文名</b>與<b>基原學名</b>對照 TCMSP 藥材（TCMSP 依<b>中國藥典 2010 年版</b>收載品項建立）。
+    臺灣側附衛福部中藥典資訊網的官方連結與 15 個欄位全文；中國側列出 TCMSP 藥材編號，可展開該藥材的成分（MOL）清單。
+    同一個中文名在兩岸可能是不同物種（<b>同名異物</b>），比對結果請以基原為準。
+  </p>
+</div>
+
+<div id="kpi"></div>
+
+<div id="layout">
+  <div id="listPanel">
+    <input id="search" type="search" placeholder="搜尋項次、中文名、拉丁名、英文名…" autocomplete="off" />
+    <div id="filters">
+      <button data-f="all" class="on">全部</button>
+      <button data-f="matched">兩邊都有</button>
+      <button data-f="pending">待確認</button>
+      <button data-f="diff">同名異物</button>
+      <button data-f="twonly">只在臺灣中藥典</button>
+      <button data-f="cnonly">只在 TCMSP</button>
+      <button data-f="amended">有修正公告</button>
+      <button data-f="prep">濃縮製劑</button>
+    </div>
+    <div id="listStats"></div>
+    <div id="list"></div>
+  </div>
+  <div id="main">
+    <div id="emptyState">載入中…</div>
+    <div id="detail" style="display:none;"></div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/qs-ui.js"></script>
+<script src="js/pharmacopeia-compare.js"></script>
+</body>
+</html>

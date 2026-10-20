@@ -52,6 +52,9 @@ CACHED_TABLES = [
     # 之後新增查詢端點不用再靠人記，那支測試會比對「實際查到的表」與這份清單。
     "pathways",
     "target_pathways",
+    # v1.51.0：兩岸中藥典比較（F1-10）。reviewed_by 只是使用者 id，API 不回傳。
+    "thp_monographs",
+    "thp_tcmsp_map",
     # v1.48.0：Step 5 文獻證據（F1-9）。searched_by 只是使用者 id，API 不回傳。
     "literature_searches",
     "literature_evidence",

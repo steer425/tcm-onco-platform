@@ -1338,3 +1338,71 @@ class LiteratureEvidence(Base):
     evidence_sentence = Column(Text, nullable=True)  # 共現句原文（外部文字，前端必須跳脫）
     flags = Column(Text, nullable=True)              # JSON 陣列：circular / includes_computational / retracted ...
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# F1-10 兩岸中藥典比較（v1.51.0）
+#
+# 資料來源：臺灣中藥典第四版中文 PDF（110-09-24 公告）＋ 114-07-30 修正公告（8 品項）。
+# 中藥典資訊網 robots.txt 禁止自動抓取，所以不爬網站：開發機用 tools/parse_thp_pdf.py 解析一次，
+# 結果 app/data/thp_v4.json 進版控，伺服器啟動時 app/thp.py 自動載入（只在檔案內容變了才重寫）。
+# 「中國側」用 TCMSP 藥材編號代表（TCMSP 依中國藥典 2010 年版收載品項），不是中國藥典官方編號。
+# ---------------------------------------------------------------------------
+class ThpMonograph(Base):
+    """臺灣中藥典第四版的一個品項。385 個資訊網品項（355 藥材＋30 飲片）＋ 9 個濃縮製劑。
+
+    十五個欄位照中藥典原文存放（長文字一律 Text，雙資料庫相容）。
+    `seq` 是書中出現順序（JSON 的主鍵，跨版本不保證）；`site_no` 是資訊網的三碼項次
+    （https://www.cmthp.mohw.gov.tw/Search/SearchDetail?v=4&p=001），濃縮製劑沒有。
+    """
+    __tablename__ = "thp_monographs"
+
+    seq = Column(Integer, primary_key=True)              # 書中順序 1～394
+    site_no = Column(String, nullable=True, index=True)  # '001'～'385'
+    kind = Column(String, nullable=False)                # herb（藥材）/ processed（飲片）/ preparation（濃縮製劑）
+    parent_seq = Column(Integer, nullable=True)          # 飲片所屬的藥材
+    name_zh = Column(String, nullable=False, index=True) # 中文名（繁體，原文）
+    name_s = Column(String, nullable=True, index=True)   # 簡體（開發機轉好，比對 TCMSP 用）
+    latin_name = Column(String, nullable=True)           # 拉丁生藥名（例：GINSENG RADIX ET RHIZOMA）
+    en_name = Column(String, nullable=True)
+    origin = Column(Text, nullable=True)                 # 基原
+    species = Column(Text, nullable=True)                # JSON：基原裡的物種學名（屬＋種小名），取自原書斜體字
+    content = Column(Text, nullable=True)                # 含量
+    description = Column(Text, nullable=True)            # 性狀
+    identification = Column(Text, nullable=True)         # 鑑別
+    impurity = Column(Text, nullable=True)               # 雜質檢查及其它規定
+    assay = Column(Text, nullable=True)                  # 含量測定
+    storage = Column(Text, nullable=True)                # 貯藏法
+    category = Column(Text, nullable=True)               # 用途分類
+    nature_meridian = Column(Text, nullable=True)        # 性味與歸經
+    functions = Column(Text, nullable=True)              # 功能
+    usage_dosage = Column(Text, nullable=True)           # 用法與用量
+    precautions = Column(Text, nullable=True)            # 注意事項
+    extra = Column(Text, nullable=True)                  # JSON：濃縮製劑的出典／處方／效能／適應症
+    amendment = Column(Text, nullable=True)              # JSON：114-07-30 修正公告的原文與備註（以此為準）
+    book_page = Column(Integer, nullable=True)           # 原書正文頁碼
+    data_version = Column(String, nullable=True)         # 載入時 JSON 檔的雜湊
+
+
+class ThpTcmspMap(Base):
+    """臺灣中藥典品項 ↔ TCMSP 藥材的比對結果（審核佇列，形狀同 tcmsp_target_uniprot）。
+
+    method：name（中文名）／species（基原學名）／latin（拉丁生藥名字詞）的組合，以「+」連接；manual＝人工指定。
+    status：auto（中文名與學名都對上）／pending（只對上一邊，待人工確認）／confirmed／rejected。
+    **重新比對只會改 auto／pending；confirmed、rejected 與人工指定一律不動。**
+    flags：JSON 陣列，same_name_diff_species（同名異物）、diff_name_same_species（異名同物）、processed（飲片）。
+    """
+    __tablename__ = "thp_tcmsp_map"
+    __table_args__ = (UniqueConstraint("thp_seq", "herb_id", name="uq_thp_tcmsp_map"),)
+
+    id = Column(String, primary_key=True, default=gen_id)
+    thp_seq = Column(Integer, ForeignKey("thp_monographs.seq"), nullable=False, index=True)
+    herb_id = Column(Integer, ForeignKey("tcmsp_herbs.id"), nullable=False, index=True)
+    method = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="pending", index=True)
+    flags = Column(Text, nullable=True)
+    note = Column(Text, nullable=True)
+    reviewed_by = Column(String, ForeignKey("users.id"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

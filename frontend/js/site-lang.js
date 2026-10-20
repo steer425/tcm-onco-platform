@@ -101,6 +101,20 @@
     }
     return null;
   }
+  // 瀏覽器序列化後的樣子（例：譯文裡的「&」讀回來會是「&amp;」）。
+  // **比較一定要用這個**：直接拿譯文字串跟 el.innerHTML 比，只要有一個字元序列化後不同，
+  // 就會「寫入 → 觸發 MutationObserver → 又不相等 → 再寫入」無窮迴圈，整頁卡死
+  // （v1.51.0 兩岸中藥典頁的免責聲明有「usage & dosage」，英文模式一開就當機）。
+  const normCache = new Map();
+  function normHtml(html) {
+    if (normCache.has(html)) return normCache.get(html);
+    const tpl = document.createElement("template");
+    tpl.innerHTML = html;
+    const out = tpl.innerHTML;
+    if (normCache.size > 2000) normCache.clear();
+    normCache.set(html, out);
+    return out;
+  }
   function textOfHtml(html) {
     const tpl = document.createElement("template");
     tpl.innerHTML = html;
@@ -123,7 +137,7 @@
       }
       if (t != null) html = t;
     }
-    if (el.innerHTML !== html) el.innerHTML = html;
+    if (el.innerHTML !== normHtml(html)) el.innerHTML = html;
     if (siteLang === "cn" && convToCn) {
       const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
       let n;
@@ -174,6 +188,11 @@
     } catch (e) { return text; }
   }
 
+  function convertNodeText(node, original) {
+    const keep = siteLang !== "cn" && node.parentElement && node.parentElement.closest('[translate="no"]');
+    return keep ? original : convertText(original);
+  }
+
   function needsConversion() {
     return siteLang === "cn" || siteLang === "en" || siteLang === "ko";
   }
@@ -189,6 +208,7 @@
         const tag = node.parentElement && node.parentElement.tagName;
         if (tag === "SCRIPT" || tag === "STYLE") return NodeFilter.FILTER_REJECT;
         if (insideBlock(node)) return NodeFilter.FILTER_REJECT;   // 段落翻譯自己處理（見檔頭）
+
         // 用「原始文字」（第一次遇到這個節點時記下來的值）判斷有沒有中文可以轉，
         // 不能用 node.nodeValue（目前畫面上的值）判斷——如果這個節點之前已經被轉成
         // 韓文/英文（沒有中文字元了），用目前值判斷會直接被 FILTER_SKIP 跳過，
@@ -213,7 +233,10 @@
     // 文字就卡在簡體狀態出不來。一律從原始文字重新轉換，才能保證來回切換語言都正確。
     nodes.forEach((node) => {
       const original = getOriginalText(node);
-      const converted = convertText(original);
+      // 標了 translate="no" 的是資料（藥材名、藥典原文）：英韓模式維持原文、簡體照常轉字形。
+      // 不能直接跳過不處理——先切簡體再切英文時，要靠這裡把它還原回繁體（v1.51.0）。
+      // 不標的話，字典裡剛好有「人參」就只有這一味變成英文，清單前後不一致
+      const converted = convertNodeText(node, original);
       if (converted !== node.nodeValue) node.nodeValue = converted;
     });
 
@@ -261,7 +284,7 @@
           else if (node.nodeType === 3) {
             const original = getOriginalText(node);
             if (original && /[\u4e00-\u9fff]/.test(original)) {
-              const converted = convertText(original);
+              const converted = convertNodeText(node, original);
               if (converted !== node.nodeValue) node.nodeValue = converted;
             }
           }
@@ -270,7 +293,7 @@
         if (m.type === "characterData" && m.target.nodeType === 3) {
           const original = getOriginalText(m.target);
           if (original && /[\u4e00-\u9fff]/.test(original)) {
-            const converted = convertText(original);
+            const converted = convertNodeText(m.target, original);
             if (converted !== m.target.nodeValue) m.target.nodeValue = converted;
           }
         }

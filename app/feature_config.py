@@ -164,6 +164,10 @@ FEATURE_CONFIG = [
     {"code": "F1-9", "module": "目標一/二", "name": "文獻證據分級（PubMed，預設人參）",
      "nav_label": "文獻證據分級", "page_url": "literature-evidence.html",
      "show_frontend": True, "show_backend": True, "sort_order": 78},
+    # 臺灣中藥典第四版 385 品項 ↔ TCMSP 藥材（中國藥典 2010 收載品項）。查看＝can_view；審核比對＝can_execute。
+    {"code": "F1-10", "module": "目標一/二", "name": "兩岸中藥典比較（臺灣中藥典第四版 × TCMSP）",
+     "nav_label": "兩岸中藥典比較", "page_url": "pharmacopeia-compare.html",
+     "show_frontend": True, "show_backend": True, "sort_order": 79},
 
     # ---- 其餘目標零基礎建設項目：現在都有對應頁面可查看/設定 ----
     {"code": "F0-1", "module": "目標零", "name": "前後台架構規劃",

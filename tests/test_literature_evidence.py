@@ -255,8 +255,10 @@ def main(client):
           by_code["F1-9"]["execute_enforced"] is True)
     check("**只限管理者的功能（F1-6 成分標準化）標 false**",
           by_code["F1-6"]["execute_enforced"] is False, by_code["F1-6"].get("execute_enforced"))
-    check("只有用 require_permission 的功能會被標成生效",
-          {c for c, p in by_code.items() if p["execute_enforced"]} == {"F1-9"},
+    # 與後端實際登記的清單比，不寫死（v1.51.0 F1-10 的審核也用 require_permission，寫死 {"F1-9"} 就紅了）
+    from app.deps import EXECUTE_ENFORCED
+    check("只有用 require_permission 的功能會被標成生效（與 deps.EXECUTE_ENFORCED 一致）",
+          {c for c, p in by_code.items() if p["execute_enforced"]} == set(EXECUTE_ENFORCED) and "F1-9" in EXECUTE_ENFORCED,
           sorted(c for c, p in by_code.items() if p["execute_enforced"]))
     f19 = db.query(models.Feature).filter(models.Feature.code == "F1-9").first()
     rp = (db.query(models.RolePermission)

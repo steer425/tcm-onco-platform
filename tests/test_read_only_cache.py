@@ -158,7 +158,8 @@ def build_requests(dark_gene_id, gencc_id):
     """每個端點一個請求。路徑參數依名稱填值；**新端點用到沒見過的參數名稱會直接列為失敗**，
     請在這裡補上，不要讓它默默沒被測到。"""
     path_vals = {"herb_id": HERB, "dis_id": "DIS1", "tar_id": "TAR1", "symbol": "BCL2",
-                 "depmap_id": DEPMAP_ID, "gene_id": dark_gene_id, "disease_id": gencc_id}
+                 "depmap_id": DEPMAP_ID, "gene_id": dark_gene_id, "disease_id": gencc_id,
+                 "seq": 2}                       # 臺灣中藥典第 2 筆＝人參（v1.51.0，啟動時自動載入）
     required_query = {"symbol": "BCL2", "key": "RWXIFXNRCLMQCD-JBVRGBGGSA-N", "q": "OCI", "herb_id": HERB}
     bodies = {"/pathways/enrich": {"tar_ids": ["TAR1", "TAR2"]}}
     reqs, unknown = [], []
@@ -208,7 +209,7 @@ def main():
         print(f"\n【自動找出的快取端點：{len(reqs)} 個】")
         check("每個端點的參數都知道怎麼填（新端點用到新參數名稱要在 build_requests 補上）",
               not unknown, unknown)
-        check("至少涵蓋 v1.49.4 盤點時的 35 個端點", len(reqs) >= 35, len(reqs))
+        check("至少涵蓋 v1.51.0 的 39 個端點（v1.49.4 盤點 35＋兩岸中藥典 4）", len(reqs) >= 39, len(reqs))
 
         # ---------- 第一階段：唯讀關閉，記錄每個端點查了哪些表 ----------
         print("\n【第一階段：記錄各端點實際查詢的資料表】")
