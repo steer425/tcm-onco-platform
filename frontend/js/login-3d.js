@@ -1,5 +1,9 @@
 // 登入頁 3D 研究流程動畫：載入器（v1.46.4；v1.46.5 點選互動與登入框延後開啟；v1.46.6 介紹視窗改成與登入框同位置同大小）
 //
+// v1.52.0：預設改為靜態頁面，右上角「切換為 3D 動畫／切換為靜態頁面」按鈕切換，選擇記在 localStorage（tcm_login_view）。
+//   靜態模式完全不抓 Three.js，登入框一開頁就出現；第一次切到 3D 才下載，之後切回靜態只是暫停繪製。
+//   切換鈕只在「裝置能跑 3D」時出現（條件見下），不能跑的裝置維持靜態、看不到按鈕。
+//
 // 什麼時候用 3D、什麼時候用平面版（js/login-bg.js）：
 //   - 3D：寬螢幕（寬 ≥ 900、高 ≥ 560、橫向），瀏覽器支援 WebGL，且使用者沒有開「減少動態效果」
 //   - 其他（手機、窄視窗、橫拿手機、不支援 WebGL、低記憶體裝置）：平面版
@@ -30,6 +34,12 @@
   const fits = () => window.innerWidth >= 900 && window.innerHeight >= 560 && window.innerWidth / window.innerHeight >= 1.15;
 
   let canvas = null, hud = null, scene = null, loading = false, failed = false, loginOpen = false;
+
+  // 使用者選的顯示方式："static"（預設）或 "3d"
+  const VIEW_KEY = "tcm_login_view";
+  let mode = "static";
+  try { if (localStorage.getItem(VIEW_KEY) === "3d") mode = "3d"; } catch (e) { /* 私密視窗：用預設 */ }
+  let toggleBtn = null;
 
   // 介紹內容（七本秘笈、花園）在 js/login-3d-info.js（三種語言各一份，v1.46.6）
   let infoKey = null;                                    // 目前開著的介紹："db:0"…"db:6"、"herbs"
@@ -184,6 +194,7 @@
 
   async function load() {
     loading = true;
+    updateToggle();
     try {
       for (const src of LIBS) await loadScript(src);
       if (!window.THREE || !window.startLogin3D) throw new Error("three.js not available");
@@ -196,17 +207,46 @@
       failed = true;                     // 停在平面版
       if (canvas) canvas.remove();
       if (hud) hud.root.remove();
+      // 抓不到 Three.js 或 WebGL 建立失敗：退回靜態並記住，免得每次進頁都重試、拖慢登入
+      mode = "static";
+      try { localStorage.setItem(VIEW_KEY, "static"); } catch (e2) { /* 私密視窗 */ }
     } finally {
       loading = false;
+      apply();
     }
   }
 
   function apply() {
-    const on = capable && fits();
+    const can = capable && fits() && !failed;
+    const on = can && mode === "3d";
+    document.body.classList.toggle("login-view-can-3d", can);
+    if (!on && infoKey) closeInfo();
     document.body.classList.toggle("login-open", loginOpen);
-    if (on && !scene && !loading && !failed) { load(); return; }
+    if (on && !scene && !loading) { load(); return; }
     document.body.classList.toggle("login-3d", !!(on && scene));
     if (scene) scene.setActive(on);
+    updateToggle();
+  }
+
+  // 右上角切換鈕
+  function updateToggle() {
+    if (!toggleBtn) return;
+    const label = loading ? "3D 動畫載入中…" : (mode === "3d" ? "切換為靜態頁面" : "切換為 3D 動畫");
+    toggleBtn.textContent = t(label);
+    toggleBtn.disabled = loading;
+    toggleBtn.setAttribute("aria-pressed", mode === "3d" ? "true" : "false");
+    toggleBtn.title = t(mode === "3d" ? "靜態頁面載入較快" : "研究流程示意動畫（第一次切換需下載 3D 元件）");
+  }
+  function buildToggle() {
+    toggleBtn = document.createElement("button");
+    toggleBtn.type = "button"; toggleBtn.id = "loginViewToggle";
+    toggleBtn.addEventListener("click", () => {
+      mode = mode === "3d" ? "static" : "3d";
+      try { localStorage.setItem(VIEW_KEY, mode); } catch (e) { /* 私密視窗：只在本頁有效 */ }
+      apply();
+    });
+    document.body.appendChild(toggleBtn);
+    updateToggle();
   }
 
   if (!capable) return;
@@ -216,7 +256,7 @@
   try { if (sessionStorage.getItem("tcm_logout_reason")) loginOpen = true; } catch (e) { /* 私密視窗 */ }
   let timer = null;
   window.addEventListener("resize", () => { clearTimeout(timer); timer = setTimeout(apply, 150); });
-  // 等登入框與平面背景先畫好，再開始抓 3D
-  const start = () => setTimeout(apply, 300);
+  // 等登入框與平面背景先畫好，再建切換鈕；選 3D 的人才開始抓 3D
+  const start = () => { buildToggle(); setTimeout(apply, 300); };
   if (document.readyState === "complete") start(); else window.addEventListener("load", start);
 })();

@@ -32,8 +32,8 @@ rem        the PROJECT_DIR value below.
 rem =====================================================================
 
 rem ---- update these two lines every release ----------------------------
-set "EXPECTED_VER=1.51.2"
-set "DEFAULT_MSG=v1.51.2 Pharmacopoeia matching: same Chinese name compares English name first, then Latin drug name (case-insensitive), with both comparisons shown; v1.51.1 item numbers match the official site"
+set "EXPECTED_VER=1.52.0"
+set "DEFAULT_MSG=v1.52.0 Login page defaults to the static view for faster sign-in; top-right button switches to the 3D animation and the choice is remembered"
 rem ----------------------------------------------------------------------
 
 set "PROJECT_DIR=D:\tcm_backend"
